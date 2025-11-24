@@ -309,7 +309,7 @@ class Bullet {
         this.critChance = owner.critChance;
         this.critDamage = owner.critDamage;
         this.lifeSteal = owner.lifeSteal;
-        this.piercing = 0;
+        this.piercing = 1; // Can hit 1 enemy (0 would mean can't hit any)
         this.hitEnemies = [];
     }
 
@@ -339,7 +339,7 @@ class Bullet {
                 
                 this.hitEnemies.push(enemy);
                 
-                if (this.hitEnemies.length > this.piercing) {
+                if (this.hitEnemies.length >= this.piercing) {
                     return false; // Bullet destroyed
                 }
             }
@@ -584,8 +584,12 @@ function openShop() {
     const shopContainer = document.getElementById('shop-items');
     shopContainer.innerHTML = '';
     
-    // Select random items for this shop
-    const shuffled = [...SHOP_ITEMS].sort(() => Math.random() - 0.5);
+    // Select random items for this shop using Fisher-Yates shuffle
+    const shuffled = [...SHOP_ITEMS];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
     const shopOfferings = shuffled.slice(0, 6);
     
     shopOfferings.forEach(item => {
@@ -797,7 +801,7 @@ function init() {
         document.getElementById('start-modal').classList.add('hidden');
         game.state = 'playing';
         spawnWave();
-        gameLoop(0);
+        requestAnimationFrame(gameLoop);
     });
     
     document.getElementById('next-wave-btn').addEventListener('click', nextWave);
