@@ -60,6 +60,52 @@ export const ENEMY_TYPES = {
         shootRange: 300,
         shootCooldown: 120,
     },
+    healer: {
+        name: 'Healer Alien',
+        color: '#22d3ee',
+        speedMultiplier: 0.7,
+        healthMultiplier: 1.2,
+        damageMultiplier: 0.6,
+        creditMultiplier: 2.5,
+        behavior: 'healer',
+        healRange: 200,
+        healAmount: 5,
+        healCooldown: 90,
+    },
+    splitter: {
+        name: 'Splitter Alien',
+        color: '#fb923c',
+        speedMultiplier: 0.9,
+        healthMultiplier: 1.3,
+        damageMultiplier: 1.1,
+        creditMultiplier: 2.2,
+        behavior: 'chase',
+        splitCount: 3,
+        splitSize: 0.5,
+    },
+    freezer: {
+        name: 'Freezer Alien',
+        color: '#38bdf8',
+        speedMultiplier: 0.8,
+        healthMultiplier: 1.1,
+        damageMultiplier: 0.9,
+        creditMultiplier: 2,
+        behavior: 'chase',
+        slowDuration: 120,
+        slowAmount: 0.5,
+    },
+    berserker: {
+        name: 'Berserker Alien',
+        color: '#dc2626',
+        speedMultiplier: 1,
+        healthMultiplier: 1.5,
+        damageMultiplier: 1.8,
+        creditMultiplier: 2.3,
+        behavior: 'berserker',
+        rageThreshold: 0.5,
+        rageSpeedBoost: 2,
+        rageDamageBoost: 1.5,
+    },
 };
 
 export function getEnemyTypeForWave(wave) {
@@ -70,6 +116,10 @@ export function getEnemyTypeForWave(wave) {
     if (wave >= 5) availableTypes.push('swarm');
     if (wave >= 7) availableTypes.push('teleporter');
     if (wave >= 10) availableTypes.push('shooter');
+    if (wave >= 12) availableTypes.push('healer');
+    if (wave >= 15) availableTypes.push('splitter');
+    if (wave >= 18) availableTypes.push('freezer');
+    if (wave >= 20) availableTypes.push('berserker');
     
     // Weight distribution
     const weights = {
@@ -79,6 +129,10 @@ export function getEnemyTypeForWave(wave) {
         swarm: 15,
         teleporter: 3,
         shooter: 2,
+        healer: 2,
+        splitter: 3,
+        freezer: 2,
+        berserker: 2,
     };
     
     // Calculate total weight

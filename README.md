@@ -70,13 +70,17 @@ You're a stranded astronaut on a hostile alien planet. Survive endless waves of 
 - **Life Steal**: Heal when dealing damage
 
 ### Enemies
-- **6 Enemy Types**: Each with unique stats and behaviors
+- **10 Enemy Types**: Each with unique stats and behaviors
   - Normal: Standard speed and health
   - Fast: Move faster but have less health  
   - Tank: Slow but heavily armored
   - Swarm: Small and weak but numerous
   - Teleporter: Can teleport near the player
   - Shooter: Ranged attacks from a distance
+  - Healer: Heals nearby enemies (wave 12+)
+  - Splitter: Splits into smaller enemies when killed (wave 15+)
+  - Freezer: Slows player on hit (wave 18+)
+  - Berserker: Speeds up and deals more damage when low health (wave 20+)
 - **Boss Waves**: Massive enemies every 5 waves with special abilities
 - Enemies get stronger and more numerous with each wave
 
@@ -148,7 +152,7 @@ Instead of a potato, you play as a cosmic astronaut with:
 **All future enhancements have been implemented!**
 
 ### 🎭 Character Selection
-Choose from 8 unique characters with different starting stats:
+Choose from 12 unique characters with different starting stats:
 - **⚖️ Balanced Astronaut**: Well-rounded stats for any playstyle
 - **🛡️ Tank**: High health (150 HP) and armor, slower movement
 - **⚡ Speedster**: Fast movement and fire rate, lower health
@@ -157,21 +161,32 @@ Choose from 8 unique characters with different starting stats:
 - **🧛 Vampire**: Drains life from enemies with each hit
 - **⚔️ Berserker**: High damage but risky - glass cannon
 - **🔧 Engineer**: Defensive specialist with armor and range
+- **💊 Medic**: Regenerates health over time for sustained survival
+- **🗡️ Assassin**: High dodge and critical backstab damage
+- **🔮 Summoner**: Spawns helper drones to fight alongside
+- **💪 Juggernaut**: Extreme tank with knockback immunity and massive health
 
 ### 👾 Enemy Types
-Face 6 different enemy types with unique behaviors:
+Face 10 different enemy types with unique behaviors:
 - **Normal Aliens**: Standard enemies with balanced stats
 - **Fast Aliens**: Quick movement but fragile
 - **Tank Aliens**: Heavily armored with high health
 - **Swarm Aliens**: Small, weak enemies in large numbers
 - **Teleporter Aliens**: Can teleport near the player (unlocked at wave 7)
 - **Shooter Aliens**: Ranged attackers that fire projectiles (unlocked at wave 10)
+- **Healer Aliens**: Heal nearby enemies, priority targets (unlocked at wave 12)
+- **Splitter Aliens**: Split into smaller enemies when killed (unlocked at wave 15)
+- **Freezer Aliens**: Slow player movement on hit (unlocked at wave 18)
+- **Berserker Aliens**: Enrage when damaged, becoming faster and deadlier (unlocked at wave 20)
 
 ### 👹 Boss System
 - **Boss waves every 5 waves** with massive health and unique abilities
-- **The Destroyer**: Melee boss that can charge and summon minions
-- **Brood Mother**: Spawns swarm minions during battle
-- **Void Walker**: Teleports around and uses void beam attacks
+- **5 Unique Boss Types**:
+  - **The Destroyer**: Melee boss that can charge and summon minions
+  - **Brood Mother**: Spawns swarm minions during battle
+  - **Void Walker**: Teleports around and uses void beam attacks
+  - **Necromancer**: Resurrects defeated enemies to fight again
+  - **Titan**: Massive bruiser with earthquake and ground slam abilities
 
 ### 🔫 Weapon Types
 Multiple weapon options for different playstyles:
@@ -179,6 +194,10 @@ Multiple weapon options for different playstyles:
 - **⚡ Laser Gun**: Continuous beam with high fire rate
 - **🚀 Rocket Launcher**: Explosive area damage
 - **🌟 Spread Shot**: Fires multiple projectiles in a spread pattern
+- **🔥 Flamethrower**: Continuous cone of fire damage
+- **⚡ Lightning Gun**: Chains damage between nearby enemies
+- **❄️ Freeze Ray**: Slows enemies while dealing damage
+- **💥 Plasma Cannon**: Piercing shots that go through multiple enemies
 
 ### 🏆 Achievements System
 Unlock 10 achievements by completing challenges:
