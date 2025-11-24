@@ -80,6 +80,30 @@ const CHARACTERS = [
         description: 'Defensive armor specialist',
         maxHealth: 120, speed: 2.2, damage: 9, fireRate: 38, armor: 8, range: 500, pickupRange: 65,
     },
+    {
+        id: 'medic',
+        name: '💊 Medic',
+        description: 'Regenerates health over time',
+        maxHealth: 110, speed: 2.5, damage: 8, fireRate: 35, armor: 3, lifeSteal: 0.15, healthRegen: 0.5,
+    },
+    {
+        id: 'assassin',
+        name: '🗡️ Assassin',
+        description: 'High dodge and critical backstab',
+        maxHealth: 70, speed: 4.5, damage: 15, fireRate: 28, critChance: 0.35, critDamage: 3.0, dodge: 0.25,
+    },
+    {
+        id: 'summoner',
+        name: '🔮 Summoner',
+        description: 'Spawns helper drones',
+        maxHealth: 95, speed: 2.6, damage: 6, fireRate: 45, armor: 2, dodge: 0.05, maxDrones: 3,
+    },
+    {
+        id: 'juggernaut',
+        name: '💪 Juggernaut',
+        description: 'Extreme tank with knockback immunity',
+        maxHealth: 200, speed: 1.5, damage: 12, fireRate: 50, armor: 12, lifeSteal: 0.1, knockbackImmune: true,
+    },
 ];
 
 // Weapon types
@@ -88,6 +112,10 @@ const WEAPON_TYPES = {
     laser: { name: '⚡ Laser', fireRate: 0.2, damage: 0.3, color: '#ff00ff', continuous: true },
     rocket: { name: '🚀 Rocket', fireRate: 2, damage: 3, color: '#ff6b6b', explosion: 80 },
     spread: { name: '🌟 Spread', fireRate: 1.3, projectiles: 5, color: '#ffd93d' },
+    flamethrower: { name: '🔥 Flamethrower', fireRate: 0.1, damage: 0.5, color: '#ff4500', cone: true },
+    lightning: { name: '⚡ Lightning', fireRate: 1.2, damage: 1.2, color: '#00d4ff', chains: 3 },
+    freeze: { name: '❄️ Freeze Ray', fireRate: 0.7, damage: 0.8, color: '#87ceeb', slows: true },
+    plasma: { name: '💥 Plasma', fireRate: 1.5, damage: 1.6, color: '#9d00ff', pierces: true },
 };
 
 // Enemy types with behaviors
@@ -98,6 +126,10 @@ const ENEMY_TYPES = {
     swarm: { color: '#f59e0b', speed: 1.2, health: 0.4, damage: 0.5, credits: 0.5, size: 0.6 },
     teleporter: { color: '#8b5cf6', speed: 0.8, health: 1, damage: 1.2, credits: 1.5, canTeleport: true },
     shooter: { color: '#ec4899', speed: 0.5, health: 0.8, damage: 1, credits: 1.8, ranged: true },
+    healer: { color: '#22d3ee', speed: 0.7, health: 1.2, damage: 0.6, credits: 2.5, heals: true },
+    splitter: { color: '#fb923c', speed: 0.9, health: 1.3, damage: 1.1, credits: 2.2, splits: 3 },
+    freezer: { color: '#38bdf8', speed: 0.8, health: 1.1, damage: 0.9, credits: 2, freezes: true },
+    berserker: { color: '#dc2626', speed: 1, health: 1.5, damage: 1.8, credits: 2.3, enrages: true },
 };
 
 // Boss types
@@ -105,6 +137,8 @@ const BOSS_TYPES = {
     destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 15, damage: 3, credits: 100 },
     broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 12, damage: 2, credits: 120, summons: true },
     voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 10, damage: 2.5, credits: 150, teleports: true },
+    necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 13, damage: 2.2, credits: 180, resurrects: true },
+    titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 20, damage: 4, credits: 200, earthquake: true },
 };
 
 // Powerup types
@@ -1815,6 +1849,10 @@ function spawnWave() {
                     if (t === 'swarm') return game.wave >= 5;
                     if (t === 'teleporter') return game.wave >= 7;
                     if (t === 'shooter') return game.wave >= 10;
+                    if (t === 'healer') return game.wave >= 12;
+                    if (t === 'splitter') return game.wave >= 15;
+                    if (t === 'freezer') return game.wave >= 18;
+                    if (t === 'berserker') return game.wave >= 20;
                     return true;
                 });
                 const type = typeKeys[Math.floor(Math.random() * typeKeys.length)];

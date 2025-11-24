@@ -35,6 +35,28 @@ export const BOSS_TYPES = {
         behavior: 'boss_teleporter',
         abilities: ['teleport_attack', 'void_beam'],
     },
+    necromancer: {
+        name: '💀 Necromancer',
+        color: '#4c1d95',
+        size: 65,
+        speedMultiplier: 0.35,
+        healthMultiplier: 13,
+        damageMultiplier: 2.2,
+        creditValue: 180,
+        behavior: 'boss_necromancer',
+        abilities: ['resurrect_enemies', 'death_curse'],
+    },
+    titan: {
+        name: '⚡ Titan',
+        color: '#b91c1c',
+        size: 80,
+        speedMultiplier: 0.25,
+        healthMultiplier: 20,
+        damageMultiplier: 4,
+        creditValue: 200,
+        behavior: 'boss_melee',
+        abilities: ['earthquake', 'ground_slam'],
+    },
 };
 
 export function getBossForWave(wave) {
