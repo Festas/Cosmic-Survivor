@@ -2086,10 +2086,10 @@ function drawPauseMenu(ctx) {
     ctx.fillStyle = 'rgba(26, 26, 46, 0.95)';
     ctx.strokeStyle = '#00ff88';
     ctx.lineWidth = 3;
-    const menuX = CONFIG.CANVAS_WIDTH / 2 - 200;
-    const menuY = CONFIG.CANVAS_HEIGHT / 2 - 150;
-    ctx.fillRect(menuX, menuY, 400, 300);
-    ctx.strokeRect(menuX, menuY, 400, 300);
+    const menuX = CONFIG.CANVAS_WIDTH / 2 - 250;
+    const menuY = CONFIG.CANVAS_HEIGHT / 2 - 200;
+    ctx.fillRect(menuX, menuY, 500, 400);
+    ctx.strokeRect(menuX, menuY, 500, 400);
     
     // Title
     ctx.fillStyle = '#ffd93d';
@@ -2105,12 +2105,68 @@ function drawPauseMenu(ctx) {
     ctx.fillText(`Wave: ${game.wave}`, CONFIG.CANVAS_WIDTH / 2, menuY + 120);
     ctx.fillText(`Kills: ${game.stats.enemiesKilled}`, CONFIG.CANVAS_WIDTH / 2, menuY + 150);
     ctx.fillText(`Credits: ${game.credits}`, CONFIG.CANVAS_WIDTH / 2, menuY + 180);
+    ctx.fillText(`Combo: ${game.stats.comboKills}x`, CONFIG.CANVAS_WIDTH / 2, menuY + 210);
+    
+    // Current weapon
+    ctx.fillStyle = '#4ecdc4';
+    ctx.font = '20px monospace';
+    const weaponName = WEAPON_TYPES[game.currentWeapon].name;
+    ctx.fillText(`Current Weapon: ${weaponName}`, CONFIG.CANVAS_WIDTH / 2, menuY + 250);
+    
+    // Active powerups
+    if (game.activePowerups.length > 0) {
+        ctx.fillStyle = '#ffd93d';
+        ctx.font = '16px monospace';
+        ctx.fillText('Active Powerups:', CONFIG.CANVAS_WIDTH / 2, menuY + 290);
+        game.activePowerups.forEach((p, i) => {
+            ctx.fillStyle = p.data.color;
+            const timeLeft = Math.ceil(p.timeLeft / 60);
+            ctx.fillText(`${p.data.name} (${timeLeft}s)`, CONFIG.CANVAS_WIDTH / 2, menuY + 315 + i * 25);
+        });
+    }
     
     // Instructions
-    ctx.fillStyle = '#4ecdc4';
+    ctx.fillStyle = '#888';
     ctx.font = '16px monospace';
-    ctx.fillText('Press ESC to Resume', CONFIG.CANVAS_WIDTH / 2, menuY + 230);
-    ctx.fillText('1-4: Switch Weapons', CONFIG.CANVAS_WIDTH / 2, menuY + 260);
+    ctx.textAlign = 'center';
+    ctx.fillText('Press ESC to Resume', CONFIG.CANVAS_WIDTH / 2, menuY + 370);
+    
+    ctx.restore();
+}
+
+// Draw weapon indicator
+function drawWeaponIndicator(ctx) {
+    const weapons = ['basic', 'laser', 'rocket', 'spread'];
+    const x = CONFIG.CANVAS_WIDTH - 200;
+    const y = CONFIG.CANVAS_HEIGHT - 60;
+    
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x, y, 190, 50);
+    
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Weapon:', x + 5, y + 20);
+    
+    weapons.forEach((weapon, i) => {
+        const wx = x + 5 + i * 45;
+        const wy = y + 30;
+        
+        if (game.currentWeapon === weapon) {
+            ctx.fillStyle = WEAPON_TYPES[weapon].color;
+            ctx.fillRect(wx, wy, 40, 15);
+        }
+        
+        ctx.strokeStyle = WEAPON_TYPES[weapon].color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(wx, wy, 40, 15);
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${i + 1}`, wx + 20, wy + 12);
+    });
     
     ctx.restore();
 }
@@ -2250,6 +2306,11 @@ function gameLoop(timestamp) {
         drawComboMeter(ctx);
         
         updateUI();
+        
+        // Draw weapon indicator (outside camera transform)
+        ctx.restore();
+        ctx.save();
+        drawWeaponIndicator(ctx);
     } else if (game.paused) {
         // Still draw everything when paused
         game.pickups.forEach(p => p.draw(ctx));
@@ -2261,7 +2322,7 @@ function gameLoop(timestamp) {
         drawPauseMenu(ctx);
     }
     
-    // Draw FPS counter
+    // Draw FPS counter (outside camera transform)
     ctx.restore();
     ctx.save();
     ctx.fillStyle = '#00ff88';
