@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cosmic Survivor - Enhanced Edition</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+        <div id="ui-overlay">
+            <div id="top-bar">
+                <div id="wave-info">Wave: <span id="wave-number">1</span></div>
+                <div id="timer">Time: <span id="time-left">60</span>s</div>
+                <div id="credits">Credits: <span id="credit-amount">0</span></div>
+            </div>
+            <div id="stats-bar">
+                <div id="health-bar-container">
+                    <div id="health-bar"></div>
+                    <span id="health-text">100 / 100</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Character Selection Modal -->
+        <div id="character-select-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>🚀 Select Your Character 🚀</h2>
+                <p class="intro-text">Choose your astronaut for this mission</p>
+                <div id="character-list"></div>
+            </div>
+        </div>
+        
+        <!-- Shop Modal -->
+        <div id="shop-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>Upgrade Station</h2>
+                <p class="wave-complete">Wave <span id="completed-wave">1</span> Complete!</p>
+                <div id="shop-items"></div>
+                <button id="next-wave-btn" class="btn-primary">Start Next Wave</button>
+            </div>
+        </div>
+        
+        <!-- Game Over Modal -->
+        <div id="game-over-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="game-over-title">Mission Failed</h2>
+                <p id="game-over-message">You survived <span id="final-wave">0</span> waves</p>
+                <div id="final-stats"></div>
+                <button id="restart-btn" class="btn-primary">Try Again</button>
+            </div>
+        </div>
+        
+        <!-- Start Modal -->
+        <div id="start-modal" class="modal">
+            <div class="modal-content">
+                <h1>🚀 Cosmic Survivor 🚀</h1>
+                <h3 style="color: #ffd93d;">Enhanced Edition</h3>
+                <p class="intro-text">Survive waves of hostile alien creatures!</p>
+                <div class="controls-info">
+                    <h3>✨ New Features:</h3>
+                    <p>🎭 4 Unique Characters</p>
+                    <p>👹 Boss Waves Every 5 Waves</p>
+                    <p>🔫 Multiple Weapon Types</p>
+                    <p>🏆 Achievements System</p>
+                    <p>📊 High Score Tracking</p>
+                    <p>🔊 Sound Effects</p>
+                    <p>📱 Mobile Touch Controls</p>
+                    <p>👾 6 Different Enemy Types</p>
+                </div>
+                <div class="controls-info">
+                    <h3>Controls:</h3>
+                    <p>🎮 WASD or Arrow Keys - Move</p>
+                    <p>📱 Touch & Drag (Mobile) - Virtual Joystick</p>
+                    <p>🔫 Auto-aim and Auto-shoot</p>
+                    <p>💰 Auto-collect Credits</p>
+                    <p>🛒 Buy upgrades between waves</p>
+                </div>
+                <button id="start-btn" class="btn-primary">Begin Mission</button>
+            </div>
+        </div>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>
