@@ -21,7 +21,14 @@ const CONFIG = {
     COMBO_TIMEOUT: 3000, // 3 seconds
     POWERUP_DURATION: 8000, // 8 seconds
     SCREEN_SHAKE_INTENSITY: 10,
+    POWERUP_DROP_CHANCE: 0.15, // 15% chance for regular enemies
+    POWERUP_DROP_CHANCE_BOSS: 0.8, // 80% chance for bosses
 };
+
+// Helper function for time conversion
+function msToFrames(ms) {
+    return ms / (1000 / CONFIG.TARGET_FPS);
+}
 
 // Character presets
 const CHARACTERS = [
@@ -329,8 +336,8 @@ function showNotification(text, color = '#ffd93d', duration = 2000) {
     game.notifications.push({
         text,
         color,
-        life: duration / 16.67, // Convert ms to frames (60 FPS)
-        maxLife: duration / 16.67,
+        life: msToFrames(duration),
+        maxLife: msToFrames(duration),
         y: 100,
     });
 }
@@ -400,8 +407,8 @@ class Powerup {
 }
 
 function spawnPowerup(x, y) {
-    // 15% chance to spawn a powerup
-    if (Math.random() > 0.15) return;
+    // Chance to spawn a powerup based on CONFIG
+    if (Math.random() > CONFIG.POWERUP_DROP_CHANCE) return;
     
     const types = Object.keys(POWERUP_TYPES);
     const type = types[Math.floor(Math.random() * types.length)];
@@ -429,8 +436,8 @@ function activatePowerup(type) {
     game.activePowerups.push({
         type,
         data,
-        timeLeft: CONFIG.POWERUP_DURATION / 16.67, // Convert to frames
-        maxTime: CONFIG.POWERUP_DURATION / 16.67,
+        timeLeft: msToFrames(CONFIG.POWERUP_DURATION),
+        maxTime: msToFrames(CONFIG.POWERUP_DURATION),
     });
 }
 
@@ -945,7 +952,7 @@ class Enemy {
         
         // Enhanced combo system
         game.stats.comboKills++;
-        game.stats.comboTimer = CONFIG.COMBO_TIMEOUT / 16.67; // Convert to frames
+        game.stats.comboTimer = msToFrames(CONFIG.COMBO_TIMEOUT);
         
         // Combo rewards
         if (game.stats.comboKills >= 10) {
@@ -971,7 +978,7 @@ class Enemy {
         }
         
         // Chance to spawn powerup (higher for bosses)
-        const powerupChance = this.isBoss ? 0.8 : 0.15;
+        const powerupChance = this.isBoss ? CONFIG.POWERUP_DROP_CHANCE_BOSS : CONFIG.POWERUP_DROP_CHANCE;
         if (Math.random() < powerupChance) {
             spawnPowerup(this.x, this.y);
         }
@@ -2053,7 +2060,7 @@ function drawComboMeter(ctx) {
     ctx.save();
     const x = CONFIG.CANVAS_WIDTH / 2;
     const y = 50;
-    const progress = game.stats.comboTimer / (CONFIG.COMBO_TIMEOUT / 16.67);
+    const progress = game.stats.comboTimer / msToFrames(CONFIG.COMBO_TIMEOUT);
     
     // Background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
