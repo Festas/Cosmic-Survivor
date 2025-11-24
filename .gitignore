@@ -1,0 +1,15 @@
+# Development files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test files
+/tmp/

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Survivor - A Space Arena Survivor Game</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="1200" height="800"></canvas>
+        <div id="ui-overlay">
+            <div id="top-bar">
+                <div id="wave-info">Wave: <span id="wave-number">1</span></div>
+                <div id="timer">Time: <span id="time-left">60</span>s</div>
+                <div id="credits">Credits: <span id="credit-amount">0</span></div>
+            </div>
+            <div id="stats-bar">
+                <div id="health-bar-container">
+                    <div id="health-bar"></div>
+                    <span id="health-text">100 / 100</span>
+                </div>
+            </div>
+        </div>
+        <div id="shop-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2>Upgrade Station</h2>
+                <p class="wave-complete">Wave <span id="completed-wave">1</span> Complete!</p>
+                <div id="shop-items"></div>
+                <button id="next-wave-btn" class="btn-primary">Start Next Wave</button>
+            </div>
+        </div>
+        <div id="game-over-modal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="game-over-title">Mission Failed</h2>
+                <p id="game-over-message">You survived <span id="final-wave">0</span> waves</p>
+                <div id="final-stats"></div>
+                <button id="restart-btn" class="btn-primary">Try Again</button>
+            </div>
+        </div>
+        <div id="start-modal" class="modal">
+            <div class="modal-content">
+                <h1>🚀 Cosmic Survivor 🚀</h1>
+                <p class="intro-text">You're stranded on an alien planet. Survive waves of hostile creatures!</p>
+                <div class="controls-info">
+                    <h3>Controls:</h3>
+                    <p>🎮 WASD or Arrow Keys - Move</p>
+                    <p>🔫 Auto-aim and shoot at enemies</p>
+                    <p>💰 Collect credits from defeated enemies</p>
+                    <p>🛒 Buy upgrades between waves</p>
+                </div>
+                <button id="start-btn" class="btn-primary">Begin Mission</button>
+            </div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>
