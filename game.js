@@ -1,12 +1,14 @@
-// Import modules
-import { CONFIG, CHARACTERS } from './js/config.js';
-import { AchievementSystem } from './js/systems/achievements.js';
-import { HighScoreSystem } from './js/systems/highscore.js';
-import { SoundSystem } from './js/systems/sound.js';
-import { TouchControls } from './js/systems/touchControls.js';
-import { Weapon, WEAPON_TYPES } from './js/weapons/weaponSystem.js';
-import { ENEMY_TYPES, getEnemyTypeForWave } from './js/entities/enemyTypes.js';
-import { BOSS_TYPES, getBossForWave, isBossWave } from './js/entities/bossTypes.js';
+// Game Constants
+const CONFIG = {
+    CANVAS_WIDTH: 1200,
+    CANVAS_HEIGHT: 800,
+    WAVE_DURATION: 60,
+    PLAYER_SIZE: 30,
+    ENEMY_SIZE: 25,
+    BULLET_SIZE: 5,
+    BULLET_SPEED: 8,
+    PICKUP_SIZE: 15,
+};
 
 // Game State
 const game = {
