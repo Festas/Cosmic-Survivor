@@ -316,7 +316,7 @@ function checkAchievements() {
 
 // ==================== VISUAL FEEDBACK HELPERS ====================
 function screenShake(intensity = CONFIG.SCREEN_SHAKE_INTENSITY) {
-    game.camera.shake = intensity;
+    game.camera.shake = Math.max(game.camera.shake, intensity);
 }
 
 function updateCamera() {
@@ -1324,24 +1324,6 @@ class Pickup {
 }
 
 // ==================== VISUAL EFFECTS ====================
-// Screen shake system
-function addScreenShake(intensity = 5) {
-    game.camera.shake = Math.max(game.camera.shake, intensity);
-}
-
-function updateCamera() {
-    if (game.camera.shake > 0) {
-        game.camera.offsetX = (Math.random() - 0.5) * game.camera.shake;
-        game.camera.offsetY = (Math.random() - 0.5) * game.camera.shake;
-        game.camera.shake *= 0.9;
-        if (game.camera.shake < 0.1) {
-            game.camera.shake = 0;
-            game.camera.offsetX = 0;
-            game.camera.offsetY = 0;
-        }
-    }
-}
-
 // Enhanced particle system
 function createParticles(x, y, color, count) {
     // Limit total particles for performance
@@ -2252,7 +2234,8 @@ function gameLoop(timestamp) {
     drawStarfield(ctx);
     
     // Grid with subtle animation (optimized - draw less frequently)
-    if (game.frameCount % 2 === 0) {
+    // Use timestamp for consistent rendering pattern
+    if (Math.floor(timestamp / 33) % 2 === 0) {
         const gridPulse = Math.sin(timestamp * 0.0005) * 0.02 + 0.05;
         ctx.strokeStyle = `rgba(78, 205, 196, ${gridPulse})`;
         ctx.lineWidth = 1;
