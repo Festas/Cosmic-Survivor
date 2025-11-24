@@ -12,7 +12,23 @@ const CONFIG = {
     BULLET_SPEED: 8,
     PICKUP_SIZE: 15,
     BOSS_WAVE_INTERVAL: 5,
+    // Performance settings
+    MAX_PARTICLES: 500,
+    PARTICLE_POOL_SIZE: 1000,
+    GRID_CELL_SIZE: 100,
+    TARGET_FPS: 60,
+    // Interactivity settings
+    COMBO_TIMEOUT: 3000, // 3 seconds
+    POWERUP_DURATION: 8000, // 8 seconds
+    SCREEN_SHAKE_INTENSITY: 10,
+    POWERUP_DROP_CHANCE: 0.15, // 15% chance for regular enemies
+    POWERUP_DROP_CHANCE_BOSS: 0.8, // 80% chance for bosses
 };
+
+// Helper function for time conversion
+function msToFrames(ms) {
+    return ms / (1000 / CONFIG.TARGET_FPS);
+}
 
 // Character presets
 const CHARACTERS = [
@@ -91,6 +107,49 @@ const BOSS_TYPES = {
     voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 10, damage: 2.5, credits: 150, teleports: true },
 };
 
+// Powerup types
+const POWERUP_TYPES = {
+    speed: { name: '⚡ Speed Boost', color: '#ffd93d', effect: 'speed', multiplier: 1.5 },
+    damage: { name: '💪 Damage Boost', color: '#ff6b6b', effect: 'damage', multiplier: 2 },
+    shield: { name: '🛡️ Shield', color: '#4ecdc4', effect: 'shield', value: 50 },
+    multishot: { name: '🔫 Multi-Shot', color: '#a855f7', effect: 'multishot', value: 2 },
+};
+
+// ==================== OBJECT POOLING ====================
+class ObjectPool {
+    constructor(createFn, resetFn, initialSize = 100) {
+        this.createFn = createFn;
+        this.resetFn = resetFn;
+        this.pool = [];
+        this.active = [];
+        
+        for (let i = 0; i < initialSize; i++) {
+            this.pool.push(createFn());
+        }
+    }
+    
+    get() {
+        const obj = this.pool.pop() || this.createFn();
+        this.active.push(obj);
+        return obj;
+    }
+    
+    release(obj) {
+        const index = this.active.indexOf(obj);
+        if (index > -1) {
+            this.active.splice(index, 1);
+            this.resetFn(obj);
+            this.pool.push(obj);
+        }
+    }
+    
+    releaseAll() {
+        while (this.active.length > 0) {
+            this.release(this.active[0]);
+        }
+    }
+}
+
 // ==================== GAME STATE ====================
 const game = {
     canvas: null,
@@ -111,6 +170,13 @@ const game = {
     joystick: { x: 0, y: 0, active: false, startX: 0, startY: 0 },
     currentWeapon: 'basic',
     camera: { shake: 0, offsetX: 0, offsetY: 0 },
+    paused: false,
+    powerups: [],
+    activePowerups: [],
+    notifications: [],
+    fps: 60,
+    frameCount: 0,
+    lastFpsUpdate: 0,
     stats: {
         enemiesKilled: 0,
         damageDealt: 0,
@@ -178,10 +244,13 @@ const Sound = {
             hit: { freq: 200, type: 'sawtooth', duration: 0.15, volume: 0.15 },
             death: { freq: [400, 100], type: 'triangle', duration: 0.3, volume: 0.2 },
             pickup: { freq: [500, 1000], type: 'sine', duration: 0.1, volume: 0.1 },
-            powerup: { freq: [300, 800], type: 'sine', duration: 0.2, volume: 0.15 },
+            powerup: { freq: [300, 800, 1200], type: 'sine', duration: 0.3, volume: 0.2 },
             waveComplete: { freq: [400, 500, 600, 800], type: 'sine', duration: 0.15, volume: 0.2 },
             boss: { freq: [100, 50], type: 'sawtooth', duration: 0.5, volume: 0.3 },
             gameOver: { freq: [300, 50], type: 'sawtooth', duration: 1, volume: 0.3 },
+            combo: { freq: [600, 800, 1000], type: 'sine', duration: 0.2, volume: 0.15 },
+            crit: { freq: [1200, 1500], type: 'square', duration: 0.15, volume: 0.12 },
+            levelUp: { freq: [400, 600, 800, 1000], type: 'sine', duration: 0.25, volume: 0.2 },
         };
         
         const sound = sounds[type];
@@ -245,6 +314,158 @@ function checkAchievements() {
     }
 }
 
+// ==================== VISUAL FEEDBACK HELPERS ====================
+function screenShake(intensity = CONFIG.SCREEN_SHAKE_INTENSITY) {
+    game.camera.shake = Math.max(game.camera.shake, intensity);
+}
+
+function updateCamera() {
+    if (game.camera.shake > 0) {
+        game.camera.offsetX = (Math.random() - 0.5) * game.camera.shake;
+        game.camera.offsetY = (Math.random() - 0.5) * game.camera.shake;
+        game.camera.shake *= 0.9;
+        if (game.camera.shake < 0.1) {
+            game.camera.shake = 0;
+            game.camera.offsetX = 0;
+            game.camera.offsetY = 0;
+        }
+    }
+}
+
+function showNotification(text, color = '#ffd93d', duration = 2000) {
+    game.notifications.push({
+        text,
+        color,
+        life: msToFrames(duration),
+        maxLife: msToFrames(duration),
+        y: 100,
+    });
+}
+
+function updateNotifications() {
+    game.notifications = game.notifications.filter(n => {
+        n.life--;
+        return n.life > 0;
+    });
+}
+
+function drawNotifications(ctx) {
+    game.notifications.forEach((n, i) => {
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, n.life / 30);
+        ctx.fillStyle = n.color;
+        ctx.font = 'bold 24px monospace';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#000';
+        ctx.shadowBlur = 10;
+        ctx.fillText(n.text, CONFIG.CANVAS_WIDTH / 2, n.y + i * 40);
+        ctx.restore();
+    });
+}
+
+// ==================== POWERUP SYSTEM ====================
+class Powerup {
+    constructor(x, y, type) {
+        this.x = x;
+        this.y = y;
+        this.size = CONFIG.PICKUP_SIZE * 1.5;
+        this.type = type;
+        this.data = POWERUP_TYPES[type];
+        this.life = msToFrames(10000); // 10 seconds
+        this.bobOffset = Math.random() * Math.PI * 2;
+    }
+
+    update() {
+        this.life--;
+        return this.life > 0;
+    }
+
+    draw(ctx) {
+        const bob = Math.sin(Date.now() * 0.005 + this.bobOffset) * 5;
+        
+        ctx.save();
+        ctx.globalAlpha = this.life < 120 ? 0.5 + Math.sin(Date.now() * 0.02) * 0.5 : 1;
+        
+        // Glow effect
+        ctx.shadowColor = this.data.color;
+        ctx.shadowBlur = 15;
+        
+        // Icon
+        ctx.fillStyle = this.data.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Inner circle
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.size * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+}
+
+function spawnPowerup(x, y) {
+    // Chance to spawn a powerup based on CONFIG
+    if (Math.random() > CONFIG.POWERUP_DROP_CHANCE) return;
+    
+    const types = Object.keys(POWERUP_TYPES);
+    const type = types[Math.floor(Math.random() * types.length)];
+    game.powerups.push(new Powerup(x, y, type));
+}
+
+function collectPowerups() {
+    game.powerups = game.powerups.filter(p => {
+        if (!p.update()) return false;
+        
+        const dist = Math.hypot(game.player.x - p.x, game.player.y - p.y);
+        if (dist < game.player.pickupRange + p.size) {
+            activatePowerup(p.type);
+            Sound.play('powerup');
+            showNotification(`${p.data.name} Activated!`, p.data.color);
+            createExplosion(p.x, p.y, p.data.color, 20);
+            return false;
+        }
+        return true;
+    });
+}
+
+function activatePowerup(type) {
+    const data = POWERUP_TYPES[type];
+    game.activePowerups.push({
+        type,
+        data,
+        timeLeft: msToFrames(CONFIG.POWERUP_DURATION),
+        maxTime: msToFrames(CONFIG.POWERUP_DURATION),
+    });
+}
+
+function updatePowerups() {
+    game.activePowerups = game.activePowerups.filter(p => {
+        p.timeLeft--;
+        if (p.timeLeft <= 0) {
+            showNotification(`${p.data.name} Expired`, '#888', 1000);
+            return false;
+        }
+        return true;
+    });
+}
+
+function getPowerupMultiplier(stat) {
+    let multiplier = 1;
+    game.activePowerups.forEach(p => {
+        if (p.data.effect === stat) {
+            multiplier *= p.data.multiplier || 1;
+        }
+    });
+    return multiplier;
+}
+
+function hasPowerup(effect) {
+    return game.activePowerups.some(p => p.data.effect === effect);
+}
+
 // ==================== PLAYER CLASS ====================
 class Player {
     constructor(character) {
@@ -269,6 +490,10 @@ class Player {
     }
 
     update() {
+        // Apply powerup modifiers
+        const speedMult = getPowerupMultiplier('speed');
+        const currentSpeed = this.speed * speedMult;
+        
         // Movement
         let dx = 0, dy = 0;
         
@@ -289,8 +514,8 @@ class Player {
             dy *= 0.707;
         }
 
-        this.x += dx * this.speed;
-        this.y += dy * this.speed;
+        this.x += dx * currentSpeed;
+        this.y += dy * currentSpeed;
         this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
         this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
 
@@ -304,10 +529,17 @@ class Player {
     }
 
     shoot() {
+        // Apply multishot powerup
+        let projectiles = this.projectileCount;
+        if (hasPowerup('multishot')) {
+            const powerup = game.activePowerups.find(p => p.data.effect === 'multishot');
+            projectiles += powerup.data.value;
+        }
+        
         const nearest = game.enemies
             .filter(e => Math.hypot(e.x - this.x, e.y - this.y) <= this.range)
             .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))
-            .slice(0, this.projectileCount);
+            .slice(0, projectiles);
         
         if (nearest.length > 0) {
             const weapon = WEAPON_TYPES[game.currentWeapon];
@@ -343,6 +575,22 @@ class Player {
     }
 
     takeDamage(amount) {
+        // Shield powerup protection
+        if (hasPowerup('shield')) {
+            const shield = game.activePowerups.find(p => p.data.effect === 'shield');
+            if (shield.data.value > 0) {
+                const absorbed = Math.min(amount, shield.data.value);
+                shield.data.value -= absorbed;
+                amount -= absorbed;
+                createTextParticle(this.x, this.y, 'SHIELD!', '#4ecdc4', 18);
+                if (shield.data.value <= 0) {
+                    game.activePowerups = game.activePowerups.filter(p => p !== shield);
+                    showNotification('Shield Broken!', '#ff6b6b', 1000);
+                }
+                if (amount <= 0) return;
+            }
+        }
+        
         if (Math.random() < this.dodge) {
             createTextParticle(this.x, this.y, 'DODGE!', '#4ecdc4', 18);
             createParticles(this.x, this.y, '#4ecdc4', 8);
@@ -355,7 +603,7 @@ class Player {
         // Enhanced damage feedback
         createTextParticle(this.x, this.y, `-${finalDamage}`, '#ff6b6b', 18);
         createParticles(this.x, this.y, '#ff6b6b', 5);
-        addScreenShake(finalDamage * 0.5);
+        screenShake(finalDamage * 0.5);
         
         Sound.play('hit');
         if (this.health <= 0) gameOver();
@@ -702,23 +950,37 @@ class Enemy {
         game.stats.enemiesKilled++;
         game.persistentStats.totalKills++;
         
-        // Combo system
+        // Enhanced combo system
         game.stats.comboKills++;
-        game.stats.comboTimer = 120; // 2 seconds
+        game.stats.comboTimer = msToFrames(CONFIG.COMBO_TIMEOUT);
         
-        // Show combo text
-        if (game.stats.comboKills > 1 && game.stats.comboKills % 5 === 0) {
-            createTextParticle(this.x, this.y - 30, `${game.stats.comboKills}x COMBO!`, '#ffd93d', 20);
+        // Combo rewards
+        if (game.stats.comboKills >= 10) {
+            const bonus = Math.floor(game.stats.comboKills / 10);
+            game.credits += bonus;
+            if (game.stats.comboKills % 10 === 0) {
+                createTextParticle(this.x, this.y - 30, `${game.stats.comboKills}x COMBO! +${bonus}💰`, '#ffd93d', 20);
+                Sound.play('combo');
+                screenShake(5);
+            }
+        } else if (game.stats.comboKills > 1 && game.stats.comboKills % 5 === 0) {
+            createTextParticle(this.x, this.y - 30, `${game.stats.comboKills}x COMBO!`, '#ffd93d', 18);
         }
         
         if (this.isBoss) {
             game.stats.bossesDefeated++;
-            showNotification(`${this.name} Defeated!`);
-            addScreenShake(15);
-            createExplosion(this.x, this.y, this.color, 50);
+            showNotification(`${this.name} Defeated!`, '#ffd93d');
+            screenShake(20);
+            createExplosion(this.x, this.y, this.color, 60);
         } else {
-            addScreenShake(this.isBoss ? 15 : 3);
-            createExplosion(this.x, this.y, this.color, this.isBoss ? 50 : 20);
+            screenShake(3);
+            createExplosion(this.x, this.y, this.color, 20);
+        }
+        
+        // Chance to spawn powerup (higher for bosses)
+        const powerupChance = this.isBoss ? CONFIG.POWERUP_DROP_CHANCE_BOSS : CONFIG.POWERUP_DROP_CHANCE;
+        if (Math.random() < powerupChance) {
+            spawnPowerup(this.x, this.y);
         }
         
         game.pickups.push(new Pickup(this.x, this.y, this.creditValue));
@@ -976,8 +1238,10 @@ class Bullet {
             
             const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
             if (dist < enemy.size + this.size) {
+                // Apply damage powerup
+                const damageMult = getPowerupMultiplier('damage');
                 const isCrit = Math.random() < this.critChance;
-                const finalDamage = Math.floor(this.damage * (isCrit ? this.critDamage : 1));
+                const finalDamage = Math.floor(this.damage * damageMult * (isCrit ? this.critDamage : 1));
                 
                 if (this.explosion) {
                     this.explode();
@@ -989,6 +1253,12 @@ class Bullet {
                     if (this.lifeSteal > 0) {
                         game.player.heal(Math.floor(finalDamage * this.lifeSteal));
                     }
+                }
+                
+                // Visual feedback for crits
+                if (isCrit) {
+                    createExplosion(enemy.x, enemy.y, '#ffd93d', 10);
+                    Sound.play('crit');
                 }
                 
                 this.hitEnemies.push(enemy);
@@ -1054,26 +1324,12 @@ class Pickup {
 }
 
 // ==================== VISUAL EFFECTS ====================
-// Screen shake system
-function addScreenShake(intensity = 5) {
-    game.camera.shake = Math.max(game.camera.shake, intensity);
-}
-
-function updateCamera() {
-    if (game.camera.shake > 0) {
-        game.camera.offsetX = (Math.random() - 0.5) * game.camera.shake;
-        game.camera.offsetY = (Math.random() - 0.5) * game.camera.shake;
-        game.camera.shake *= 0.9;
-        if (game.camera.shake < 0.1) {
-            game.camera.shake = 0;
-            game.camera.offsetX = 0;
-            game.camera.offsetY = 0;
-        }
-    }
-}
-
 // Enhanced particle system
 function createParticles(x, y, color, count) {
+    // Limit total particles for performance
+    if (game.particles.length > CONFIG.MAX_PARTICLES) return;
+    
+    count = Math.min(count, CONFIG.MAX_PARTICLES - game.particles.length);
     for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
         const speed = 2 + Math.random() * 4;
@@ -1092,6 +1348,10 @@ function createParticles(x, y, color, count) {
 
 // Create explosion effect
 function createExplosion(x, y, color, count = 30) {
+    // Limit total particles for performance
+    if (game.particles.length > CONFIG.MAX_PARTICLES) return;
+    
+    count = Math.min(count, CONFIG.MAX_PARTICLES - game.particles.length);
     for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count;
         const speed = 3 + Math.random() * 5;
@@ -1742,6 +2002,164 @@ function drawJoystick(ctx) {
     ctx.restore();
 }
 
+// Draw active powerups UI
+function drawActivePowerups(ctx) {
+    ctx.save();
+    let offsetY = 150;
+    game.activePowerups.forEach((p, i) => {
+        const x = 20;
+        const y = offsetY + i * 45;
+        const progress = p.timeLeft / p.maxTime;
+        
+        // Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(x, y, 150, 35);
+        
+        // Progress bar
+        ctx.fillStyle = p.data.color;
+        ctx.fillRect(x, y, 150 * progress, 35);
+        
+        // Text
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px monospace';
+        ctx.textAlign = 'left';
+        ctx.shadowColor = '#000';
+        ctx.shadowBlur = 5;
+        ctx.fillText(p.data.name, x + 5, y + 22);
+        
+        // Time left
+        const timeLeft = Math.ceil(p.timeLeft / CONFIG.TARGET_FPS);
+        ctx.textAlign = 'right';
+        ctx.fillText(`${timeLeft}s`, x + 145, y + 22);
+    });
+    ctx.restore();
+}
+
+// Draw combo meter
+function drawComboMeter(ctx) {
+    if (game.stats.comboKills <= 1) return;
+    
+    ctx.save();
+    const x = CONFIG.CANVAS_WIDTH / 2;
+    const y = 50;
+    const progress = game.stats.comboTimer / msToFrames(CONFIG.COMBO_TIMEOUT);
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x - 75, y, 150, 30);
+    
+    // Progress bar
+    ctx.fillStyle = progress > 0.5 ? '#ffd93d' : '#ff6b6b';
+    ctx.fillRect(x - 75, y, 150 * progress, 30);
+    
+    // Text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 5;
+    ctx.fillText(`${game.stats.comboKills}x COMBO`, x, y + 20);
+    
+    ctx.restore();
+}
+
+// Draw pause menu
+function drawPauseMenu(ctx) {
+    ctx.save();
+    
+    // Semi-transparent overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+    
+    // Menu box
+    ctx.fillStyle = 'rgba(26, 26, 46, 0.95)';
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 3;
+    const menuX = CONFIG.CANVAS_WIDTH / 2 - 250;
+    const menuY = CONFIG.CANVAS_HEIGHT / 2 - 200;
+    ctx.fillRect(menuX, menuY, 500, 400);
+    ctx.strokeRect(menuX, menuY, 500, 400);
+    
+    // Title
+    ctx.fillStyle = '#ffd93d';
+    ctx.font = 'bold 36px monospace';
+    ctx.textAlign = 'center';
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 10;
+    ctx.fillText('PAUSED', CONFIG.CANVAS_WIDTH / 2, menuY + 60);
+    
+    // Stats
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '18px monospace';
+    ctx.fillText(`Wave: ${game.wave}`, CONFIG.CANVAS_WIDTH / 2, menuY + 120);
+    ctx.fillText(`Kills: ${game.stats.enemiesKilled}`, CONFIG.CANVAS_WIDTH / 2, menuY + 150);
+    ctx.fillText(`Credits: ${game.credits}`, CONFIG.CANVAS_WIDTH / 2, menuY + 180);
+    ctx.fillText(`Combo: ${game.stats.comboKills}x`, CONFIG.CANVAS_WIDTH / 2, menuY + 210);
+    
+    // Current weapon
+    ctx.fillStyle = '#4ecdc4';
+    ctx.font = '20px monospace';
+    const weaponName = WEAPON_TYPES[game.currentWeapon].name;
+    ctx.fillText(`Current Weapon: ${weaponName}`, CONFIG.CANVAS_WIDTH / 2, menuY + 250);
+    
+    // Active powerups
+    if (game.activePowerups.length > 0) {
+        ctx.fillStyle = '#ffd93d';
+        ctx.font = '16px monospace';
+        ctx.fillText('Active Powerups:', CONFIG.CANVAS_WIDTH / 2, menuY + 290);
+        game.activePowerups.forEach((p, i) => {
+            ctx.fillStyle = p.data.color;
+            const timeLeft = Math.ceil(p.timeLeft / CONFIG.TARGET_FPS);
+            ctx.fillText(`${p.data.name} (${timeLeft}s)`, CONFIG.CANVAS_WIDTH / 2, menuY + 315 + i * 25);
+        });
+    }
+    
+    // Instructions
+    ctx.fillStyle = '#888';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Press ESC to Resume', CONFIG.CANVAS_WIDTH / 2, menuY + 370);
+    
+    ctx.restore();
+}
+
+// Draw weapon indicator
+function drawWeaponIndicator(ctx) {
+    const weapons = ['basic', 'laser', 'rocket', 'spread'];
+    const x = CONFIG.CANVAS_WIDTH - 200;
+    const y = CONFIG.CANVAS_HEIGHT - 60;
+    
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x, y, 190, 50);
+    
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('Weapon:', x + 5, y + 20);
+    
+    weapons.forEach((weapon, i) => {
+        const wx = x + 5 + i * 45;
+        const wy = y + 30;
+        
+        if (game.currentWeapon === weapon) {
+            ctx.fillStyle = WEAPON_TYPES[weapon].color;
+            ctx.fillRect(wx, wy, 40, 15);
+        }
+        
+        ctx.strokeStyle = WEAPON_TYPES[weapon].color;
+        ctx.lineWidth = 2;
+        ctx.strokeRect(wx, wy, 40, 15);
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${i + 1}`, wx + 20, wy + 12);
+    });
+    
+    ctx.restore();
+}
+
 // ==================== GAME LOOP ====================
 let lastTime = 0;
 let timer = 0;
@@ -1790,6 +2208,14 @@ function gameLoop(timestamp) {
     const deltaTime = timestamp - lastTime;
     lastTime = timestamp;
     
+    // FPS counter
+    game.frameCount++;
+    if (timestamp - game.lastFpsUpdate > 1000) {
+        game.fps = game.frameCount;
+        game.frameCount = 0;
+        game.lastFpsUpdate = timestamp;
+    }
+    
     const ctx = game.ctx;
     
     // Update camera shake
@@ -1807,24 +2233,27 @@ function gameLoop(timestamp) {
     updateStarfield();
     drawStarfield(ctx);
     
-    // Grid with subtle animation
-    const gridPulse = Math.sin(timestamp * 0.0005) * 0.02 + 0.05;
-    ctx.strokeStyle = `rgba(78, 205, 196, ${gridPulse})`;
-    ctx.lineWidth = 1;
-    for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += 50) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, CONFIG.CANVAS_HEIGHT);
-        ctx.stroke();
-    }
-    for (let y = 0; y < CONFIG.CANVAS_HEIGHT; y += 50) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(CONFIG.CANVAS_WIDTH, y);
-        ctx.stroke();
+    // Grid with subtle animation (optimized - draw less frequently)
+    // Use timestamp divided by ~33ms (approximately 30 FPS) for consistent rendering pattern
+    if (Math.floor(timestamp / 33) % 2 === 0) {
+        const gridPulse = Math.sin(timestamp * 0.0005) * 0.02 + 0.05;
+        ctx.strokeStyle = `rgba(78, 205, 196, ${gridPulse})`;
+        ctx.lineWidth = 1;
+        for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += 50) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, CONFIG.CANVAS_HEIGHT);
+            ctx.stroke();
+        }
+        for (let y = 0; y < CONFIG.CANVAS_HEIGHT; y += 50) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(CONFIG.CANVAS_WIDTH, y);
+            ctx.stroke();
+        }
     }
     
-    if (game.state === 'playing') {
+    if (game.state === 'playing' && !game.paused) {
         timer += deltaTime;
         if (timer >= 1000) {
             timer = 0;
@@ -1852,19 +2281,44 @@ function gameLoop(timestamp) {
         });
         updateParticles();
         updateNotifications();
+        updatePowerups();
+        collectPowerups();
         
         game.pickups.forEach(p => p.draw(ctx));
+        game.powerups.forEach(p => p.draw(ctx));
         game.enemies.forEach(e => e.draw(ctx));
         game.bullets.forEach(b => b.draw(ctx));
         game.player.draw(ctx);
         drawParticles(ctx);
         drawNotifications(ctx);
         drawJoystick(ctx);
+        drawActivePowerups(ctx);
+        drawComboMeter(ctx);
         
         updateUI();
+        
+        // Draw weapon indicator (outside camera transform)
+        ctx.restore();
+        ctx.save();
+        drawWeaponIndicator(ctx);
+    } else if (game.paused) {
+        // Still draw everything when paused
+        game.pickups.forEach(p => p.draw(ctx));
+        game.powerups.forEach(p => p.draw(ctx));
+        game.enemies.forEach(e => e.draw(ctx));
+        game.bullets.forEach(b => b.draw(ctx));
+        game.player.draw(ctx);
+        drawParticles(ctx);
+        drawPauseMenu(ctx);
     }
     
-    // Restore canvas (end camera shake)
+    // Draw FPS counter (outside camera transform)
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle = '#00ff88';
+    ctx.font = '14px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`FPS: ${game.fps}`, CONFIG.CANVAS_WIDTH - 10, 20);
     ctx.restore();
     
     requestAnimationFrame(gameLoop);
@@ -1973,6 +2427,29 @@ function showAchievements() {
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
-window.addEventListener('keydown', e => game.keys[e.key] = true);
+window.addEventListener('keydown', e => {
+    game.keys[e.key] = true;
+    
+    // Pause toggle
+    if (e.key === 'Escape' && game.state === 'playing') {
+        game.paused = !game.paused;
+        e.preventDefault();
+    }
+    
+    // Weapon switching
+    if (game.state === 'playing' && !game.paused) {
+        const weapons = ['basic', 'laser', 'rocket', 'spread'];
+        if (e.key >= '1' && e.key <= '4') {
+            const weaponIndex = parseInt(e.key) - 1;
+            if (weaponIndex < weapons.length) {
+                game.currentWeapon = weapons[weaponIndex];
+                const weaponName = WEAPON_TYPES[game.currentWeapon].name;
+                showNotification(`Switched to ${weaponName}`, '#4ecdc4', 1000);
+                Sound.play('pickup');
+            }
+        }
+    }
+});
+
 window.addEventListener('keyup', e => game.keys[e.key] = false);
 window.addEventListener('load', init);
