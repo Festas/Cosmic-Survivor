@@ -371,7 +371,7 @@ class Powerup {
         this.size = CONFIG.PICKUP_SIZE * 1.5;
         this.type = type;
         this.data = POWERUP_TYPES[type];
-        this.life = 600; // 10 seconds at 60 FPS
+        this.life = msToFrames(10000); // 10 seconds
         this.bobOffset = Math.random() * Math.PI * 2;
     }
 
@@ -2028,7 +2028,7 @@ function drawActivePowerups(ctx) {
         ctx.fillText(p.data.name, x + 5, y + 22);
         
         // Time left
-        const timeLeft = Math.ceil(p.timeLeft / 60);
+        const timeLeft = Math.ceil(p.timeLeft / CONFIG.TARGET_FPS);
         ctx.textAlign = 'right';
         ctx.fillText(`${timeLeft}s`, x + 145, y + 22);
     });
@@ -2109,7 +2109,7 @@ function drawPauseMenu(ctx) {
         ctx.fillText('Active Powerups:', CONFIG.CANVAS_WIDTH / 2, menuY + 290);
         game.activePowerups.forEach((p, i) => {
             ctx.fillStyle = p.data.color;
-            const timeLeft = Math.ceil(p.timeLeft / 60);
+            const timeLeft = Math.ceil(p.timeLeft / CONFIG.TARGET_FPS);
             ctx.fillText(`${p.data.name} (${timeLeft}s)`, CONFIG.CANVAS_WIDTH / 2, menuY + 315 + i * 25);
         });
     }
@@ -2234,7 +2234,7 @@ function gameLoop(timestamp) {
     drawStarfield(ctx);
     
     // Grid with subtle animation (optimized - draw less frequently)
-    // Use timestamp for consistent rendering pattern
+    // Use timestamp divided by ~33ms (approximately 30 FPS) for consistent rendering pattern
     if (Math.floor(timestamp / 33) % 2 === 0) {
         const gridPulse = Math.sin(timestamp * 0.0005) * 0.02 + 0.05;
         ctx.strokeStyle = `rgba(78, 205, 196, ${gridPulse})`;
