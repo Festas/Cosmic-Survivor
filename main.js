@@ -1077,20 +1077,149 @@ function drawParticles(ctx) {
 }
 
 // ==================== SHOP SYSTEM ====================
+// Brotato-style items with rarity, trade-offs, and categories
+const ITEM_CATEGORIES = {
+    WEAPON: 'weapon',
+    STAT: 'stat',
+    SPECIAL: 'special'
+};
+
+const RARITY = {
+    COMMON: { name: 'Common', color: '#9ca3af', priceMultiplier: 1 },
+    UNCOMMON: { name: 'Uncommon', color: '#22c55e', priceMultiplier: 1.5 },
+    RARE: { name: 'Rare', color: '#3b82f6', priceMultiplier: 2 },
+    EPIC: { name: 'Epic', color: '#a855f7', priceMultiplier: 2.5 },
+    LEGENDARY: { name: 'Legendary', color: '#f59e0b', priceMultiplier: 3 }
+};
+
 const SHOP_ITEMS = [
-    { name: '💚 Health', desc: '+20 Max HP, Full Heal', price: 10, apply: p => { p.maxHealth += 20; p.health = p.maxHealth; } },
-    { name: '⚡ Fire Rate', desc: '+20% Fire Rate', price: 15, apply: p => p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.8)) },
-    { name: '💪 Damage', desc: '+5 Damage', price: 12, apply: p => p.damage += 5 },
-    { name: '🎯 Projectile', desc: '+1 Projectile', price: 25, apply: p => p.projectileCount += 1 },
-    { name: '🏃 Speed', desc: '+0.5 Speed', price: 10, apply: p => p.speed += 0.5 },
-    { name: '🛡️ Armor', desc: '+2 Armor', price: 15, apply: p => p.armor += 2 },
-    { name: '✨ Crit Chance', desc: '+10% Crit', price: 20, apply: p => p.critChance = Math.min(0.9, p.critChance + 0.1) },
-    { name: '💥 Crit Damage', desc: '+0.5x Crit', price: 20, apply: p => p.critDamage += 0.5 },
-    { name: '🔭 Range', desc: '+100 Range', price: 15, apply: p => p.range += 100 },
-    { name: '🧲 Pickup Range', desc: '+30 Pickup', price: 8, apply: p => p.pickupRange += 30 },
-    { name: '💉 Life Steal', desc: '+15% Lifesteal', price: 25, apply: p => p.lifeSteal += 0.15 },
-    { name: '🎲 Dodge', desc: '+10% Dodge', price: 20, apply: p => p.dodge = Math.min(0.7, p.dodge + 0.1) },
+    // Common Stat Items
+    { name: '💚 Medkit', category: ITEM_CATEGORIES.STAT, rarity: RARITY.COMMON, basePrice: 8,
+      effects: ['+20 Max HP', 'Full Heal'], apply: p => { p.maxHealth += 20; p.health = p.maxHealth; } },
+    { name: '🏃 Running Shoes', category: ITEM_CATEGORIES.STAT, rarity: RARITY.COMMON, basePrice: 10,
+      effects: ['+0.5 Speed'], apply: p => p.speed += 0.5 },
+    { name: '🧲 Magnet', category: ITEM_CATEGORIES.STAT, rarity: RARITY.COMMON, basePrice: 6,
+      effects: ['+30 Pickup Range'], apply: p => p.pickupRange += 30 },
+    { name: '💪 Power Glove', category: ITEM_CATEGORIES.STAT, rarity: RARITY.COMMON, basePrice: 10,
+      effects: ['+5 Damage'], apply: p => p.damage += 5 },
+    { name: '🛡️ Armor Plate', category: ITEM_CATEGORIES.STAT, rarity: RARITY.COMMON, basePrice: 12,
+      effects: ['+2 Armor'], apply: p => p.armor += 2 },
+      
+    // Uncommon Items with Trade-offs
+    { name: '⚡ Energy Drink', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 12,
+      effects: ['+25% Fire Rate', '-5 Max HP'], apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.75)); p.maxHealth -= 5; } },
+    { name: '🎯 Focus Lens', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 15,
+      effects: ['+150 Range', '-0.3 Speed'], apply: p => { p.range += 150; p.speed = Math.max(1, p.speed - 0.3); } },
+    { name: '⚔️ Battle Fury', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 14,
+      effects: ['+8 Damage', '-10 Max HP'], apply: p => { p.damage += 8; p.maxHealth -= 10; } },
+    { name: '🦅 Eagle Eye', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 16,
+      effects: ['+15% Crit Chance', '+100 Range'], apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.15); p.range += 100; } },
+    { name: '🌪️ Whirlwind', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 15,
+      effects: ['+1.0 Speed', '-3 Armor'], apply: p => { p.speed += 1.0; p.armor = Math.max(0, p.armor - 3); } },
+    
+    // Rare Items
+    { name: '💎 Diamond Heart', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 18,
+      effects: ['+40 Max HP', '+4 Armor', '-0.4 Speed'], apply: p => { p.maxHealth += 40; p.armor += 4; p.speed = Math.max(1, p.speed - 0.4); } },
+    { name: '🎯 Multi-Shot', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 22,
+      effects: ['+1 Projectile', '-3 Damage'], apply: p => { p.projectileCount += 1; p.damage = Math.max(1, p.damage - 3); } },
+    { name: '💉 Vampire Fang', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 20,
+      effects: ['+20% Life Steal', '-15 Max HP'], apply: p => { p.lifeSteal += 0.20; p.maxHealth -= 15; } },
+    { name: '⚡ Overclocked Core', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 20,
+      effects: ['+35% Fire Rate', '+10 Damage', '-20 Max HP'], apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.65)); p.damage += 10; p.maxHealth -= 20; } },
+    { name: '🎲 Lucky Charm', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 18,
+      effects: ['+20% Crit Chance', '+15% Dodge'], apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.20); p.dodge = Math.min(0.7, p.dodge + 0.15); } },
+    
+    // Epic Items
+    { name: '💥 Critical Mass', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.EPIC, basePrice: 24,
+      effects: ['+25% Crit Chance', '+1.0x Crit Dmg', '-10% Fire Rate'], apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.25); p.critDamage += 1.0; p.fireRate = Math.floor(p.fireRate * 1.1); } },
+    { name: '🛡️ Titan Armor', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.EPIC, basePrice: 26,
+      effects: ['+60 Max HP', '+6 Armor', '-0.8 Speed'], apply: p => { p.maxHealth += 60; p.armor += 6; p.speed = Math.max(1, p.speed - 0.8); } },
+    { name: '🌟 Nova Burst', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.EPIC, basePrice: 28,
+      effects: ['+2 Projectiles', '+15 Damage', '-20% Fire Rate'], apply: p => { p.projectileCount += 2; p.damage += 15; p.fireRate = Math.floor(p.fireRate * 1.2); } },
+    { name: '⚡ Lightning Reflexes', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.EPIC, basePrice: 25,
+      effects: ['+25% Dodge', '+1.2 Speed', '-10 Max HP'], apply: p => { p.dodge = Math.min(0.7, p.dodge + 0.25); p.speed += 1.2; p.maxHealth -= 10; } },
+    
+    // Legendary Items
+    { name: '👑 Crown of Power', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.LEGENDARY, basePrice: 35,
+      effects: ['+20 Damage', '+2 Projectiles', '+100 Range', '-30 Max HP'], apply: p => { p.damage += 20; p.projectileCount += 2; p.range += 100; p.maxHealth -= 30; } },
+    { name: '🔮 Mystic Orb', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.LEGENDARY, basePrice: 38,
+      effects: ['+40% Crit Chance', '+1.5x Crit Dmg', '+30% Life Steal'], apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.40); p.critDamage += 1.5; p.lifeSteal += 0.30; } },
+    { name: '⚔️ God Slayer', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.LEGENDARY, basePrice: 40,
+      effects: ['+35 Damage', '+50% Fire Rate', '-40 Max HP', '-1.0 Speed'], apply: p => { p.damage += 35; p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.5)); p.maxHealth -= 40; p.speed = Math.max(1, p.speed - 1.0); } },
+    { name: '🌌 Cosmic Shield', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.LEGENDARY, basePrice: 36,
+      effects: ['+100 Max HP', '+10 Armor', '+30% Dodge', '-1.2 Speed'], apply: p => { p.maxHealth += 100; p.armor += 10; p.dodge = Math.min(0.7, p.dodge + 0.30); p.speed = Math.max(1, p.speed - 1.2); } },
+    
+    // Weapons
+    { name: '🔫 Plasma Rifle', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.UNCOMMON, basePrice: 18,
+      effects: ['+12 Damage', '+200 Range', 'Weapon Unlock'], apply: p => { p.damage += 12; p.range += 200; } },
+    { name: '⚡ Tesla Coil', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.RARE, basePrice: 24,
+      effects: ['+60% Fire Rate', '+1 Projectile', 'Weapon Unlock'], apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.4)); p.projectileCount += 1; } },
+    { name: '🚀 Rocket Pod', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.EPIC, basePrice: 30,
+      effects: ['+25 Damage', '+3 Projectiles', '-30% Fire Rate'], apply: p => { p.damage += 25; p.projectileCount += 3; p.fireRate = Math.floor(p.fireRate * 1.3); } },
+    { name: '🌟 Cosmic Cannon', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.LEGENDARY, basePrice: 42,
+      effects: ['+40 Damage', '+4 Projectiles', '+300 Range', '-40% Fire Rate'], apply: p => { p.damage += 40; p.projectileCount += 4; p.range += 300; p.fireRate = Math.floor(p.fireRate * 1.4); } },
 ];
+
+// Shop state management
+let shopState = {
+    currentOfferings: [],
+    lockedItems: new Set(),
+    rerollCost: 3,
+    rerollCount: 0
+};
+
+function generateShopOfferings() {
+    // Generate weighted random items based on rarity
+    const offerings = [];
+    const rarityWeights = [
+        { rarity: RARITY.COMMON, weight: 50 },
+        { rarity: RARITY.UNCOMMON, weight: 30 },
+        { rarity: RARITY.RARE, weight: 12 },
+        { rarity: RARITY.EPIC, weight: 6 },
+        { rarity: RARITY.LEGENDARY, weight: 2 }
+    ];
+    
+    for (let i = 0; i < 6; i++) {
+        // Skip if item is locked from previous reroll
+        if (shopState.currentOfferings[i] && shopState.lockedItems.has(i)) {
+            offerings.push(shopState.currentOfferings[i]);
+            continue;
+        }
+        
+        // Weighted random rarity selection
+        const totalWeight = rarityWeights.reduce((sum, r) => sum + r.weight, 0);
+        let random = Math.random() * totalWeight;
+        let selectedRarity = RARITY.COMMON;
+        
+        for (const { rarity, weight } of rarityWeights) {
+            random -= weight;
+            if (random <= 0) {
+                selectedRarity = rarity;
+                break;
+            }
+        }
+        
+        // Get items of selected rarity
+        const itemsOfRarity = SHOP_ITEMS.filter(item => item.rarity === selectedRarity);
+        if (itemsOfRarity.length > 0) {
+            const item = itemsOfRarity[Math.floor(Math.random() * itemsOfRarity.length)];
+            offerings.push({
+                ...item,
+                price: Math.ceil(item.basePrice * item.rarity.priceMultiplier * (1 + game.wave * 0.1))
+            });
+        } else {
+            // Fallback to common if no items of selected rarity
+            const commonItems = SHOP_ITEMS.filter(item => item.rarity === RARITY.COMMON);
+            const item = commonItems[Math.floor(Math.random() * commonItems.length)];
+            offerings.push({
+                ...item,
+                price: Math.ceil(item.basePrice * item.rarity.priceMultiplier * (1 + game.wave * 0.1))
+            });
+        }
+    }
+    
+    return offerings;
+}
 
 function openShop() {
     game.state = 'shop';
@@ -1105,34 +1234,155 @@ function openShop() {
         game.persistentStats.lowHealthSurvival = (game.persistentStats.lowHealthSurvival || 0) + 1;
     }
     
+    // Reset shop state for new wave
+    if (shopState.currentOfferings.length === 0) {
+        shopState.currentOfferings = generateShopOfferings();
+        shopState.lockedItems.clear();
+        shopState.rerollCost = 3;
+        shopState.rerollCount = 0;
+    }
+    
+    renderShop();
+}
+
+function renderShop() {
     const shopContainer = document.getElementById('shop-items');
     shopContainer.innerHTML = '';
     
-    const shuffled = [...SHOP_ITEMS].sort(() => Math.random() - 0.5);
-    const offerings = shuffled.slice(0, 6);
+    // Add reroll button at the top
+    const rerollSection = document.createElement('div');
+    rerollSection.className = 'shop-reroll-section';
+    rerollSection.innerHTML = `
+        <button id="reroll-btn" class="btn-reroll ${game.credits < shopState.rerollCost ? 'disabled' : ''}">
+            🔄 Reroll Shop (${shopState.rerollCost} 💰)
+        </button>
+        <p class="reroll-info">Click on items to lock/unlock them before rerolling</p>
+    `;
+    shopContainer.appendChild(rerollSection);
     
-    offerings.forEach(item => {
+    const itemsGrid = document.createElement('div');
+    itemsGrid.className = 'shop-items-grid';
+    
+    shopState.currentOfferings.forEach((item, index) => {
+        const isLocked = shopState.lockedItems.has(index);
+        const canAfford = game.credits >= item.price;
+        
         const div = document.createElement('div');
-        div.className = 'shop-item' + (game.credits < item.price ? ' disabled' : '');
+        div.className = `shop-item rarity-${item.rarity.name.toLowerCase()}${!canAfford ? ' disabled' : ''}${isLocked ? ' locked' : ''}`;
+        div.dataset.index = index;
+        
+        // Create effects display
+        const effectsHTML = item.effects.map(effect => {
+            const isPositive = effect.startsWith('+');
+            const isNegative = effect.startsWith('-');
+            const className = isPositive ? 'positive' : (isNegative ? 'negative' : 'neutral');
+            return `<span class="effect ${className}">${effect}</span>`;
+        }).join('');
+        
         div.innerHTML = `
-            <h4>${item.name}</h4>
-            <p>${item.desc}</p>
-            <p class="price">💰 ${item.price} Credits</p>
+            <div class="item-header">
+                <h4>${item.name}</h4>
+                <span class="rarity-badge" style="background: ${item.rarity.color}">${item.rarity.name}</span>
+            </div>
+            <div class="item-category">${item.category}</div>
+            <div class="item-effects">${effectsHTML}</div>
+            <div class="item-footer">
+                <p class="price">💰 ${item.price}</p>
+                ${isLocked ? '<span class="lock-icon">🔒</span>' : '<span class="lock-icon-hover">🔓</span>'}
+            </div>
         `;
-        div.addEventListener('click', () => {
-            if (game.credits >= item.price) {
-                game.credits -= item.price;
-                item.apply(game.player);
-                game.persistentStats.upgradesPurchased++;
-                savePersistentStats();
-                Sound.play('powerup');
-                updateUI();
-                openShop();
-                checkAchievements();
+        
+        // Right-click to lock/unlock
+        div.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            toggleItemLock(index);
+        });
+        
+        // Click to purchase
+        div.addEventListener('click', (e) => {
+            // Don't purchase if clicking to lock
+            if (e.shiftKey || e.ctrlKey) {
+                toggleItemLock(index);
+                return;
+            }
+            
+            if (canAfford) {
+                purchaseItem(item, index);
             }
         });
-        shopContainer.appendChild(div);
+        
+        itemsGrid.appendChild(div);
     });
+    
+    shopContainer.appendChild(itemsGrid);
+    
+    // Add reroll button event listener
+    const rerollBtn = document.getElementById('reroll-btn');
+    if (rerollBtn) {
+        rerollBtn.addEventListener('click', rerollShop);
+    }
+}
+
+function toggleItemLock(index) {
+    if (shopState.lockedItems.has(index)) {
+        shopState.lockedItems.delete(index);
+    } else {
+        shopState.lockedItems.add(index);
+    }
+    renderShop();
+}
+
+function purchaseItem(item, index) {
+    game.credits -= item.price;
+    item.apply(game.player);
+    game.persistentStats.upgradesPurchased++;
+    savePersistentStats();
+    Sound.play('powerup');
+    
+    // Remove purchased item and unlock it
+    shopState.currentOfferings.splice(index, 1);
+    
+    // Adjust locked items indices
+    const newLockedItems = new Set();
+    shopState.lockedItems.forEach(lockedIndex => {
+        if (lockedIndex < index) {
+            newLockedItems.add(lockedIndex);
+        } else if (lockedIndex > index) {
+            newLockedItems.add(lockedIndex - 1);
+        }
+    });
+    shopState.lockedItems = newLockedItems;
+    
+    // Add a new item to replace the purchased one
+    const newItem = generateShopOfferings()[0];
+    shopState.currentOfferings.push(newItem);
+    
+    updateUI();
+    renderShop();
+    checkAchievements();
+}
+
+function rerollShop() {
+    if (game.credits < shopState.rerollCost) return;
+    
+    game.credits -= shopState.rerollCost;
+    shopState.rerollCount++;
+    shopState.rerollCost = Math.ceil(3 * (1 + shopState.rerollCount * 0.5)); // Increase reroll cost
+    
+    // Generate new offerings, keeping locked items
+    const newOfferings = [];
+    for (let i = 0; i < shopState.currentOfferings.length; i++) {
+        if (shopState.lockedItems.has(i)) {
+            newOfferings.push(shopState.currentOfferings[i]);
+        } else {
+            newOfferings.push(generateShopOfferings()[0]);
+        }
+    }
+    
+    shopState.currentOfferings = newOfferings;
+    Sound.play('powerup');
+    updateUI();
+    renderShop();
 }
 
 // ==================== WAVE SYSTEM ====================
@@ -1185,6 +1435,13 @@ function nextWave() {
     game.timeLeft = CONFIG.WAVE_DURATION;
     game.state = 'playing';
     document.getElementById('shop-modal').classList.add('hidden');
+    
+    // Reset shop state for next wave
+    shopState.currentOfferings = [];
+    shopState.lockedItems.clear();
+    shopState.rerollCost = 3;
+    shopState.rerollCount = 0;
+    
     spawnWave();
     checkAchievements();
 }
