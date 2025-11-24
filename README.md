@@ -148,11 +148,15 @@ Instead of a potato, you play as a cosmic astronaut with:
 **All future enhancements have been implemented!**
 
 ### 🎭 Character Selection
-Choose from 4 unique characters with different starting stats:
+Choose from 8 unique characters with different starting stats:
 - **⚖️ Balanced Astronaut**: Well-rounded stats for any playstyle
 - **🛡️ Tank**: High health (150 HP) and armor, slower movement
 - **⚡ Speedster**: Fast movement and fire rate, lower health
 - **🎯 Sniper**: Long range with high critical damage
+- **🔫 Gunslinger**: Multi-shot specialist with rapid fire
+- **🧛 Vampire**: Drains life from enemies with each hit
+- **⚔️ Berserker**: High damage but risky - glass cannon
+- **🔧 Engineer**: Defensive specialist with armor and range
 
 ### 👾 Enemy Types
 Face 6 different enemy types with unique behaviors:

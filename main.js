@@ -40,6 +40,30 @@ const CHARACTERS = [
         description: 'Long range, high crit',
         maxHealth: 80, speed: 2.5, damage: 20, fireRate: 50, critChance: 0.3, critDamage: 2.5, range: 600,
     },
+    {
+        id: 'gunslinger',
+        name: '🔫 Gunslinger',
+        description: 'Multi-shot specialist',
+        maxHealth: 85, speed: 3.5, damage: 8, fireRate: 20, projectileCount: 3, dodge: 0.05,
+    },
+    {
+        id: 'vampire',
+        name: '🧛 Vampire',
+        description: 'Life drain on hit',
+        maxHealth: 90, speed: 2.8, damage: 12, fireRate: 35, armor: 2, lifeSteal: 0.2,
+    },
+    {
+        id: 'berserker',
+        name: '⚔️ Berserker',
+        description: 'High damage glass cannon',
+        maxHealth: 60, speed: 4, damage: 18, fireRate: 25, critChance: 0.25, critDamage: 2.0, dodge: 0.15,
+    },
+    {
+        id: 'engineer',
+        name: '🔧 Engineer',
+        description: 'Defensive armor specialist',
+        maxHealth: 120, speed: 2.2, damage: 9, fireRate: 38, armor: 8, range: 500, pickupRange: 65,
+    },
 ];
 
 // Weapon types
@@ -223,6 +247,7 @@ class Player {
         this.x = CONFIG.CANVAS_WIDTH / 2;
         this.y = CONFIG.CANVAS_HEIGHT / 2;
         this.size = CONFIG.PLAYER_SIZE;
+        this.characterId = character.id;
         this.maxHealth = character.maxHealth;
         this.health = character.maxHealth;
         this.speed = character.speed;
@@ -334,20 +359,187 @@ class Player {
 
     draw(ctx) {
         ctx.save();
-        ctx.fillStyle = '#4ecdc4';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#1a1a2e';
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = 'rgba(78, 205, 196, 0.5)';
-        ctx.beginPath();
-        ctx.arc(this.x - this.size * 0.2, this.y - this.size * 0.2, this.size * 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#00ff88';
-        ctx.fillRect(this.x - this.size * 0.4, this.y + this.size * 0.3, this.size * 0.8, this.size * 0.6);
+        
+        // Different visuals for each character
+        switch(this.characterId) {
+            case 'balanced':
+                // Balanced: Classic astronaut with cyan helmet
+                ctx.fillStyle = '#4ecdc4';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = 'rgba(78, 205, 196, 0.5)';
+                ctx.beginPath();
+                ctx.arc(this.x - this.size * 0.2, this.y - this.size * 0.2, this.size * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#00ff88';
+                ctx.fillRect(this.x - this.size * 0.4, this.y + this.size * 0.3, this.size * 0.8, this.size * 0.6);
+                break;
+                
+            case 'tank':
+                // Tank: Heavy armor plating with shield emblem
+                ctx.fillStyle = '#64748b';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#334155';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+                // Shield emblem
+                ctx.fillStyle = '#94a3b8';
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y - this.size * 0.4);
+                ctx.lineTo(this.x - this.size * 0.3, this.y);
+                ctx.lineTo(this.x, this.y + this.size * 0.5);
+                ctx.lineTo(this.x + this.size * 0.3, this.y);
+                ctx.closePath();
+                ctx.fill();
+                break;
+                
+            case 'speedster':
+                // Speedster: Sleek design with lightning pattern
+                ctx.fillStyle = '#fbbf24';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                // Lightning bolt
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y - this.size * 0.5);
+                ctx.lineTo(this.x - this.size * 0.2, this.y);
+                ctx.lineTo(this.x + this.size * 0.1, this.y);
+                ctx.lineTo(this.x, this.y + this.size * 0.5);
+                ctx.lineTo(this.x + this.size * 0.2, this.y - this.size * 0.1);
+                ctx.lineTo(this.x - this.size * 0.1, this.y - this.size * 0.1);
+                ctx.closePath();
+                ctx.fill();
+                break;
+                
+            case 'sniper':
+                // Sniper: Scope/targeting reticle design
+                ctx.fillStyle = '#22c55e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.65, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.45, 0, Math.PI * 2);
+                ctx.fill();
+                // Crosshair
+                ctx.strokeStyle = '#86efac';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.size * 0.6, this.y);
+                ctx.lineTo(this.x + this.size * 0.6, this.y);
+                ctx.moveTo(this.x, this.y - this.size * 0.6);
+                ctx.lineTo(this.x, this.y + this.size * 0.6);
+                ctx.stroke();
+                break;
+                
+            case 'gunslinger':
+                // Gunslinger: Dual-wielding with bullets
+                ctx.fillStyle = '#f97316';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Bullets
+                ctx.fillStyle = '#fdba74';
+                for (let i = 0; i < 3; i++) {
+                    const angle = (i - 1) * 0.4;
+                    const dx = Math.cos(angle) * this.size * 0.5;
+                    const dy = Math.sin(angle) * this.size * 0.5;
+                    ctx.fillRect(this.x + dx - 2, this.y + dy - 4, 4, 8);
+                }
+                break;
+                
+            case 'vampire':
+                // Vampire: Dark with blood-red accents
+                ctx.fillStyle = '#7c2d12';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Fangs
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.size * 0.2, this.y + this.size * 0.2);
+                ctx.lineTo(this.x - this.size * 0.1, this.y + this.size * 0.4);
+                ctx.lineTo(this.x, this.y + this.size * 0.2);
+                ctx.lineTo(this.x + this.size * 0.1, this.y + this.size * 0.4);
+                ctx.lineTo(this.x + this.size * 0.2, this.y + this.size * 0.2);
+                ctx.closePath();
+                ctx.fill();
+                break;
+                
+            case 'berserker':
+                // Berserker: Aggressive spiky design
+                ctx.fillStyle = '#dc2626';
+                // Spiky circle
+                ctx.beginPath();
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const radius = i % 2 === 0 ? this.size * 0.8 : this.size * 0.5;
+                    const x = this.x + Math.cos(angle) * radius;
+                    const y = this.y + Math.sin(angle) * radius;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+                
+            case 'engineer':
+                // Engineer: Mechanical/gear design
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Gear teeth
+                ctx.fillStyle = '#60a5fa';
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const x = this.x + Math.cos(angle) * this.size * 0.6;
+                    const y = this.y + Math.sin(angle) * this.size * 0.6;
+                    ctx.fillRect(x - 3, y - 3, 6, 6);
+                }
+                break;
+                
+            default:
+                // Fallback to balanced design
+                ctx.fillStyle = '#4ecdc4';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+        }
+        
         ctx.restore();
     }
 }
@@ -501,17 +693,200 @@ class Enemy {
 
     draw(ctx) {
         ctx.save();
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
+        
+        const typeData = ENEMY_TYPES[this.type] || ENEMY_TYPES.normal;
         
         if (this.isBoss) {
+            // Boss design - large and imposing
+            const bossType = BOSS_TYPES[this.type] || BOSS_TYPES.destroyer;
+            
+            // Main body
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Boss-specific features
+            if (this.type === 'destroyer' || this.type === 'normal') {
+                // Horns for destroyer
+                ctx.fillStyle = '#991b1b';
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.size * 0.8, this.y - this.size * 0.5);
+                ctx.lineTo(this.x - this.size * 0.5, this.y - this.size);
+                ctx.lineTo(this.x - this.size * 0.3, this.y - this.size * 0.5);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.size * 0.8, this.y - this.size * 0.5);
+                ctx.lineTo(this.x + this.size * 0.5, this.y - this.size);
+                ctx.lineTo(this.x + this.size * 0.3, this.y - this.size * 0.5);
+                ctx.fill();
+            } else if (this.type === 'broodmother') {
+                // Spider-like legs
+                ctx.strokeStyle = '#92400e';
+                ctx.lineWidth = 4;
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(this.x + Math.cos(angle) * this.size * 1.5, this.y + Math.sin(angle) * this.size * 1.5);
+                    ctx.stroke();
+                }
+            } else if (this.type === 'voidwalker') {
+                // Ethereal wispy tentacles
+                ctx.strokeStyle = 'rgba(139, 92, 246, 0.6)';
+                ctx.lineWidth = 3;
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2 + Date.now() * 0.001;
+                    const wave = Math.sin(Date.now() * 0.003 + i) * 20;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y);
+                    ctx.quadraticCurveTo(
+                        this.x + Math.cos(angle) * this.size,
+                        this.y + Math.sin(angle) * this.size + wave,
+                        this.x + Math.cos(angle) * this.size * 1.3,
+                        this.y + Math.sin(angle) * this.size * 1.3
+                    );
+                    ctx.stroke();
+                }
+            }
+            
+            // Boss border
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
             ctx.stroke();
+        } else {
+            // Regular enemy designs - unique for each type
+            switch(this.type) {
+                case 'normal':
+                    // Classic alien blob with tentacles
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Small tentacles
+                    ctx.fillStyle = '#9333ea';
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (i / 4) * Math.PI * 2;
+                        ctx.beginPath();
+                        ctx.arc(
+                            this.x + Math.cos(angle) * this.size * 0.8,
+                            this.y + Math.sin(angle) * this.size * 0.8,
+                            this.size * 0.3,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                    break;
+                    
+                case 'fast':
+                    // Sleek predator design
+                    ctx.fillStyle = this.color;
+                    // Elongated oval body
+                    ctx.beginPath();
+                    ctx.ellipse(this.x, this.y, this.size * 1.2, this.size * 0.7, Math.PI / 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Spikes
+                    ctx.fillStyle = '#dc2626';
+                    for (let i = 0; i < 3; i++) {
+                        const angle = Math.PI / 4 + (i - 1) * 0.3;
+                        ctx.beginPath();
+                        ctx.moveTo(this.x + Math.cos(angle) * this.size * 0.5, this.y + Math.sin(angle) * this.size * 0.5);
+                        ctx.lineTo(this.x + Math.cos(angle) * this.size * 1.5, this.y + Math.sin(angle) * this.size * 1.5);
+                        ctx.lineTo(this.x + Math.cos(angle + 0.3) * this.size * 0.5, this.y + Math.sin(angle + 0.3) * this.size * 0.5);
+                        ctx.fill();
+                    }
+                    break;
+                    
+                case 'tank':
+                    // Armored beetle design
+                    ctx.fillStyle = this.color;
+                    // Shell segments
+                    for (let i = 0; i < 3; i++) {
+                        ctx.beginPath();
+                        ctx.arc(
+                            this.x,
+                            this.y - this.size * 0.4 + i * this.size * 0.4,
+                            this.size * 0.8,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                    // Armor plating
+                    ctx.strokeStyle = '#065f46';
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < 4; i++) {
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size * (0.9 - i * 0.2), 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    break;
+                    
+                case 'swarm':
+                    // Small insect-like creature
+                    ctx.fillStyle = this.color;
+                    // Body
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Wings
+                    ctx.fillStyle = 'rgba(251, 191, 36, 0.5)';
+                    ctx.beginPath();
+                    ctx.ellipse(this.x - this.size * 0.5, this.y, this.size * 0.6, this.size * 0.3, -Math.PI / 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.ellipse(this.x + this.size * 0.5, this.y, this.size * 0.6, this.size * 0.3, Math.PI / 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    break;
+                    
+                case 'teleporter':
+                    // Mystical orb with energy rings
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Energy rings
+                    const pulse = Math.sin(Date.now() * 0.005) * 0.2 + 1;
+                    ctx.strokeStyle = 'rgba(139, 92, 246, 0.6)';
+                    ctx.lineWidth = 2;
+                    for (let i = 0; i < 3; i++) {
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size * (1.2 + i * 0.3) * pulse, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    break;
+                    
+                case 'shooter':
+                    // Ranged attacker with cannon
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Cannon barrels
+                    const angle = game.player ? Math.atan2(game.player.y - this.y, game.player.x - this.x) : 0;
+                    ctx.fillStyle = '#9f1239';
+                    for (let i = -1; i <= 1; i += 2) {
+                        ctx.save();
+                        ctx.translate(this.x, this.y);
+                        ctx.rotate(angle);
+                        ctx.fillRect(this.size * 0.5, this.size * 0.2 * i, this.size * 0.8, this.size * 0.15);
+                        ctx.restore();
+                    }
+                    break;
+                    
+                default:
+                    // Fallback blob
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+            }
         }
         
+        // Eyes for all enemies
         ctx.fillStyle = '#fff';
         ctx.beginPath();
         ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.2, this.size * 0.2, 0, Math.PI * 2);
@@ -523,6 +898,7 @@ class Enemy {
         ctx.arc(this.x + this.size * 0.3, this.y - this.size * 0.2, this.size * 0.1, 0, Math.PI * 2);
         ctx.fill();
         
+        // Health bar
         if (this.health < this.maxHealth) {
             const barWidth = this.size * 1.5;
             const barX = this.x - barWidth / 2;
