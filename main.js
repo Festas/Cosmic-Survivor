@@ -128,9 +128,18 @@ function saveHighScores() {
 
 // ==================== SOUND SYSTEM ====================
 const Sound = {
+    audioContext: null,
+    
+    getContext() {
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        return this.audioContext;
+    },
+    
     play(type) {
         if (!game.soundEnabled) return;
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const ctx = this.getContext();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.connect(gain);
@@ -1069,8 +1078,8 @@ function init() {
     soundBtn.className = 'sound-btn';
     soundBtn.textContent = game.soundEnabled ? '🔊' : '🔇';
     soundBtn.addEventListener('click', () => {
-        Sound.toggle();
-        soundBtn.textContent = game.soundEnabled ? '🔊' : '🔇';
+        const enabled = Sound.toggle();
+        soundBtn.textContent = enabled ? '🔊' : '🔇';
     });
     document.body.appendChild(soundBtn);
     
