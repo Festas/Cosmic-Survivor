@@ -866,7 +866,7 @@ class Enemy {
                     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
                     ctx.fill();
                     // Cannon barrels
-                    const angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
+                    const angle = game.player ? Math.atan2(game.player.y - this.y, game.player.x - this.x) : 0;
                     ctx.fillStyle = '#9f1239';
                     for (let i = -1; i <= 1; i += 2) {
                         ctx.save();
