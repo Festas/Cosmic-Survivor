@@ -105,16 +105,20 @@ const game = {
     bullets: [],
     pickups: [],
     particles: [],
+    stars: [],
     keys: {},
     touchActive: false,
     joystick: { x: 0, y: 0, active: false, startX: 0, startY: 0 },
     currentWeapon: 'basic',
+    camera: { shake: 0, offsetX: 0, offsetY: 0 },
     stats: {
         enemiesKilled: 0,
         damageDealt: 0,
         damageTaken: 0,
         bossesDefeated: 0,
         waveStartDamage: 0,
+        comboKills: 0,
+        comboTimer: 0,
     },
     persistentStats: loadPersistentStats(),
     achievements: loadAchievements(),
@@ -340,13 +344,19 @@ class Player {
 
     takeDamage(amount) {
         if (Math.random() < this.dodge) {
-            createTextParticle(this.x, this.y, 'DODGE!', '#4ecdc4');
+            createTextParticle(this.x, this.y, 'DODGE!', '#4ecdc4', 18);
+            createParticles(this.x, this.y, '#4ecdc4', 8);
             return;
         }
         const finalDamage = Math.max(1, amount - this.armor);
         this.health -= finalDamage;
         game.stats.damageTaken += finalDamage;
-        createTextParticle(this.x, this.y, `-${finalDamage}`, '#ff6b6b');
+        
+        // Enhanced damage feedback
+        createTextParticle(this.x, this.y, `-${finalDamage}`, '#ff6b6b', 18);
+        createParticles(this.x, this.y, '#ff6b6b', 5);
+        addScreenShake(finalDamage * 0.5);
+        
         Sound.play('hit');
         if (this.health <= 0) gameOver();
     }
@@ -354,7 +364,10 @@ class Player {
     heal(amount) {
         const heal = Math.min(amount, this.maxHealth - this.health);
         this.health += heal;
-        if (heal > 0) createTextParticle(this.x, this.y, `+${heal}`, '#00ff88');
+        if (heal > 0) {
+            createTextParticle(this.x, this.y, `+${heal}`, '#00ff88', 18);
+            createParticles(this.x, this.y, '#00ff88', 8);
+        }
     }
 
     draw(ctx) {
@@ -670,7 +683,14 @@ class Enemy {
     takeDamage(amount, isCrit = false) {
         this.health -= amount;
         game.stats.damageDealt += amount;
-        createTextParticle(this.x, this.y, `-${amount}${isCrit ? '!' : ''}`, isCrit ? '#ffd93d' : '#fff');
+        
+        // Enhanced damage numbers
+        const fontSize = isCrit ? 22 : 16;
+        createTextParticle(this.x, this.y, `-${amount}${isCrit ? '!' : ''}`, isCrit ? '#ffd93d' : '#fff', fontSize);
+        
+        // Hit flash effect
+        createParticles(this.x, this.y, this.color, 3);
+        
         if (this.health <= 0) {
             this.die();
             return true;
@@ -681,12 +701,27 @@ class Enemy {
     die() {
         game.stats.enemiesKilled++;
         game.persistentStats.totalKills++;
+        
+        // Combo system
+        game.stats.comboKills++;
+        game.stats.comboTimer = 120; // 2 seconds
+        
+        // Show combo text
+        if (game.stats.comboKills > 1 && game.stats.comboKills % 5 === 0) {
+            createTextParticle(this.x, this.y - 30, `${game.stats.comboKills}x COMBO!`, '#ffd93d', 20);
+        }
+        
         if (this.isBoss) {
             game.stats.bossesDefeated++;
             showNotification(`${this.name} Defeated!`);
+            addScreenShake(15);
+            createExplosion(this.x, this.y, this.color, 50);
+        } else {
+            addScreenShake(this.isBoss ? 15 : 3);
+            createExplosion(this.x, this.y, this.color, this.isBoss ? 50 : 20);
         }
+        
         game.pickups.push(new Pickup(this.x, this.y, this.creditValue));
-        createParticles(this.x, this.y, this.color, this.isBoss ? 30 : 15);
         Sound.play('death');
         checkAchievements();
     }
@@ -1018,10 +1053,30 @@ class Pickup {
     }
 }
 
+// ==================== VISUAL EFFECTS ====================
+// Screen shake system
+function addScreenShake(intensity = 5) {
+    game.camera.shake = Math.max(game.camera.shake, intensity);
+}
+
+function updateCamera() {
+    if (game.camera.shake > 0) {
+        game.camera.offsetX = (Math.random() - 0.5) * game.camera.shake;
+        game.camera.offsetY = (Math.random() - 0.5) * game.camera.shake;
+        game.camera.shake *= 0.9;
+        if (game.camera.shake < 0.1) {
+            game.camera.shake = 0;
+            game.camera.offsetX = 0;
+            game.camera.offsetY = 0;
+        }
+    }
+}
+
+// Enhanced particle system
 function createParticles(x, y, color, count) {
     for (let i = 0; i < count; i++) {
-        const angle = (Math.PI * 2 * i) / count;
-        const speed = 2 + Math.random() * 3;
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
+        const speed = 2 + Math.random() * 4;
         game.particles.push({
             x, y,
             vx: Math.cos(angle) * speed,
@@ -1029,19 +1084,62 @@ function createParticles(x, y, color, count) {
             color,
             life: 30 + Math.random() * 20,
             maxLife: 50,
+            size: 2 + Math.random() * 2,
             type: 'particle',
         });
     }
 }
 
-function createTextParticle(x, y, text, color) {
-    game.particles.push({ x, y, text, color, life: 60, maxLife: 60, vy: -1, type: 'text' });
+// Create explosion effect
+function createExplosion(x, y, color, count = 30) {
+    for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count;
+        const speed = 3 + Math.random() * 5;
+        game.particles.push({
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            color,
+            life: 40 + Math.random() * 20,
+            maxLife: 60,
+            size: 3 + Math.random() * 3,
+            type: 'explosion',
+        });
+    }
+}
+
+function createTextParticle(x, y, text, color, size = 16) {
+    game.particles.push({ 
+        x, y, text, color, 
+        life: 60, maxLife: 60, 
+        vy: -1.5, 
+        scale: 1, 
+        fontSize: size,
+        type: 'text' 
+    });
 }
 
 function updateParticles() {
+    // Update combo timer
+    if (game.stats.comboTimer > 0) {
+        game.stats.comboTimer--;
+        if (game.stats.comboTimer === 0) {
+            game.stats.comboKills = 0;
+        }
+    }
+
     game.particles = game.particles.filter(p => {
         if (p.type === 'text') {
             p.y += p.vy;
+            p.vy *= 0.95; // Slow down
+            p.scale = 1 + (1 - p.life / p.maxLife) * 0.3; // Pop effect
+            p.life--;
+            return p.life > 0;
+        } else if (p.type === 'explosion') {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vx *= 0.96;
+            p.vy *= 0.96;
             p.life--;
             return p.life > 0;
         } else {
@@ -1060,20 +1158,63 @@ function drawParticles(ctx) {
             ctx.save();
             ctx.globalAlpha = p.life / p.maxLife;
             ctx.fillStyle = p.color;
-            ctx.font = 'bold 16px monospace';
+            ctx.font = `bold ${p.fontSize * p.scale}px monospace`;
             ctx.textAlign = 'center';
             ctx.strokeStyle = '#000';
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 4;
             ctx.strokeText(p.text, p.x, p.y);
             ctx.fillText(p.text, p.x, p.y);
+            
+            // Add glow effect for critical hits
+            if (p.text.includes('!') || p.fontSize > 16) {
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 10 * (p.life / p.maxLife);
+                ctx.fillText(p.text, p.x, p.y);
+            }
             ctx.restore();
-        } else {
+        } else if (p.type === 'explosion') {
+            ctx.save();
             ctx.fillStyle = p.color;
             ctx.globalAlpha = p.life / p.maxLife;
-            ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
-            ctx.globalAlpha = 1;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 5;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * (1 - p.life / p.maxLife), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        } else {
+            ctx.save();
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = p.life / p.maxLife;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 3;
+            ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
+            ctx.restore();
         }
     });
+    
+    // Draw combo counter
+    if (game.stats.comboKills > 1 && game.state === 'playing') {
+        ctx.save();
+        ctx.font = 'bold 24px monospace';
+        ctx.textAlign = 'right';
+        const alpha = Math.min(game.stats.comboTimer / 60, 1);
+        ctx.globalAlpha = alpha;
+        
+        const comboColor = game.stats.comboKills >= 10 ? '#ffd93d' : 
+                          game.stats.comboKills >= 5 ? '#ff6b6b' : '#00ff88';
+        
+        ctx.fillStyle = comboColor;
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = comboColor;
+        ctx.shadowBlur = 10;
+        
+        const text = `${game.stats.comboKills}x COMBO!`;
+        ctx.strokeText(text, CONFIG.CANVAS_WIDTH - 20, 120);
+        ctx.fillText(text, CONFIG.CANVAS_WIDTH - 20, 120);
+        ctx.restore();
+    }
 }
 
 // ==================== SHOP SYSTEM ====================
@@ -1492,8 +1633,18 @@ function updateUI() {
     document.getElementById('credit-amount').textContent = game.credits;
     
     const healthPercent = (game.player.health / game.player.maxHealth) * 100;
-    document.getElementById('health-bar').style.width = healthPercent + '%';
+    const healthBar = document.getElementById('health-bar');
+    healthBar.style.width = healthPercent + '%';
     document.getElementById('health-text').textContent = `${Math.ceil(game.player.health)} / ${game.player.maxHealth}`;
+    
+    // Low health warning effect
+    const healthContainer = document.getElementById('health-bar-container');
+    if (healthPercent <= 25) {
+        const pulse = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+        healthContainer.style.boxShadow = `0 0 ${20 + pulse * 10}px rgba(255, 0, 0, ${0.5 + pulse * 0.5})`;
+    } else {
+        healthContainer.style.boxShadow = '';
+    }
 }
 
 let notifications = [];
@@ -1595,16 +1746,70 @@ function drawJoystick(ctx) {
 let lastTime = 0;
 let timer = 0;
 
+// Initialize starfield
+function initStarfield() {
+    game.stars = [];
+    for (let i = 0; i < 150; i++) {
+        game.stars.push({
+            x: Math.random() * CONFIG.CANVAS_WIDTH,
+            y: Math.random() * CONFIG.CANVAS_HEIGHT,
+            size: Math.random() * 2,
+            speed: 0.1 + Math.random() * 0.5,
+            twinkle: Math.random() * Math.PI * 2,
+        });
+    }
+}
+
+function updateStarfield() {
+    game.stars.forEach(star => {
+        star.y += star.speed;
+        star.twinkle += 0.05;
+        if (star.y > CONFIG.CANVAS_HEIGHT) {
+            star.y = 0;
+            star.x = Math.random() * CONFIG.CANVAS_WIDTH;
+        }
+    });
+}
+
+function drawStarfield(ctx) {
+    ctx.save();
+    game.stars.forEach(star => {
+        const alpha = 0.3 + Math.sin(star.twinkle) * 0.3;
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#fff';
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = star.size * 2;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    ctx.restore();
+}
+
 function gameLoop(timestamp) {
     const deltaTime = timestamp - lastTime;
     lastTime = timestamp;
     
     const ctx = game.ctx;
-    ctx.fillStyle = '#1a1a2e';
+    
+    // Update camera shake
+    updateCamera();
+    
+    // Apply camera offset
+    ctx.save();
+    ctx.translate(game.camera.offsetX, game.camera.offsetY);
+    
+    // Background
+    ctx.fillStyle = '#0a0a1a';
     ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
     
-    // Grid
-    ctx.strokeStyle = 'rgba(78, 205, 196, 0.05)';
+    // Animated starfield
+    updateStarfield();
+    drawStarfield(ctx);
+    
+    // Grid with subtle animation
+    const gridPulse = Math.sin(timestamp * 0.0005) * 0.02 + 0.05;
+    ctx.strokeStyle = `rgba(78, 205, 196, ${gridPulse})`;
     ctx.lineWidth = 1;
     for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += 50) {
         ctx.beginPath();
@@ -1659,6 +1864,9 @@ function gameLoop(timestamp) {
         updateUI();
     }
     
+    // Restore canvas (end camera shake)
+    ctx.restore();
+    
     requestAnimationFrame(gameLoop);
 }
 
@@ -1666,6 +1874,9 @@ function gameLoop(timestamp) {
 function init() {
     game.canvas = document.getElementById('gameCanvas');
     game.ctx = game.canvas.getContext('2d');
+    
+    // Initialize visual systems
+    initStarfield();
     
     setupTouchControls();
     
