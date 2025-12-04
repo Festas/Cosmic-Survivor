@@ -1493,3 +1493,41 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+/* Locked Character Styles */
+.locked-character {
+    opacity: 0.6;
+    cursor: not-allowed;
+    position: relative;
+}
+
+.locked-character::after {
+    content: '🔒';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 24px;
+}
+
+.unlock-requirement {
+    font-size: 11px;
+    color: #ffd93d;
+    margin: 10px 0;
+}
+
+.unlock-btn {
+    width: 100%;
+    padding: 8px;
+    background: linear-gradient(135deg, #ffd93d 0%, #ff9d00 100%);
+    border: none;
+    border-radius: 5px;
+    color: #000;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.unlock-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(255, 217, 61, 0.8);
+}
