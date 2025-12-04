@@ -2,11 +2,49 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cosmic Survivor">
+    <meta name="theme-color" content="#00ff88">
+    <meta name="description" content="Survive waves of alien creatures in this action-packed arena shooter!">
+    
     <title>Cosmic Survivor - Enhanced Edition</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- iOS Icons - Note: Add actual icon files for production -->
+    <link rel="apple-touch-icon" href="icon-192.svg">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+    
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1 class="loading-title">🚀 Cosmic Survivor 🚀</h1>
+            <div class="loading-spinner"></div>
+            <p class="loading-text">Initializing...</p>
+            <div class="loading-bar-container">
+                <div class="loading-bar" id="loading-bar"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rotate Device Message (Portrait Mode) -->
+    <div id="rotate-message" class="hidden">
+        <div class="rotate-content">
+            <div class="phone-icon">📱</div>
+            <p>Please rotate your device to landscape mode</p>
+            <div class="rotate-icon">🔄</div>
+        </div>
+    </div>
+    
     <div id="game-container">
         <canvas id="gameCanvas" width="1200" height="800"></canvas>
         <div id="ui-overlay">
@@ -69,6 +107,8 @@
                     <p>📱 Mobile Touch Controls</p>
                     <p>👾 10 Different Enemy Types</p>
                     <p>💀 5 Epic Boss Types</p>
+                    <p>⏸️ Pause & Resume</p>
+                    <p>📴 Offline Support (PWA)</p>
                 </div>
                 <div class="controls-info">
                     <h3>Controls:</h3>
@@ -83,7 +123,34 @@
                 <button id="start-btn" class="btn-primary">Begin Mission</button>
             </div>
         </div>
+        
+        <!-- Pause Overlay -->
+        <div id="pause-overlay">
+            <div class="pause-menu">
+                <h2>⏸️ PAUSED</h2>
+                <p>Press ESC or click Resume to continue</p>
+                <button id="resume-btn" class="btn-primary">Resume</button>
+            </div>
+        </div>
+        
+        <!-- Pause Button -->
+        <button id="pause-btn" title="Pause Game">⏸️</button>
     </div>
     <script src="main.js"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('SW registered:', registration);
+                    })
+                    .catch(error => {
+                        console.log('SW registration failed:', error);
+                    });
+            });
+        }
+    </script>
 </body>
 </html>

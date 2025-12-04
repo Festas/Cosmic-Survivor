@@ -223,35 +223,69 @@ const game = {
     persistentStats: loadPersistentStats(),
     achievements: loadAchievements(),
     highScores: loadHighScores(),
-    soundEnabled: localStorage.getItem('soundEnabled') !== 'false',
+    soundEnabled: (() => {
+        try {
+            return localStorage.getItem('soundEnabled') !== 'false';
+        } catch (error) {
+            console.warn('Failed to load sound preference:', error);
+            return true;
+        }
+    })(),
 };
 
 function loadPersistentStats() {
     const defaults = { totalKills: 0, totalCredits: 0, maxWave: 0, upgradesPurchased: 0, weaponsUnlocked: 1 };
-    const saved = localStorage.getItem('cosmicSurvivor_stats');
-    return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    try {
+        const saved = localStorage.getItem('cosmicSurvivor_stats');
+        return saved ? { ...defaults, ...JSON.parse(saved) } : defaults;
+    } catch (error) {
+        console.warn('Failed to load persistent stats from localStorage:', error);
+        return defaults;
+    }
 }
 
 function savePersistentStats() {
-    localStorage.setItem('cosmicSurvivor_stats', JSON.stringify(game.persistentStats));
+    try {
+        localStorage.setItem('cosmicSurvivor_stats', JSON.stringify(game.persistentStats));
+    } catch (error) {
+        console.warn('Failed to save persistent stats to localStorage:', error);
+    }
 }
 
 function loadAchievements() {
-    const saved = localStorage.getItem('cosmicSurvivor_achievements');
-    return saved ? JSON.parse(saved) : [];
+    try {
+        const saved = localStorage.getItem('cosmicSurvivor_achievements');
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.warn('Failed to load achievements from localStorage:', error);
+        return [];
+    }
 }
 
 function saveAchievements() {
-    localStorage.setItem('cosmicSurvivor_achievements', JSON.stringify(game.achievements));
+    try {
+        localStorage.setItem('cosmicSurvivor_achievements', JSON.stringify(game.achievements));
+    } catch (error) {
+        console.warn('Failed to save achievements to localStorage:', error);
+    }
 }
 
 function loadHighScores() {
-    const saved = localStorage.getItem('cosmicSurvivor_highScores');
-    return saved ? JSON.parse(saved) : [];
+    try {
+        const saved = localStorage.getItem('cosmicSurvivor_highScores');
+        return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+        console.warn('Failed to load high scores from localStorage:', error);
+        return [];
+    }
 }
 
 function saveHighScores() {
-    localStorage.setItem('cosmicSurvivor_highScores', JSON.stringify(game.highScores));
+    try {
+        localStorage.setItem('cosmicSurvivor_highScores', JSON.stringify(game.highScores));
+    } catch (error) {
+        console.warn('Failed to save high scores to localStorage:', error);
+    }
 }
 
 // ==================== SOUND SYSTEM ====================
@@ -315,7 +349,11 @@ const Sound = {
     },
     toggle() {
         game.soundEnabled = !game.soundEnabled;
-        localStorage.setItem('soundEnabled', game.soundEnabled);
+        try {
+            localStorage.setItem('soundEnabled', game.soundEnabled);
+        } catch (error) {
+            console.warn('Failed to save sound preference:', error);
+        }
         return game.soundEnabled;
     },
 };
@@ -1945,32 +1983,6 @@ function updateUI() {
     }
 }
 
-let notifications = [];
-function showNotification(text) {
-    notifications.push({ text, life: 180, y: 100 + notifications.length * 40 });
-}
-
-function updateNotifications() {
-    notifications = notifications.filter(n => {
-        n.life--;
-        return n.life > 0;
-    });
-}
-
-function drawNotifications(ctx) {
-    ctx.save();
-    notifications.forEach(n => {
-        ctx.globalAlpha = Math.min(1, n.life / 60);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(CONFIG.CANVAS_WIDTH / 2 - 200, n.y - 15, 400, 30);
-        ctx.fillStyle = '#ffd93d';
-        ctx.font = 'bold 20px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(n.text, CONFIG.CANVAS_WIDTH / 2, n.y + 5);
-    });
-    ctx.restore();
-}
-
 // ==================== TOUCH CONTROLS ====================
 function setupTouchControls() {
     const canvas = game.canvas;
@@ -1978,14 +1990,12 @@ function setupTouchControls() {
     canvas.addEventListener('touchstart', e => {
         e.preventDefault();
         const touch = e.touches[0];
-        const rect = canvas.getBoundingClientRect();
-        const x = touch.clientX - rect.left;
-        const y = touch.clientY - rect.top;
+        const pos = getTouchPos(touch);
         
-        if (x < CONFIG.CANVAS_WIDTH / 2) {
+        if (pos.x < CONFIG.CANVAS_WIDTH / 2) {
             game.joystick.active = true;
-            game.joystick.startX = x;
-            game.joystick.startY = y;
+            game.joystick.startX = pos.x;
+            game.joystick.startY = pos.y;
         }
     }, { passive: false });
     
@@ -1994,12 +2004,10 @@ function setupTouchControls() {
         if (!game.joystick.active) return;
         
         const touch = e.touches[0];
-        const rect = canvas.getBoundingClientRect();
-        const x = touch.clientX - rect.left;
-        const y = touch.clientY - rect.top;
+        const pos = getTouchPos(touch);
         
-        const dx = x - game.joystick.startX;
-        const dy = y - game.joystick.startY;
+        const dx = pos.x - game.joystick.startX;
+        const dy = pos.y - game.joystick.startY;
         const dist = Math.sqrt(dx * dx + dy * dy);
         const maxDist = 50;
         
@@ -2363,12 +2371,139 @@ function gameLoop(timestamp) {
 }
 
 // ==================== INITIALIZATION ====================
+
+// Canvas scaling and responsiveness
+let canvasScale = 1;
+let canvasOffsetX = 0;
+let canvasOffsetY = 0;
+
+function resizeCanvas() {
+    const canvas = game.canvas;
+    const container = document.getElementById('game-container');
+    
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    
+    // Calculate scale to fit canvas while maintaining aspect ratio
+    const scaleX = containerWidth / CONFIG.CANVAS_WIDTH;
+    const scaleY = containerHeight / CONFIG.CANVAS_HEIGHT;
+    canvasScale = Math.min(scaleX, scaleY);
+    
+    // Apply scaling via CSS
+    const scaledWidth = CONFIG.CANVAS_WIDTH * canvasScale;
+    const scaledHeight = CONFIG.CANVAS_HEIGHT * canvasScale;
+    
+    canvas.style.width = scaledWidth + 'px';
+    canvas.style.height = scaledHeight + 'px';
+    
+    // Center the canvas
+    canvasOffsetX = (containerWidth - scaledWidth) / 2;
+    canvasOffsetY = (containerHeight - scaledHeight) / 2;
+    
+    canvas.style.marginLeft = canvasOffsetX + 'px';
+    canvas.style.marginTop = canvasOffsetY + 'px';
+}
+
+// Convert touch coordinates to canvas coordinates
+function getTouchPos(touch) {
+    const canvas = game.canvas;
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: (touch.clientX - rect.left) / canvasScale,
+        y: (touch.clientY - rect.top) / canvasScale
+    };
+}
+
+// Loading screen management
+function showLoadingScreen() {
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingBar = document.getElementById('loading-bar');
+    const loadingText = loadingScreen.querySelector('.loading-text');
+    
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress >= 100) {
+            progress = 100;
+            clearInterval(interval);
+            setTimeout(() => {
+                loadingScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 500);
+            }, 300);
+        }
+        loadingBar.style.width = progress + '%';
+        
+        if (progress < 30) {
+            loadingText.textContent = 'Loading assets...';
+        } else if (progress < 60) {
+            loadingText.textContent = 'Initializing game...';
+        } else if (progress < 90) {
+            loadingText.textContent = 'Almost ready...';
+        } else {
+            loadingText.textContent = 'Ready!';
+        }
+    }, 100);
+}
+
+// Orientation detection
+function checkOrientation() {
+    const rotateMessage = document.getElementById('rotate-message');
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isPortrait = window.innerHeight > window.innerWidth;
+    
+    if (isMobile && isPortrait && window.innerWidth < 1024) {
+        rotateMessage.classList.remove('hidden');
+    } else {
+        rotateMessage.classList.add('hidden');
+    }
+}
+
+// Pause functionality
+function togglePause() {
+    if (game.state !== 'playing') return;
+    
+    game.paused = !game.paused;
+    const pauseOverlay = document.getElementById('pause-overlay');
+    
+    if (game.paused) {
+        pauseOverlay.classList.add('active');
+    } else {
+        pauseOverlay.classList.remove('active');
+    }
+}
+
+// Visibility change handler
+function handleVisibilityChange() {
+    if (document.hidden && game.state === 'playing' && !game.paused) {
+        togglePause();
+    }
+}
+
 function init() {
     game.canvas = document.getElementById('gameCanvas');
     game.ctx = game.canvas.getContext('2d');
     
+    // Initialize loading screen
+    showLoadingScreen();
+    
     // Initialize visual systems
     initStarfield();
+    
+    // Setup canvas scaling
+    resizeCanvas();
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+        checkOrientation();
+    });
+    
+    // Check orientation on load
+    checkOrientation();
+    window.addEventListener('orientationchange', checkOrientation);
+    
+    // Setup visibility change handler
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     setupTouchControls();
     
@@ -2407,6 +2542,14 @@ function init() {
     
     document.getElementById('next-wave-btn').addEventListener('click', nextWave);
     document.getElementById('restart-btn').addEventListener('click', restartGame);
+    
+    // Pause button
+    const pauseBtn = document.getElementById('pause-btn');
+    pauseBtn.addEventListener('click', togglePause);
+    
+    // Resume button
+    const resumeBtn = document.getElementById('resume-btn');
+    resumeBtn.addEventListener('click', togglePause);
     
     // Sound toggle
     const soundBtn = document.createElement('button');
