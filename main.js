@@ -703,7 +703,8 @@ class Player {
                 
                 if (nearest) {
                     const angle = Math.atan2(nearest.y - droneY, nearest.x - droneX);
-                    game.bullets.push({
+                    // Create a simple drone bullet object with an update method
+                    const droneBullet = {
                         x: droneX,
                         y: droneY,
                         angle,
@@ -716,8 +717,34 @@ class Player {
                         lifeSteal: 0,
                         piercing: 1,
                         hitEnemies: [],
-                        isDrone: true,
-                    });
+                        isDroneBullet: true,
+                        update() {
+                            this.x += Math.cos(this.angle) * this.speed;
+                            this.y += Math.sin(this.angle) * this.speed;
+                            
+                            for (let i = game.enemies.length - 1; i >= 0; i--) {
+                                const e = game.enemies[i];
+                                const dist = Math.hypot(e.x - this.x, e.y - this.y);
+                                if (dist < e.size + this.size && !this.hitEnemies.includes(e)) {
+                                    const killed = e.takeDamage(this.damage, false);
+                                    this.hitEnemies.push(e);
+                                    if (this.hitEnemies.length >= this.piercing) {
+                                        return false;
+                                    }
+                                }
+                            }
+                            
+                            return this.x >= 0 && this.x <= CONFIG.CANVAS_WIDTH && 
+                                   this.y >= 0 && this.y <= CONFIG.CANVAS_HEIGHT;
+                        },
+                        draw(ctx) {
+                            ctx.fillStyle = this.color;
+                            ctx.beginPath();
+                            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    };
+                    game.bullets.push(droneBullet);
                     drone.shootCooldown = 60; // 1 second
                 }
             }
