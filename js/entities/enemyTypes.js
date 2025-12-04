@@ -106,6 +106,29 @@ export const ENEMY_TYPES = {
         rageSpeedBoost: 2,
         rageDamageBoost: 1.5,
     },
+    bomber: {
+        name: 'Bomber Alien',
+        color: '#ff3300',
+        speedMultiplier: 0.7,
+        healthMultiplier: 0.9,
+        damageMultiplier: 1,
+        creditMultiplier: 2.5,
+        behavior: 'chase',
+        explosionRadius: 100,
+        explosionDamage: 30,
+        unlockWave: 22,
+    },
+    mimic: {
+        name: 'Mimic Alien',
+        color: '#ffd93d',
+        speedMultiplier: 0,
+        healthMultiplier: 0.6,
+        damageMultiplier: 2,
+        creditMultiplier: 3,
+        behavior: 'mimic',
+        disguiseRange: 150,
+        unlockWave: 25,
+    },
 };
 
 export function getEnemyTypeForWave(wave) {
@@ -120,6 +143,8 @@ export function getEnemyTypeForWave(wave) {
     if (wave >= 15) availableTypes.push('splitter');
     if (wave >= 18) availableTypes.push('freezer');
     if (wave >= 20) availableTypes.push('berserker');
+    if (wave >= 22) availableTypes.push('bomber');
+    if (wave >= 25) availableTypes.push('mimic');
     
     // Weight distribution
     const weights = {
@@ -133,6 +158,8 @@ export function getEnemyTypeForWave(wave) {
         splitter: 3,
         freezer: 2,
         berserker: 2,
+        bomber: 3,
+        mimic: 2,
     };
     
     // Calculate total weight
