@@ -55,7 +55,7 @@ const CHARACTERS = [
         id: 'sniper',
         name: '🎯 Sniper',
         description: 'Long range, high crit',
-        maxHealth: 80, speed: 2.5, damage: 20, fireRate: 50, critChance: 0.3, critDamage: 2.5, range: 600,
+        maxHealth: 80, speed: 2.5, damage: 25, fireRate: 50, critChance: 0.3, critDamage: 2.5, range: 600,
     },
     {
         id: 'gunslinger',
@@ -67,7 +67,7 @@ const CHARACTERS = [
         id: 'vampire',
         name: '🧛 Vampire',
         description: 'Life drain on hit',
-        maxHealth: 90, speed: 2.8, damage: 12, fireRate: 35, armor: 2, lifeSteal: 0.2,
+        maxHealth: 90, speed: 2.8, damage: 12, fireRate: 35, armor: 2, lifeSteal: 0.25,
     },
     {
         id: 'berserker',
@@ -602,12 +602,30 @@ class Player {
         this.dodge = character.dodge || 0;
         this.lifeSteal = character.lifeSteal || 0;
         this.pickupRange = character.pickupRange || 50;
+        this.healthRegen = character.healthRegen || 0;
+        this.maxDrones = character.maxDrones || 0;
+        this.knockbackImmune = character.knockbackImmune || false;
+        this.drones = [];
+        this.droneRespawnCooldown = 0;
+        this.slowDebuff = 0; // Frames remaining for slow effect
+        this.slowAmount = 0; // Slow percentage
     }
 
     update() {
+        // Health regeneration (Medic ability)
+        if (this.healthRegen && this.healthRegen > 0) {
+            this.heal(this.healthRegen / CONFIG.TARGET_FPS); // Convert per-second to per-frame
+        }
+        
         // Apply powerup modifiers
         const speedMult = getPowerupMultiplier('speed');
-        const currentSpeed = this.speed * speedMult;
+        let currentSpeed = this.speed * speedMult;
+        
+        // Apply slow debuff (from Freezer enemies)
+        if (this.slowDebuff > 0) {
+            currentSpeed *= (1 - this.slowAmount);
+            this.slowDebuff--;
+        }
         
         // Movement
         let dx = 0, dy = 0;
@@ -641,6 +659,97 @@ class Player {
         }
 
         this.collectPickups();
+        
+        // Drone system (Summoner ability)
+        if (this.maxDrones > 0) {
+            this.updateDrones();
+        }
+    }
+    
+    updateDrones() {
+        // Remove dead drones
+        this.drones = this.drones.filter(drone => drone.health > 0);
+        
+        // Spawn new drones if needed
+        if (this.drones.length < this.maxDrones && this.droneRespawnCooldown <= 0) {
+            this.drones.push({
+                angle: (this.drones.length / this.maxDrones) * Math.PI * 2,
+                health: 30,
+                maxHealth: 30,
+                shootCooldown: 0,
+            });
+            if (this.drones.length < this.maxDrones) {
+                this.droneRespawnCooldown = 180; // 3 seconds
+            }
+        }
+        
+        if (this.droneRespawnCooldown > 0) {
+            this.droneRespawnCooldown--;
+        }
+        
+        // Update drone positions and behavior
+        this.drones.forEach((drone, i) => {
+            // Orbit around player
+            drone.angle += 0.02;
+            const orbitRadius = 60;
+            const droneX = this.x + Math.cos(drone.angle) * orbitRadius;
+            const droneY = this.y + Math.sin(drone.angle) * orbitRadius;
+            
+            // Shoot at nearby enemies
+            if (drone.shootCooldown <= 0) {
+                const nearest = game.enemies
+                    .filter(e => Math.hypot(e.x - droneX, e.y - droneY) <= 300)
+                    .sort((a, b) => Math.hypot(a.x - droneX, a.y - droneY) - Math.hypot(b.x - droneX, b.y - droneY))[0];
+                
+                if (nearest) {
+                    const angle = Math.atan2(nearest.y - droneY, nearest.x - droneX);
+                    // Create a simple drone bullet object with an update method
+                    const droneBullet = {
+                        x: droneX,
+                        y: droneY,
+                        angle,
+                        speed: CONFIG.BULLET_SPEED,
+                        size: 4,
+                        damage: this.damage * 0.3, // 30% of player damage
+                        color: '#a855f7',
+                        critChance: 0,
+                        critDamage: 1,
+                        lifeSteal: 0,
+                        piercing: 1,
+                        hitEnemies: [],
+                        isDroneBullet: true,
+                        update() {
+                            this.x += Math.cos(this.angle) * this.speed;
+                            this.y += Math.sin(this.angle) * this.speed;
+                            
+                            for (let i = game.enemies.length - 1; i >= 0; i--) {
+                                const e = game.enemies[i];
+                                const dist = Math.hypot(e.x - this.x, e.y - this.y);
+                                if (dist < e.size + this.size && !this.hitEnemies.includes(e)) {
+                                    const killed = e.takeDamage(this.damage, false);
+                                    this.hitEnemies.push(e);
+                                    if (this.hitEnemies.length >= this.piercing) {
+                                        return false;
+                                    }
+                                }
+                            }
+                            
+                            return this.x >= 0 && this.x <= CONFIG.CANVAS_WIDTH && 
+                                   this.y >= 0 && this.y <= CONFIG.CANVAS_HEIGHT;
+                        },
+                        draw(ctx) {
+                            ctx.fillStyle = this.color;
+                            ctx.beginPath();
+                            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    };
+                    game.bullets.push(droneBullet);
+                    drone.shootCooldown = 60; // 1 second
+                }
+            }
+            if (drone.shootCooldown > 0) drone.shootCooldown--;
+        });
     }
 
     shoot() {
@@ -841,6 +950,148 @@ class Player {
                 }
                 break;
                 
+            case 'medic':
+                // Medic: Cross emblem with healing aura
+                ctx.fillStyle = '#ec4899';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Cross emblem
+                ctx.fillStyle = '#dc2626';
+                ctx.fillRect(this.x - this.size * 0.35, this.y - this.size * 0.1, this.size * 0.7, this.size * 0.2);
+                ctx.fillRect(this.x - this.size * 0.1, this.y - this.size * 0.35, this.size * 0.2, this.size * 0.7);
+                // Healing aura particles
+                if (this.healthRegen > 0) {
+                    const pulse = Math.sin(Date.now() * 0.005) * 0.3 + 0.7;
+                    ctx.fillStyle = `rgba(134, 239, 172, ${pulse * 0.5})`;
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (i / 4) * Math.PI * 2 + Date.now() * 0.002;
+                        const dist = this.size * (1.2 + Math.sin(Date.now() * 0.003 + i) * 0.3);
+                        ctx.beginPath();
+                        ctx.arc(
+                            this.x + Math.cos(angle) * dist,
+                            this.y + Math.sin(angle) * dist,
+                            this.size * 0.15,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                }
+                break;
+                
+            case 'assassin':
+                // Assassin: Hooded figure with shadow trail
+                ctx.fillStyle = '#7c3aed';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Hood
+                ctx.fillStyle = '#581c87';
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.size * 0.5, this.y - this.size * 0.8);
+                ctx.lineTo(this.x, this.y - this.size * 0.9);
+                ctx.lineTo(this.x + this.size * 0.5, this.y - this.size * 0.8);
+                ctx.lineTo(this.x + this.size * 0.4, this.y - this.size * 0.3);
+                ctx.lineTo(this.x - this.size * 0.4, this.y - this.size * 0.3);
+                ctx.closePath();
+                ctx.fill();
+                // Shadow trail effect
+                const shadowPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.5;
+                ctx.fillStyle = `rgba(88, 28, 135, ${shadowPulse * 0.4})`;
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * (1.2 + i * 0.2), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                break;
+                
+            case 'summoner':
+                // Summoner: Floating orbs with mystical runes
+                ctx.fillStyle = '#a855f7';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#1a1a2e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+                // Mystical runes
+                ctx.strokeStyle = '#c084fc';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2 + Date.now() * 0.001;
+                    const x = this.x + Math.cos(angle) * this.size * 0.3;
+                    const y = this.y + Math.sin(angle) * this.size * 0.3;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y - 3);
+                    ctx.lineTo(x, y + 3);
+                    ctx.moveTo(x - 3, y);
+                    ctx.lineTo(x + 3, y);
+                    ctx.stroke();
+                }
+                // Draw drones
+                this.drones.forEach(drone => {
+                    const orbitRadius = 60;
+                    const droneX = this.x + Math.cos(drone.angle) * orbitRadius;
+                    const droneY = this.y + Math.sin(drone.angle) * orbitRadius;
+                    
+                    ctx.fillStyle = '#a855f7';
+                    ctx.beginPath();
+                    ctx.arc(droneX, droneY, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#c084fc';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    
+                    // Drone health bar
+                    if (drone.health < drone.maxHealth) {
+                        const barWidth = 16;
+                        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                        ctx.fillRect(droneX - barWidth / 2, droneY - 12, barWidth, 2);
+                        ctx.fillStyle = '#00ff88';
+                        ctx.fillRect(droneX - barWidth / 2, droneY - 12, barWidth * (drone.health / drone.maxHealth), 2);
+                    }
+                });
+                break;
+                
+            case 'juggernaut':
+                // Juggernaut: Massive armored titan with glowing core
+                ctx.fillStyle = '#d97706';
+                // Larger outer armor
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.9, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#92400e';
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
+                ctx.fill();
+                // Glowing core
+                const corePulse = Math.sin(Date.now() * 0.004) * 0.3 + 0.7;
+                ctx.fillStyle = `rgba(251, 191, 36, ${corePulse})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size * 0.4, 0, Math.PI * 2);
+                ctx.fill();
+                // Armor plates
+                ctx.strokeStyle = '#fbbf24';
+                ctx.lineWidth = 3;
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + Math.cos(angle) * this.size * 0.5, this.y + Math.sin(angle) * this.size * 0.5);
+                    ctx.lineTo(this.x + Math.cos(angle) * this.size * 0.85, this.y + Math.sin(angle) * this.size * 0.85);
+                    ctx.stroke();
+                }
+                break;
+                
             case 'vampire':
                 // Vampire: Dark with blood-red accents
                 ctx.fillStyle = '#7c2d12';
@@ -955,8 +1206,25 @@ class Enemy {
             this.color = enemyType.color;
             this.canTeleport = enemyType.canTeleport;
             this.isRanged = enemyType.ranged;
+            this.canHeal = enemyType.heals;
+            this.canSplit = enemyType.splits;
+            this.canFreeze = enemyType.freezes;
+            this.canEnrage = enemyType.enrages;
             this.teleportCooldown = 0;
             this.shootCooldown = 0;
+            this.healCooldown = 0;
+            this.enraged = false;
+            this.splitGeneration = 0; // Track split depth to prevent infinite splitting
+        }
+        
+        // Boss-specific abilities
+        if (isBoss) {
+            const bossType = BOSS_TYPES[type] || BOSS_TYPES.destroyer;
+            this.canResurrect = bossType.resurrects;
+            this.canEarthquake = bossType.earthquake;
+            this.resurrectCooldown = 0;
+            this.earthquakeCooldown = 0;
+            this.resurrectedEnemies = [];
         }
         
         this.attackCooldown = 0;
@@ -977,8 +1245,20 @@ class Enemy {
                 this.teleport();
                 this.teleportCooldown = 240;
             }
+            // Necromancer resurrection ability
+            if (this.canResurrect && this.resurrectCooldown <= 0 && this.resurrectedEnemies.length < 5) {
+                this.resurrectEnemy();
+                this.resurrectCooldown = 600; // 10 seconds
+            }
+            // Titan earthquake ability
+            if (this.canEarthquake && this.earthquakeCooldown <= 0) {
+                this.earthquake();
+                this.earthquakeCooldown = 480; // 8 seconds
+            }
             if (this.summonCooldown > 0) this.summonCooldown--;
             if (this.teleportCooldown > 0) this.teleportCooldown--;
+            if (this.resurrectCooldown > 0) this.resurrectCooldown--;
+            if (this.earthquakeCooldown > 0) this.earthquakeCooldown--;
         }
 
         // Regular enemy abilities
@@ -991,9 +1271,25 @@ class Enemy {
             this.shootAtPlayer();
             this.shootCooldown = 120;
         }
+        
+        // Healer ability - heal nearby enemies
+        if (this.canHeal && this.healCooldown <= 0) {
+            this.healNearbyEnemies();
+            this.healCooldown = 120; // 2 seconds
+        }
+        
+        // Berserker enrage - when health drops below 30%
+        if (this.canEnrage && !this.enraged && this.health < this.maxHealth * 0.3) {
+            this.enraged = true;
+            this.speed *= 1.5;
+            this.damage *= 1.5;
+            createTextParticle(this.x, this.y - 30, 'ENRAGED!', '#ff0000', 20);
+            createParticles(this.x, this.y, '#ff0000', 20);
+        }
 
         if (this.teleportCooldown > 0) this.teleportCooldown--;
         if (this.shootCooldown > 0) this.shootCooldown--;
+        if (this.healCooldown > 0) this.healCooldown--;
 
         // Move toward player
         if (dist > (this.isRanged ? 200 : 0)) {
@@ -1004,6 +1300,21 @@ class Enemy {
         // Attack player
         if (dist < this.size + game.player.size && this.attackCooldown <= 0) {
             game.player.takeDamage(this.damage);
+            
+            // Freezer slow debuff
+            if (this.canFreeze) {
+                const newSlow = 0.5; // 50% slow
+                // Stack slow up to 70% max
+                if (game.player.slowDebuff > 0) {
+                    game.player.slowAmount = Math.min(0.7, game.player.slowAmount + 0.2);
+                } else {
+                    game.player.slowAmount = newSlow;
+                }
+                game.player.slowDebuff = 120; // 2 seconds
+                createTextParticle(game.player.x, game.player.y - 30, 'FROZEN!', '#38bdf8', 16);
+                createParticles(game.player.x, game.player.y, '#38bdf8', 10);
+            }
+            
             this.attackCooldown = 60;
         }
         if (this.attackCooldown > 0) this.attackCooldown--;
@@ -1041,6 +1352,67 @@ class Enemy {
             color: this.color,
             isEnemyBullet: true,
         });
+    }
+    
+    healNearbyEnemies() {
+        const healRadius = 150;
+        const healAmount = 0.05; // 5% of max health
+        
+        game.enemies.forEach(enemy => {
+            if (enemy !== this && !enemy.isBoss) {
+                const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+                if (dist <= healRadius && enemy.health < enemy.maxHealth) {
+                    const heal = Math.min(enemy.maxHealth * healAmount, enemy.maxHealth - enemy.health);
+                    enemy.health += heal;
+                    createTextParticle(enemy.x, enemy.y, `+${Math.floor(heal)}`, '#00ff88', 14);
+                }
+            }
+        });
+        
+        // Green healing pulse visual
+        createParticles(this.x, this.y, '#00ff88', 15);
+    }
+    
+    resurrectEnemy() {
+        // Try to resurrect a recently killed enemy (simulate by spawning a zombie)
+        if (Math.random() < 0.5 && game.enemies.length < 50) { // 50% chance
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 100 + Math.random() * 50;
+            const x = this.x + Math.cos(angle) * dist;
+            const y = this.y + Math.sin(angle) * dist;
+            
+            // Create a zombie enemy with 50% stats
+            const zombie = new Enemy(x, y, this.wave, 'normal', false);
+            zombie.maxHealth *= 0.5;
+            zombie.health = zombie.maxHealth;
+            zombie.color = '#4ade80'; // Green tint for zombies
+            zombie.isZombie = true;
+            
+            game.enemies.push(zombie);
+            this.resurrectedEnemies.push(zombie);
+            
+            createTextParticle(this.x, this.y - 40, 'RESURRECTION!', '#a78bfa', 18);
+            createParticles(x, y, '#a78bfa', 20);
+        }
+    }
+    
+    earthquake() {
+        const shockwaveRadius = 200;
+        const dist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+        
+        // Screen shake
+        screenShake(15);
+        
+        // Damage and slow player if in range
+        if (dist <= shockwaveRadius) {
+            game.player.takeDamage(this.damage * 0.5);
+            game.player.slowDebuff = Math.max(game.player.slowDebuff, 120); // 2 seconds
+            game.player.slowAmount = Math.max(game.player.slowAmount, 0.3); // 30% slow
+            createTextParticle(this.x, this.y - 50, 'EARTHQUAKE!', '#fbbf24', 20);
+        }
+        
+        // Visual shockwave effect
+        createParticles(this.x, this.y, '#fbbf24', 40);
     }
 
     takeDamage(amount, isCrit = false) {
@@ -1080,6 +1452,30 @@ class Enemy {
             }
         } else if (game.stats.comboKills > 1 && game.stats.comboKills % 5 === 0) {
             createTextParticle(this.x, this.y - 30, `${game.stats.comboKills}x COMBO!`, '#ffd93d', 18);
+        }
+        
+        // Splitter ability - split into smaller enemies
+        if (this.canSplit && this.splitGeneration === 0 && game.enemies.length < 50) {
+            for (let i = 0; i < 3; i++) {
+                const angle = (i / 3) * Math.PI * 2;
+                const dist = this.size * 2;
+                const x = this.x + Math.cos(angle) * dist;
+                const y = this.y + Math.sin(angle) * dist;
+                
+                const split = new Enemy(x, y, this.wave, this.type, false);
+                // Smaller enemies have 40% stats
+                split.maxHealth *= 0.4;
+                split.health = split.maxHealth;
+                split.damage *= 0.4;
+                split.speed *= 0.4;
+                split.size *= 0.7;
+                split.creditValue = Math.floor(split.creditValue * 0.3); // Reduced credits
+                split.splitGeneration = 1; // Prevent further splitting
+                split.canSplit = false; // Can't split again
+                
+                game.enemies.push(split);
+            }
+            createTextParticle(this.x, this.y - 30, 'SPLIT!', '#fb923c', 18);
         }
         
         if (this.isBoss) {
@@ -1159,6 +1555,97 @@ class Enemy {
                         this.y + Math.sin(angle) * this.size * 1.3
                     );
                     ctx.stroke();
+                }
+            } else if (this.type === 'necromancer') {
+                // Skeletal mage with staff and soul flames
+                // Skeletal body
+                ctx.strokeStyle = '#6b21a8';
+                ctx.lineWidth = 4;
+                
+                // Staff
+                ctx.beginPath();
+                ctx.moveTo(this.x - this.size * 0.3, this.y + this.size * 0.8);
+                ctx.lineTo(this.x - this.size * 0.3, this.y - this.size * 0.9);
+                ctx.stroke();
+                
+                // Skull orb on staff
+                ctx.fillStyle = '#8b5cf6';
+                ctx.beginPath();
+                ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.9, this.size * 0.25, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Soul flames
+                const soulPulse = Math.sin(Date.now() * 0.008) * 0.4 + 0.6;
+                ctx.fillStyle = `rgba(167, 139, 250, ${soulPulse})`;
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i / 5) * Math.PI * 2 + Date.now() * 0.003;
+                    const dist = this.size * (1.1 + Math.sin(Date.now() * 0.005 + i) * 0.2);
+                    const flameHeight = Math.sin(Date.now() * 0.01 + i) * this.size * 0.3;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + Math.cos(angle) * dist, this.y + Math.sin(angle) * dist);
+                    ctx.lineTo(
+                        this.x + Math.cos(angle) * dist,
+                        this.y + Math.sin(angle) * dist - flameHeight
+                    );
+                    ctx.lineTo(
+                        this.x + Math.cos(angle) * (dist + this.size * 0.1),
+                        this.y + Math.sin(angle) * dist - flameHeight * 0.5
+                    );
+                    ctx.closePath();
+                    ctx.fill();
+                }
+                
+                // Resurrection visual effect
+                if (this.resurrectCooldown < 60) {
+                    const resurrectGlow = (60 - this.resurrectCooldown) / 60;
+                    ctx.strokeStyle = `rgba(167, 139, 250, ${resurrectGlow})`;
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * (1 + resurrectGlow * 0.5), 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            } else if (this.type === 'titan') {
+                // Colossal golem with bronze color and glowing runes
+                // Bronze armor segments
+                ctx.fillStyle = '#92400e';
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y - this.size * 0.3 + i * this.size * 0.3, this.size * 0.9, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Glowing runes
+                const runePulse = Math.sin(Date.now() * 0.006) * 0.4 + 0.6;
+                ctx.fillStyle = `rgba(251, 191, 36, ${runePulse})`;
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const x = this.x + Math.cos(angle) * this.size * 0.6;
+                    const y = this.y + Math.sin(angle) * this.size * 0.6;
+                    
+                    // Rune symbols
+                    ctx.beginPath();
+                    ctx.arc(x, y, this.size * 0.1, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = `rgba(251, 191, 36, ${runePulse})`;
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x - this.size * 0.08, y);
+                    ctx.lineTo(x + this.size * 0.08, y);
+                    ctx.moveTo(x, y - this.size * 0.08);
+                    ctx.lineTo(x, y + this.size * 0.08);
+                    ctx.stroke();
+                }
+                
+                // Earthquake charging effect
+                if (this.earthquakeCooldown < 60) {
+                    const quakePulse = (60 - this.earthquakeCooldown) / 60;
+                    ctx.strokeStyle = `rgba(251, 191, 36, ${quakePulse})`;
+                    ctx.lineWidth = 6;
+                    for (let i = 0; i < 3; i++) {
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size * (1.2 + i * 0.3 + quakePulse * 0.5), 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
                 }
             }
             
@@ -1286,6 +1773,168 @@ class Enemy {
                         ctx.rotate(angle);
                         ctx.fillRect(this.size * 0.5, this.size * 0.2 * i, this.size * 0.8, this.size * 0.15);
                         ctx.restore();
+                    }
+                    break;
+                    
+                case 'healer':
+                    // Healer drone with healing aura and plus symbol
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Plus symbol
+                    ctx.fillStyle = '#fff';
+                    const crossSize = this.size * 0.6;
+                    ctx.fillRect(this.x - crossSize / 2, this.y - crossSize * 0.15, crossSize, crossSize * 0.3);
+                    ctx.fillRect(this.x - crossSize * 0.15, this.y - crossSize / 2, crossSize * 0.3, crossSize);
+                    
+                    // Glowing aura to make it stand out as high priority
+                    const healGlow = Math.sin(Date.now() * 0.008) * 0.4 + 0.6;
+                    ctx.strokeStyle = `rgba(34, 211, 238, ${healGlow})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * 1.3, 0, Math.PI * 2);
+                    ctx.stroke();
+                    
+                    // Healing pulse rings
+                    if (this.healCooldown < 30) {
+                        const pulseRadius = this.size * (1.5 + (30 - this.healCooldown) / 30 * 3);
+                        ctx.strokeStyle = `rgba(0, 255, 136, ${0.5 - (30 - this.healCooldown) / 60})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, pulseRadius, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    break;
+                    
+                case 'splitter':
+                    // Gelatinous blob with internal cores visible
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Wobble effect
+                    const wobble = Math.sin(Date.now() * 0.01) * 0.1 + 1;
+                    ctx.fillStyle = 'rgba(251, 146, 60, 0.6)';
+                    ctx.beginPath();
+                    ctx.ellipse(this.x, this.y, this.size * 0.9 * wobble, this.size * 0.9 / wobble, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Internal cores
+                    ctx.fillStyle = '#ea580c';
+                    for (let i = 0; i < 3; i++) {
+                        const angle = (i / 3) * Math.PI * 2 + Date.now() * 0.001;
+                        const dist = this.size * 0.4;
+                        ctx.beginPath();
+                        ctx.arc(
+                            this.x + Math.cos(angle) * dist,
+                            this.y + Math.sin(angle) * dist,
+                            this.size * 0.15,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                    break;
+                    
+                case 'freezer':
+                    // Ice crystal entity with frost particles
+                    ctx.fillStyle = this.color;
+                    
+                    // Crystal shape
+                    ctx.beginPath();
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2;
+                        const radius = i % 2 === 0 ? this.size * 1.1 : this.size * 0.7;
+                        const x = this.x + Math.cos(angle) * radius;
+                        const y = this.y + Math.sin(angle) * radius;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    // Inner glow
+                    ctx.fillStyle = 'rgba(125, 211, 252, 0.6)';
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Frost particles
+                    const frostPulse = Math.sin(Date.now() * 0.006) * 0.3 + 0.7;
+                    ctx.fillStyle = `rgba(186, 230, 253, ${frostPulse * 0.6})`;
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2 + Date.now() * 0.003;
+                        const dist = this.size * (1.3 + Math.sin(Date.now() * 0.005 + i) * 0.2);
+                        ctx.beginPath();
+                        ctx.arc(
+                            this.x + Math.cos(angle) * dist,
+                            this.y + Math.sin(angle) * dist,
+                            this.size * 0.1,
+                            0,
+                            Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                    break;
+                    
+                case 'berserker':
+                    // Rage demon with flame effects
+                    const berserkerColor = this.enraged ? '#ff0000' : this.color;
+                    ctx.fillStyle = berserkerColor;
+                    
+                    // Demon body with horns
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Horns
+                    ctx.fillStyle = '#7f1d1d';
+                    ctx.beginPath();
+                    ctx.moveTo(this.x - this.size * 0.6, this.y - this.size * 0.3);
+                    ctx.lineTo(this.x - this.size * 0.4, this.y - this.size * 0.8);
+                    ctx.lineTo(this.x - this.size * 0.2, this.y - this.size * 0.3);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + this.size * 0.6, this.y - this.size * 0.3);
+                    ctx.lineTo(this.x + this.size * 0.4, this.y - this.size * 0.8);
+                    ctx.lineTo(this.x + this.size * 0.2, this.y - this.size * 0.3);
+                    ctx.fill();
+                    
+                    // Enraged effects
+                    if (this.enraged) {
+                        // Pulsing red aura
+                        const ragePulse = Math.sin(Date.now() * 0.015) * 0.4 + 0.6;
+                        ctx.strokeStyle = `rgba(255, 0, 0, ${ragePulse})`;
+                        ctx.lineWidth = 4;
+                        ctx.beginPath();
+                        ctx.arc(this.x, this.y, this.size * 1.4, 0, Math.PI * 2);
+                        ctx.stroke();
+                        
+                        // Flame particles
+                        ctx.fillStyle = `rgba(251, 146, 60, ${ragePulse * 0.7})`;
+                        for (let i = 0; i < 8; i++) {
+                            const angle = (i / 8) * Math.PI * 2 + Date.now() * 0.01;
+                            const dist = this.size * (1.2 + Math.sin(Date.now() * 0.012 + i) * 0.3);
+                            ctx.beginPath();
+                            ctx.arc(
+                                this.x + Math.cos(angle) * dist,
+                                this.y + Math.sin(angle) * dist,
+                                this.size * 0.15,
+                                0,
+                                Math.PI * 2
+                            );
+                            ctx.fill();
+                        }
+                        
+                        // Angry eyes (red)
+                        ctx.fillStyle = '#ff0000';
+                        ctx.beginPath();
+                        ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.2, this.size * 0.15, 0, Math.PI * 2);
+                        ctx.arc(this.x + this.size * 0.3, this.y - this.size * 0.2, this.size * 0.15, 0, Math.PI * 2);
+                        ctx.fill();
                     }
                     break;
                     
@@ -2421,11 +3070,34 @@ function gameLoop(timestamp) {
             if (b.isEnemyBullet) {
                 b.x += Math.cos(b.angle) * b.speed;
                 b.y += Math.sin(b.angle) * b.speed;
-                const dist = Math.hypot(game.player.x - b.x, game.player.y - b.y);
-                if (dist < game.player.size + b.size) {
+                
+                // Check collision with player
+                const distPlayer = Math.hypot(game.player.x - b.x, game.player.y - b.y);
+                if (distPlayer < game.player.size + b.size) {
                     game.player.takeDamage(b.damage);
                     return false;
                 }
+                
+                // Check collision with drones (Summoner ability)
+                if (game.player.drones && game.player.drones.length > 0) {
+                    for (let i = 0; i < game.player.drones.length; i++) {
+                        const drone = game.player.drones[i];
+                        const orbitRadius = 60;
+                        const droneX = game.player.x + Math.cos(drone.angle) * orbitRadius;
+                        const droneY = game.player.y + Math.sin(drone.angle) * orbitRadius;
+                        const distDrone = Math.hypot(droneX - b.x, droneY - b.y);
+                        
+                        if (distDrone < 8 + b.size) {
+                            drone.health -= b.damage;
+                            createParticles(droneX, droneY, '#a855f7', 5);
+                            if (drone.health <= 0) {
+                                createTextParticle(droneX, droneY, 'DESTROYED!', '#ff6b6b', 14);
+                            }
+                            return false;
+                        }
+                    }
+                }
+                
                 return b.x >= 0 && b.x <= CONFIG.CANVAS_WIDTH && b.y >= 0 && b.y <= CONFIG.CANVAS_HEIGHT;
             }
             return b.update();
