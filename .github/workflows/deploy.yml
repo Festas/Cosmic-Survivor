@@ -88,5 +88,8 @@ jobs:
             docker compose pull
             docker compose up -d
             
+            # Logout from registry for security
+            docker logout ghcr.io
+            
             # Clean up old images
             docker image prune -af
