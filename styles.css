@@ -1001,3 +1001,107 @@ body {
         font-size: 20px;
     }
 }
+
+/* Portrait Mode Support */
+@media (orientation: portrait) {
+    body {
+        overflow: hidden;
+    }
+    
+    #game-container {
+        width: 100vw;
+        height: 100vh;
+    }
+    
+    #ui-overlay {
+        padding: 10px;
+    }
+    
+    #top-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    
+    #top-bar > div {
+        font-size: 14px;
+        white-space: nowrap;
+    }
+    
+    #health-bar-container {
+        width: 100%;
+        max-width: 250px;
+        height: 25px;
+    }
+    
+    #health-text {
+        font-size: 14px;
+    }
+    
+    .sound-btn,
+    .achievements-btn {
+        top: 8px;
+        right: 8px;
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+    }
+    
+    .achievements-btn {
+        right: 50px;
+    }
+    
+    #pause-btn {
+        top: 8px;
+        right: 92px;
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+    }
+}
+
+/* Additional responsive adjustments for very narrow screens */
+@media (max-width: 480px) {
+    #top-bar {
+        gap: 6px;
+        padding: 6px 10px;
+    }
+    
+    #top-bar > div {
+        font-size: 12px;
+    }
+    
+    #health-bar-container {
+        max-width: 200px;
+        height: 22px;
+    }
+    
+    #health-text {
+        font-size: 12px;
+    }
+    
+    .sound-btn,
+    .achievements-btn,
+    #pause-btn {
+        top: 6px;
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+    
+    .achievements-btn {
+        right: 44px;
+    }
+    
+    #pause-btn {
+        right: 80px;
+    }
+}
+
+/* Ensure rotate message is hidden in portrait mode */
+@media (orientation: portrait) {
+    #rotate-message {
+        display: none !important;
+    }
+}
