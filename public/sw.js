@@ -66,7 +66,7 @@ self.addEventListener('fetch', event => {
         console.log('[SW] Fetching from network:', event.request.url);
         return fetch(event.request).then(response => {
           // Check if valid response
-          if (!response || response.status !== 200 || response.type !== 'basic') {
+          if (!response || response.status !== 200) {
             return response;
           }
           

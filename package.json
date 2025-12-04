@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && npm run copy-assets",
+    "copy-assets": "copyfiles -f main.js game.js dist",
     "preview": "vite preview",
     "serve": "vite preview"
   },
@@ -19,6 +20,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "copyfiles": "^2.4.1",
     "vite": "^5.0.0"
   }
 }

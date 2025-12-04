@@ -1983,32 +1983,6 @@ function updateUI() {
     }
 }
 
-let notifications = [];
-function showNotification(text) {
-    notifications.push({ text, life: 180, y: 100 + notifications.length * 40 });
-}
-
-function updateNotifications() {
-    notifications = notifications.filter(n => {
-        n.life--;
-        return n.life > 0;
-    });
-}
-
-function drawNotifications(ctx) {
-    ctx.save();
-    notifications.forEach(n => {
-        ctx.globalAlpha = Math.min(1, n.life / 60);
-        ctx.fillStyle = '#000';
-        ctx.fillRect(CONFIG.CANVAS_WIDTH / 2 - 200, n.y - 15, 400, 30);
-        ctx.fillStyle = '#ffd93d';
-        ctx.font = 'bold 20px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(n.text, CONFIG.CANVAS_WIDTH / 2, n.y + 5);
-    });
-    ctx.restore();
-}
-
 // ==================== TOUCH CONTROLS ====================
 function setupTouchControls() {
     const canvas = game.canvas;

@@ -11,9 +11,13 @@ export default defineConfig({
         classic: './index.html'
       }
     },
-    // Ensure service worker is copied
-    copyPublicDir: true
+    // Copy all assets including JS files
+    copyPublicDir: true,
+    minify: 'esbuild',
+    sourcemap: false
   },
+  // Public directory for static assets that should be copied as-is
+  publicDir: 'public',
   server: {
     port: 3000,
     open: '/index-enhanced.html'
