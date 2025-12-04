@@ -415,6 +415,15 @@ function showNotification(text, color = '#ffd93d', duration = 2000) {
     });
 }
 
+function checkWaveClear() {
+    // Check if wave is cleared (all enemies defeated)
+    if (game.enemies.length === 0 && game.state === 'playing' && game.timeLeft > CONFIG.WAVE_CLEAR_COUNTDOWN) {
+        game.timeLeft = CONFIG.WAVE_CLEAR_COUNTDOWN;
+        showNotification(`Wave Cleared! Shop opening in ${CONFIG.WAVE_CLEAR_COUNTDOWN}s...`, '#00ff88');
+        Sound.play('powerup');
+    }
+}
+
 function updateNotifications() {
     game.notifications = game.notifications.filter(n => {
         n.life--;
@@ -1327,12 +1336,8 @@ class Bullet {
                         game.player.heal(Math.floor(finalDamage * this.lifeSteal));
                     }
                     
-                    // Check if wave is cleared (all enemies defeated)
-                    if (game.enemies.length === 0 && game.state === 'playing' && game.timeLeft > CONFIG.WAVE_CLEAR_COUNTDOWN) {
-                        game.timeLeft = CONFIG.WAVE_CLEAR_COUNTDOWN;
-                        showNotification(`Wave Cleared! Shop opening in ${CONFIG.WAVE_CLEAR_COUNTDOWN}s...`, '#00ff88');
-                        Sound.play('powerup');
-                    }
+                    // Check if wave is cleared after enemy removal
+                    checkWaveClear();
                 }
                 
                 // Visual feedback for crits
@@ -1363,11 +1368,7 @@ class Bullet {
         createParticles(this.x, this.y, this.color, 20);
         
         // Check if wave is cleared after explosion
-        if (game.enemies.length === 0 && game.state === 'playing' && game.timeLeft > CONFIG.WAVE_CLEAR_COUNTDOWN) {
-            game.timeLeft = CONFIG.WAVE_CLEAR_COUNTDOWN;
-            showNotification(`Wave Cleared! Shop opening in ${CONFIG.WAVE_CLEAR_COUNTDOWN}s...`, '#00ff88');
-            Sound.play('powerup');
-        }
+        checkWaveClear();
     }
 
     draw(ctx) {
