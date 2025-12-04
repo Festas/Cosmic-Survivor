@@ -45,9 +45,14 @@ Nginx configuration that:
 - Serves files from `/usr/share/nginx/html`
 - Handles SPA routing (fallback to index-enhanced.html)
 - Enables gzip compression
-- Sets cache headers (1 year for assets, 1 hour for HTML)
+- Sets cache headers:
+  - **Service Worker (sw.js)**: `no-cache, no-store, must-revalidate` - ensures users always get the latest version
+  - **Static assets (JS, CSS, images)**: 1 year with `immutable` - safe due to Vite's content hashing
+  - **HTML files**: 1 hour with `must-revalidate`
 - Adds security headers
 - Provides a health check endpoint at `/health`
+
+**Important**: The service worker must never be cached by browsers to ensure users receive updates immediately. The build process injects a unique timestamp into the service worker on each deployment, which invalidates the cache and ensures users get the latest version of the game.
 
 ### .github/workflows/deploy.yml
 GitHub Actions workflow that:
@@ -111,6 +116,22 @@ To manually trigger a deployment:
 5. Click "Run workflow" button
 
 ## Troubleshooting
+
+### Service Worker Issues
+
+If users report seeing "page cannot be opened" errors after deployments:
+
+1. **Clear Service Worker Cache**: Users can hard-refresh (Ctrl+F5 or Cmd+Shift+R) to force fetch the new service worker
+2. **Check Service Worker Version**: Open browser DevTools → Application → Service Workers and verify the version matches the build timestamp
+3. **Verify Update Notification**: After a new deployment, users should see a green notification banner prompting them to refresh
+4. **Manual Update**: Users can go to DevTools → Application → Service Workers and click "Update" or "Unregister"
+
+The service worker automatically:
+- Uses network-first strategy for HTML files (always tries to fetch fresh version)
+- Uses cache-first strategy for static assets (JS, CSS, images)
+- Checks for updates every minute when the page is open
+- Notifies users when a new version is available
+- Cleans up old caches on activation
 
 ### Check container status
 ```bash

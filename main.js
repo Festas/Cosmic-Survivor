@@ -295,7 +295,40 @@ const Sound = {
     
     getContext() {
         if (!this.audioContext) {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (error) {
+                console.warn('AudioContext not supported:', error);
+                // Return a comprehensive mock context to prevent errors
+                const noop = () => {};
+                const mockNode = {
+                    connect: noop,
+                    disconnect: noop,
+                    start: noop,
+                    stop: noop
+                };
+                this.audioContext = {
+                    createOscillator: () => ({
+                        ...mockNode,
+                        type: '',
+                        frequency: { value: 0, setValueAtTime: noop, exponentialRampToValueAtTime: noop }
+                    }),
+                    createGain: () => ({
+                        ...mockNode,
+                        gain: { 
+                            value: 0,
+                            setValueAtTime: noop,
+                            exponentialRampToValueAtTime: noop,
+                            linearRampToValueAtTime: noop
+                        }
+                    }),
+                    destination: mockNode,
+                    currentTime: 0,
+                    close: noop,
+                    resume: () => Promise.resolve(),
+                    suspend: () => Promise.resolve()
+                };
+            }
         }
         return this.audioContext;
     },
@@ -1979,23 +2012,53 @@ function restartGame() {
 }
 
 // ==================== UI & NOTIFICATIONS ====================
+// Track last UI values to avoid unnecessary DOM updates
+const lastUIValues = {
+    wave: -1,
+    timeLeft: -1,
+    credits: -1,
+    health: -1,
+    maxHealth: -1
+};
+
 function updateUI() {
-    document.getElementById('wave-number').textContent = game.wave;
-    document.getElementById('time-left').textContent = Math.ceil(game.timeLeft);
-    document.getElementById('credit-amount').textContent = game.credits;
+    // Only update wave if it changed
+    if (lastUIValues.wave !== game.wave) {
+        document.getElementById('wave-number').textContent = game.wave;
+        lastUIValues.wave = game.wave;
+    }
     
-    const healthPercent = (game.player.health / game.player.maxHealth) * 100;
-    const healthBar = document.getElementById('health-bar');
-    healthBar.style.width = healthPercent + '%';
-    document.getElementById('health-text').textContent = `${Math.ceil(game.player.health)} / ${game.player.maxHealth}`;
+    // Only update time if it changed (rounded)
+    const timeLeft = Math.ceil(game.timeLeft);
+    if (lastUIValues.timeLeft !== timeLeft) {
+        document.getElementById('time-left').textContent = timeLeft;
+        lastUIValues.timeLeft = timeLeft;
+    }
     
-    // Low health warning effect
-    const healthContainer = document.getElementById('health-bar-container');
-    if (healthPercent <= 25) {
-        const pulse = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
-        healthContainer.style.boxShadow = `0 0 ${20 + pulse * 10}px rgba(255, 0, 0, ${0.5 + pulse * 0.5})`;
-    } else {
-        healthContainer.style.boxShadow = '';
+    // Only update credits if they changed
+    if (lastUIValues.credits !== game.credits) {
+        document.getElementById('credit-amount').textContent = game.credits;
+        lastUIValues.credits = game.credits;
+    }
+    
+    // Only update health if it changed (rounded)
+    const health = Math.ceil(game.player.health);
+    if (lastUIValues.health !== health || lastUIValues.maxHealth !== game.player.maxHealth) {
+        const healthPercent = (game.player.health / game.player.maxHealth) * 100;
+        const healthBar = document.getElementById('health-bar');
+        healthBar.style.width = healthPercent + '%';
+        document.getElementById('health-text').textContent = `${health} / ${game.player.maxHealth}`;
+        lastUIValues.health = health;
+        lastUIValues.maxHealth = game.player.maxHealth;
+        
+        // Low health warning effect
+        const healthContainer = document.getElementById('health-bar-container');
+        if (healthPercent <= 25) {
+            const pulse = Math.sin(Date.now() * 0.01) * 0.5 + 0.5;
+            healthContainer.style.boxShadow = `0 0 ${20 + pulse * 10}px rgba(255, 0, 0, ${0.5 + pulse * 0.5})`;
+        } else {
+            healthContainer.style.boxShadow = '';
+        }
     }
 }
 
@@ -2051,16 +2114,42 @@ function drawJoystick(ctx) {
     const currentY = startY + game.joystick.y * 50;
     
     ctx.save();
-    ctx.globalAlpha = 0.3;
+    
+    // Outer circle with pulse effect for better visibility
+    const pulse = Math.sin(Date.now() * 0.005) * 0.1 + 0.35;
+    ctx.globalAlpha = pulse;
     ctx.fillStyle = '#4ecdc4';
     ctx.beginPath();
     ctx.arc(startX, startY, 50, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha = 0.5;
+    
+    // Outer ring for better definition
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(startX, startY, 50, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Inner control stick with radial gradient for glow effect (more performant than shadow)
+    const gradient = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, 30);
+    gradient.addColorStop(0, '#00ff88');
+    gradient.addColorStop(0.7, '#00ff88');
+    gradient.addColorStop(1, 'rgba(0, 255, 136, 0)');
+    
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(currentX, currentY, 30, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Solid center
+    ctx.globalAlpha = 1;
     ctx.fillStyle = '#00ff88';
     ctx.beginPath();
     ctx.arc(currentX, currentY, 25, 0, Math.PI * 2);
     ctx.fill();
+    
     ctx.restore();
 }
 
@@ -2504,11 +2593,16 @@ function init() {
     // Initialize visual systems
     initStarfield();
     
-    // Setup canvas scaling
+    // Setup canvas scaling with debouncing
     resizeCanvas();
+    
+    let resizeTimeout;
     window.addEventListener('resize', () => {
-        resizeCanvas();
-        checkOrientation();
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            resizeCanvas();
+            checkOrientation();
+        }, 100); // Debounce for 100ms
     });
     
     // Check orientation on load

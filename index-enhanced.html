@@ -148,10 +148,43 @@
                 navigator.serviceWorker.register('/sw.js')
                     .then(registration => {
                         console.log('SW registered:', registration);
+                        
+                        // Check for updates periodically
+                        setInterval(() => {
+                            registration.update();
+                        }, 60000); // Check every minute
                     })
                     .catch(error => {
                         console.log('SW registration failed:', error);
                     });
+                    
+                // Listen for service worker updates
+                navigator.serviceWorker.addEventListener('message', event => {
+                    if (event.data && event.data.type === 'SW_UPDATED') {
+                        console.log('New version available:', event.data.version);
+                        // Show a subtle notification to user
+                        const notification = document.createElement('div');
+                        notification.id = 'update-notification';
+                        notification.innerHTML = `
+                            <div style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); 
+                                        background: #00ff88; color: #000; padding: 15px 25px; 
+                                        border-radius: 10px; box-shadow: 0 4px 12px rgba(0,255,136,0.3); 
+                                        z-index: 10000; font-weight: bold; text-align: center;">
+                                🚀 New version available! <button onclick="location.reload()" 
+                                   style="margin-left: 10px; padding: 5px 15px; background: #000; 
+                                          color: #00ff88; border: 2px solid #00ff88; border-radius: 5px; 
+                                          cursor: pointer; font-weight: bold;">Refresh</button>
+                            </div>
+                        `;
+                        document.body.appendChild(notification);
+                        
+                        // Auto-hide after 10 seconds
+                        setTimeout(() => {
+                            const notif = document.getElementById('update-notification');
+                            if (notif) notif.remove();
+                        }, 10000);
+                    }
+                });
             });
         }
     </script>

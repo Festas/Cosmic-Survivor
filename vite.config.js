@@ -1,4 +1,26 @@
 import { defineConfig } from 'vite';
+import { readFileSync, writeFileSync } from 'fs';
+import { join } from 'path';
+
+// Plugin to inject build timestamp into service worker
+function injectServiceWorkerVersion() {
+  return {
+    name: 'inject-sw-version',
+    closeBundle() {
+      const swPath = join(process.cwd(), 'dist', 'sw.js');
+      try {
+        let swContent = readFileSync(swPath, 'utf-8');
+        const buildTimestamp = Date.now().toString();
+        // Use regex with word boundaries to ensure we only replace the intended placeholder
+        swContent = swContent.replace(/\b__BUILD_TIMESTAMP__\b/g, buildTimestamp);
+        writeFileSync(swPath, swContent);
+        console.log(`[Build] Service worker version set to: ${buildTimestamp}`);
+      } catch (error) {
+        console.error('[Build] Failed to update service worker version:', error);
+      }
+    }
+  };
+}
 
 export default defineConfig({
   base: './',
@@ -18,6 +40,7 @@ export default defineConfig({
   },
   // Public directory for static assets that should be copied as-is
   publicDir: 'public',
+  plugins: [injectServiceWorkerVersion()],
   server: {
     port: 3000,
     open: '/index-enhanced.html'
