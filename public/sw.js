@@ -1,7 +1,11 @@
 // Service Worker for Cosmic Survivor
-// Implements offline caching with cache-first strategy
+// Implements offline caching with network-first strategy for HTML files
 
-const CACHE_NAME = 'cosmic-survivor-v1';
+// CACHE_VERSION should be updated by build process
+// This ensures cache invalidation on deployments
+const CACHE_VERSION = '__BUILD_TIMESTAMP__'; // Will be replaced during build
+const CACHE_NAME = `cosmic-survivor-${CACHE_VERSION}`;
+
 const urlsToCache = [
   '/',
   '/index-enhanced.html',
@@ -23,20 +27,23 @@ const urlsToCache = [
 
 // Install event - cache resources
 self.addEventListener('install', event => {
-  console.log('[SW] Installing service worker...');
+  console.log('[SW] Installing service worker version:', CACHE_VERSION);
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('[SW] Caching app shell');
         return cache.addAll(urlsToCache);
       })
-      .then(() => self.skipWaiting())
+      .then(() => {
+        console.log('[SW] Cache populated, skipping waiting');
+        return self.skipWaiting();
+      })
   );
 });
 
-// Activate event - clean up old caches
+// Activate event - clean up old caches and notify clients
 self.addEventListener('activate', event => {
-  console.log('[SW] Activating service worker...');
+  console.log('[SW] Activating service worker version:', CACHE_VERSION);
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
@@ -47,47 +54,91 @@ self.addEventListener('activate', event => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => {
+      console.log('[SW] Claiming clients');
+      return self.clients.claim();
+    }).then(() => {
+      // Notify all clients about the new version
+      return self.clients.matchAll().then(clients => {
+        clients.forEach(client => {
+          client.postMessage({
+            type: 'SW_UPDATED',
+            version: CACHE_VERSION
+          });
+        });
+      });
+    })
   );
 });
 
-// Fetch event - cache-first strategy for static assets
+// Determine if a request is for an HTML file
+function isHtmlRequest(request) {
+  const url = new URL(request.url);
+  return request.destination === 'document' || 
+         url.pathname.endsWith('.html') || 
+         url.pathname === '/';
+}
+
+// Fetch event - network-first for HTML, cache-first for other assets
 self.addEventListener('fetch', event => {
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        // Cache hit - return cached response
-        if (response) {
-          console.log('[SW] Serving from cache:', event.request.url);
-          return response;
-        }
-        
-        // Not in cache - fetch from network
-        console.log('[SW] Fetching from network:', event.request.url);
-        return fetch(event.request).then(response => {
+  const isHtml = isHtmlRequest(event.request);
+  
+  if (isHtml) {
+    // Network-first strategy for HTML files
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
           // Check if valid response
-          if (!response || response.status !== 200) {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(error => {
+          console.log('[SW] Network failed for HTML, serving from cache:', event.request.url);
+          // Fallback to cache if network fails
+          return caches.match(event.request).then(cachedResponse => {
+            return cachedResponse || caches.match('/index-enhanced.html');
+          });
+        })
+    );
+  } else {
+    // Cache-first strategy for static assets (JS, CSS, images, etc.)
+    event.respondWith(
+      caches.match(event.request)
+        .then(response => {
+          if (response) {
             return response;
           }
           
-          // Clone the response
-          const responseToCache = response.clone();
-          
-          // Cache the fetched response for future use
-          caches.open(CACHE_NAME)
-            .then(cache => {
+          // Not in cache - fetch from network
+          return fetch(event.request).then(response => {
+            // Check if valid response
+            if (!response || response.status !== 200) {
+              return response;
+            }
+            
+            // Clone and cache the response
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then(cache => {
               cache.put(event.request, responseToCache);
             });
-          
-          return response;
-        });
-      })
-      .catch(error => {
-        console.error('[SW] Fetch failed:', error);
-        // Return offline page if available
-        return caches.match('/index-enhanced.html');
-      })
-  );
+            
+            return response;
+          });
+        })
+        .catch(error => {
+          console.error('[SW] Fetch failed:', error);
+          return new Response('Offline - resource not available', {
+            status: 503,
+            statusText: 'Service Unavailable'
+          });
+        })
+    );
+  }
 });
 
 // Handle messages from the client
