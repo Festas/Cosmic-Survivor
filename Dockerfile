@@ -6,7 +6,7 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # Copy package files
-COPY package.json ./
+COPY package*.json ./
 
 # Install dependencies
 # Note: npm strict-ssl is disabled to work around certificate chain issues
