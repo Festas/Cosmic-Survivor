@@ -57,6 +57,30 @@ export const BOSS_TYPES = {
         behavior: 'boss_melee',
         abilities: ['earthquake', 'ground_slam'],
     },
+    swarmqueen: {
+        name: '👑 Swarm Queen',
+        color: '#f59e0b',
+        size: 75,
+        speedMultiplier: 0.4,
+        healthMultiplier: 18,
+        damageMultiplier: 2.5,
+        creditValue: 250,
+        behavior: 'boss_swarm_queen',
+        abilities: ['spawn_swarm', 'weak_points'],
+        weakPoints: 3,
+    },
+    cosmichorror: {
+        name: '🐙 Cosmic Horror',
+        color: '#4c0099',
+        size: 100,
+        speedMultiplier: 0.2,
+        healthMultiplier: 25,
+        damageMultiplier: 3.5,
+        creditValue: 300,
+        behavior: 'boss_cosmic_horror',
+        abilities: ['tentacle_attack', 'void_zone', 'phase_shift'],
+        phases: 3,
+    },
 };
 
 export function getBossForWave(wave) {
