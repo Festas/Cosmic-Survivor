@@ -299,12 +299,34 @@ const Sound = {
                 this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             } catch (error) {
                 console.warn('AudioContext not supported:', error);
-                // Return a mock context to prevent errors
+                // Return a comprehensive mock context to prevent errors
+                const noop = () => {};
+                const mockNode = {
+                    connect: noop,
+                    disconnect: noop,
+                    start: noop,
+                    stop: noop
+                };
                 this.audioContext = {
-                    createOscillator: () => ({ connect: () => {}, start: () => {}, stop: () => {} }),
-                    createGain: () => ({ connect: () => {}, gain: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} } }),
-                    destination: {},
-                    currentTime: 0
+                    createOscillator: () => ({
+                        ...mockNode,
+                        type: '',
+                        frequency: { value: 0, setValueAtTime: noop, exponentialRampToValueAtTime: noop }
+                    }),
+                    createGain: () => ({
+                        ...mockNode,
+                        gain: { 
+                            value: 0,
+                            setValueAtTime: noop,
+                            exponentialRampToValueAtTime: noop,
+                            linearRampToValueAtTime: noop
+                        }
+                    }),
+                    destination: mockNode,
+                    currentTime: 0,
+                    close: noop,
+                    resume: () => Promise.resolve(),
+                    suspend: () => Promise.resolve()
                 };
             }
         }
@@ -2109,11 +2131,21 @@ function drawJoystick(ctx) {
     ctx.arc(startX, startY, 50, 0, Math.PI * 2);
     ctx.stroke();
     
-    // Inner control stick with glow
+    // Inner control stick with radial gradient for glow effect (more performant than shadow)
+    const gradient = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, 30);
+    gradient.addColorStop(0, '#00ff88');
+    gradient.addColorStop(0.7, '#00ff88');
+    gradient.addColorStop(1, 'rgba(0, 255, 136, 0)');
+    
     ctx.globalAlpha = 0.7;
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(currentX, currentY, 30, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Solid center
+    ctx.globalAlpha = 1;
     ctx.fillStyle = '#00ff88';
-    ctx.shadowColor = '#00ff88';
-    ctx.shadowBlur = 15;
     ctx.beginPath();
     ctx.arc(currentX, currentY, 25, 0, Math.PI * 2);
     ctx.fill();

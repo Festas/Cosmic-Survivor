@@ -11,7 +11,8 @@ function injectServiceWorkerVersion() {
       try {
         let swContent = readFileSync(swPath, 'utf-8');
         const buildTimestamp = Date.now().toString();
-        swContent = swContent.replace('__BUILD_TIMESTAMP__', buildTimestamp);
+        // Use regex with word boundaries to ensure we only replace the intended placeholder
+        swContent = swContent.replace(/\b__BUILD_TIMESTAMP__\b/g, buildTimestamp);
         writeFileSync(swPath, swContent);
         console.log(`[Build] Service worker version set to: ${buildTimestamp}`);
       } catch (error) {
