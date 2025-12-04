@@ -274,6 +274,10 @@ export class MusicSystem {
             }
             this.bassOscillator = null;
         }
+        
+        // Note: Drum and arpeggio oscillators are created in closures
+        // They will be cleaned up when isPlaying is set to false
+        // as their creation loops check isPlaying before continuing
     }
 
     // Resume audio context (needed for browser policies)

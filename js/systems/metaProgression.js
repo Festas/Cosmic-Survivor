@@ -93,7 +93,7 @@ export class MetaProgressionSystem {
             lifeSupport: 70,
         };
         const baseCost = baseCosts[upgradeName] || 50;
-        // Cost escalates: level 1 = base, level 2 = base*2, level 3 = base*3.5, etc.
+        // Cost escalates: level 0->1 = base, level 1->2 = base*2.5, level 2->3 = base*4, etc.
         return Math.floor(baseCost * (1 + level * 1.5));
     }
 

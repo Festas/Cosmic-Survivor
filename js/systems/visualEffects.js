@@ -1,5 +1,10 @@
 // Visual Effects System - Screen Shake, Hit Stop, Particles, etc.
 export class VisualEffectsSystem {
+    // Constants
+    static CELEBRATION_PARTICLE_LIFETIME_BASE = 60;
+    static CELEBRATION_PARTICLE_LIFETIME_VARIANCE = 30;
+    static DAMAGE_NUMBER_LIFETIME = 60;
+    
     constructor(canvas) {
         this.canvas = canvas;
         this.screenShake = { x: 0, y: 0, intensity: 0, duration: 0 };
@@ -220,7 +225,8 @@ export class VisualEffectsSystem {
                 color,
                 size: 3 + Math.random() * 3,
                 alpha: 1,
-                lifetime: 60 + Math.random() * 30
+                lifetime: VisualEffectsSystem.CELEBRATION_PARTICLE_LIFETIME_BASE + 
+                         Math.random() * VisualEffectsSystem.CELEBRATION_PARTICLE_LIFETIME_VARIANCE
             });
         }
     }

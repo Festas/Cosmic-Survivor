@@ -152,16 +152,17 @@ export class SynergySystem {
 
     // Apply all active synergies to player stats
     applySynergies(playerStats) {
-        let modifiedStats = { ...playerStats };
+        // Note: Directly modifying playerStats for efficiency
+        // This is acceptable as synergies are recalculated periodically
 
         for (const key of this.activeSynergies) {
             const synergy = this.synergyDefinitions[key];
             if (synergy) {
-                modifiedStats = synergy.apply(modifiedStats);
+                playerStats = synergy.apply(playerStats);
             }
         }
 
-        return modifiedStats;
+        return playerStats;
     }
 
     // Get list of active synergies for UI

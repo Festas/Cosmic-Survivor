@@ -1501,12 +1501,17 @@ body {
     position: relative;
 }
 
-.locked-character::after {
-    content: '🔒';
+.locked-character::before {
+    content: 'LOCKED';
     position: absolute;
     top: 10px;
     right: 10px;
-    font-size: 24px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #ff6b6b;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 4px 8px;
+    border-radius: 4px;
 }
 
 .unlock-requirement {

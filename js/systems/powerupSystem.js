@@ -228,7 +228,7 @@ export class PowerupSystem {
             const types = ['magnet', 'nuke', 'clone', 'berserk', 'shield', 'multishot'];
             const weights = [30, 5, 15, 20, 25, 30]; // Nuke is rare
             
-            let total = weights.reduce((a, b) => a + b, 0);
+            const total = weights.reduce((a, b) => a + b, 0);
             let random = Math.random() * total;
             
             for (let i = 0; i < types.length; i++) {
@@ -238,6 +238,9 @@ export class PowerupSystem {
                     break;
                 }
             }
+            
+            // Fallback if none selected
+            if (!type) type = 'magnet';
         }
 
         return {

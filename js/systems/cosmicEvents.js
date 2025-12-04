@@ -269,6 +269,11 @@ export class CosmicEventsSystem {
     // Helper methods for specific events
     spawnMeteor(game) {
         // Create meteor projectile that damages both enemies and player
+        if (!game || !game.canvas) {
+            console.warn('Cannot spawn meteor: game or canvas not initialized');
+            return;
+        }
+        
         const x = Math.random() * game.canvas.width;
         const y = -20;
         

@@ -142,10 +142,36 @@
                 systems.visualEffects.render(this.ctx);
             }
             
+            // Render FPS if enabled
+            if (systems.settings && systems.settings.shouldShowFPS() && this.ctx) {
+                renderFPS(this.ctx);
+            }
+            
             if (systems.visualEffects && this.ctx) {
                 this.ctx.restore();
             }
         };
+        
+        // FPS tracking
+        let lastFrameTime = Date.now();
+        let fps = 60;
+        
+        function renderFPS(ctx) {
+            const now = Date.now();
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+            
+            if (delta > 0) {
+                fps = Math.round(1000 / delta);
+            }
+            
+            ctx.save();
+            ctx.fillStyle = '#00ff88';
+            ctx.font = 'bold 16px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(`FPS: ${fps}`, game.canvas.width - 10, 20);
+            ctx.restore();
+        }
         
         // Enhanced character creation
         if (originalCreatePlayer) {
@@ -414,7 +440,8 @@
         console.log('Enhanced systems integration complete!');
         
         // Filter character selection by unlocked characters
-        filterCharacterSelection();
+        // Delay to ensure main.js has finished adding characters
+        setTimeout(filterCharacterSelection, 500);
     });
     
     function filterCharacterSelection() {
@@ -423,7 +450,7 @@
         
         const metaProg = window.enhancedSystems.metaProgression;
         
-        // Clear existing characters
+        // Clear existing characters (including those added by main.js)
         charContainer.innerHTML = '';
         
         // Get all characters from CHARACTERS array
