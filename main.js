@@ -6,6 +6,7 @@ const CONFIG = {
     CANVAS_WIDTH: 1200,
     CANVAS_HEIGHT: 800,
     WAVE_DURATION: 60,
+    WAVE_CLEAR_COUNTDOWN: 5,
     PLAYER_SIZE: 30,
     ENEMY_SIZE: 25,
     BULLET_SIZE: 5,
@@ -412,6 +413,15 @@ function showNotification(text, color = '#ffd93d', duration = 2000) {
         maxLife: msToFrames(duration),
         y: 100,
     });
+}
+
+function checkWaveClear() {
+    // Check if wave is cleared (all enemies defeated)
+    if (game.enemies.length === 0 && game.state === 'playing' && game.timeLeft > CONFIG.WAVE_CLEAR_COUNTDOWN) {
+        game.timeLeft = CONFIG.WAVE_CLEAR_COUNTDOWN;
+        showNotification(`Wave Cleared! Shop opening in ${CONFIG.WAVE_CLEAR_COUNTDOWN}s...`, '#00ff88');
+        Sound.play('powerup');
+    }
 }
 
 function updateNotifications() {
@@ -1325,6 +1335,9 @@ class Bullet {
                     if (this.lifeSteal > 0) {
                         game.player.heal(Math.floor(finalDamage * this.lifeSteal));
                     }
+                    
+                    // Check if wave is cleared after enemy removal
+                    checkWaveClear();
                 }
                 
                 // Visual feedback for crits
@@ -1353,6 +1366,9 @@ class Bullet {
             }
         });
         createParticles(this.x, this.y, this.color, 20);
+        
+        // Check if wave is cleared after explosion
+        checkWaveClear();
     }
 
     draw(ctx) {
@@ -2450,12 +2466,9 @@ function showLoadingScreen() {
 // Orientation detection
 function checkOrientation() {
     const rotateMessage = document.getElementById('rotate-message');
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isPortrait = window.innerHeight > window.innerWidth;
-    
-    if (isMobile && isPortrait && window.innerWidth < 1024) {
-        rotateMessage.classList.remove('hidden');
-    } else {
+    // Allow both portrait and landscape mode
+    // Only show rotate message if element exists (for backwards compatibility)
+    if (rotateMessage) {
         rotateMessage.classList.add('hidden');
     }
 }
