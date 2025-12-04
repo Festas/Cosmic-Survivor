@@ -8,7 +8,10 @@ WORKDIR /app
 # Copy package files
 COPY package.json ./
 
-# Install dependencies (disable strict SSL for Alpine compatibility)
+# Install dependencies
+# Note: npm strict-ssl is disabled to work around certificate chain issues
+# that can occur in some Docker build environments with Alpine Linux.
+# The packages are still downloaded from the official npm registry.
 RUN npm config set strict-ssl false && npm install
 
 # Copy source files

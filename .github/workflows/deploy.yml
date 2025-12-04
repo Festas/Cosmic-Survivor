@@ -58,8 +58,11 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            # Create deployment directory if it doesn't exist
+            mkdir -p /home/deploy/cosmic-survivor
+            
             # Navigate to deployment directory
-            cd /home/deploy/cosmic-survivor || mkdir -p /home/deploy/cosmic-survivor && cd /home/deploy/cosmic-survivor
+            cd /home/deploy/cosmic-survivor
             
             # Log in to GitHub Container Registry
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
