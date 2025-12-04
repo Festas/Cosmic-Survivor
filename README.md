@@ -22,11 +22,42 @@ You're a stranded astronaut on a hostile alien planet. Survive endless waves of 
 - **Dynamic Enemy Spawning**: Different enemy types with varying speeds and health
 - **Visual Effects**: Particle systems, damage numbers, and smooth animations
 - **Responsive UI**: Clean, cyberpunk-inspired interface with real-time stats
+- **Progressive Web App (PWA)**: Install on your device and play offline!
+- **Mobile Optimized**: Full touch support with responsive canvas scaling
+- **Pause & Resume**: Automatically pauses when you switch tabs or apps
+
+## 📱 PWA Installation
+
+Cosmic Survivor is a Progressive Web App, which means you can install it on your device for a native app-like experience!
+
+### Desktop (Chrome/Edge)
+1. Open `index-enhanced.html` in Chrome or Edge
+2. Click the install icon (➕) in the address bar
+3. Click "Install" in the popup
+4. The game will open in its own window and appear in your app menu
+
+### Mobile (Android)
+1. Open the game in Chrome
+2. Tap the menu (⋮) and select "Add to Home Screen" or "Install App"
+3. The game icon will be added to your home screen
+4. Launch it like any other app - works offline!
+
+### Mobile (iOS/Safari)
+1. Open the game in Safari
+2. Tap the Share button (□↑)
+3. Scroll down and tap "Add to Home Screen"
+4. Tap "Add" to confirm
+5. Find the game icon on your home screen
+
+**Note:** For production deployment, replace the placeholder icon files (`icon-192.png` and `icon-512.png`) with actual game icons.
 
 ## 🕹️ Controls
 
 ### Desktop
 - **WASD** or **Arrow Keys**: Move your character
+- **1-4 Keys**: Switch between weapon types
+- **ESC**: Pause/Resume game
+- **⏸️ Button**: Pause game (top-right corner)
 - **Auto-Aim**: Automatically targets nearest enemies within range
 - **Auto-Shoot**: Fires automatically at targeted enemies
 - **Auto-Collect**: Automatically picks up nearby credits
@@ -35,8 +66,11 @@ You're a stranded astronaut on a hostile alien planet. Survive endless waves of 
 
 ### Mobile
 - **Touch & Drag**: Virtual joystick appears on the left side of the screen
+- **⏸️ Button**: Pause game (tap in top-right area)
 - **Auto-Aim & Auto-Shoot**: Same as desktop
+- **Auto-Pause**: Game pauses when you switch apps or lock screen
 - All UI buttons are touch-enabled
+- **Landscape Mode**: For the best experience, rotate your device to landscape
 
 ## 🚀 How to Play
 
@@ -93,13 +127,15 @@ You're a stranded astronaut on a hostile alien planet. Survive endless waves of 
 
 ### Enhanced Edition
 - **Engine**: Pure JavaScript with modular ES6 structure
-- **Canvas API**: HTML5 Canvas for rendering
+- **Canvas API**: HTML5 Canvas for rendering with responsive scaling
 - **Sound**: Web Audio API for procedural sound generation
-- **Storage**: LocalStorage for achievements, high scores, and persistent stats
-- **Mobile**: Touch event handling with virtual joystick
-- **No Dependencies**: No frameworks or external libraries needed
+- **Storage**: LocalStorage for achievements, high scores, and persistent stats (with fallback error handling)
+- **Mobile**: Touch event handling with virtual joystick and scaled coordinates
+- **PWA**: Service Worker for offline support and installability
+- **No Dependencies**: No frameworks or external libraries needed for runtime
 - **Browser Compatibility**: Works in all modern browsers (Chrome, Firefox, Safari, Edge)
-- **Resolution**: 1200x800 canvas (responsive on mobile)
+- **Resolution**: 1200x800 canvas with automatic scaling to fit any screen
+- **Build Tool**: Vite for development and production builds
 
 ### Modular Architecture
 - Separated concerns with dedicated modules for:
@@ -118,10 +154,14 @@ You're a stranded astronaut on a hostile alien planet. Survive endless waves of 
 ```
 Cosmic-Survivor/
 ├── index.html              # Classic version
-├── index-enhanced.html     # Enhanced version with all new features
+├── index-enhanced.html     # Enhanced version with all new features (PWA)
+├── manifest.json           # PWA manifest file
+├── sw.js                   # Service Worker for offline support
 ├── styles.css              # Game styling and UI (shared)
 ├── game.js                 # Classic game logic
 ├── main.js                 # Enhanced game with all features
+├── package.json            # NPM dependencies and scripts
+├── vite.config.js          # Vite build configuration
 ├── js/                     # Modular code structure
 │   ├── config.js           # Game configuration and character definitions
 │   ├── game.js             # Main game state management
@@ -138,6 +178,80 @@ Cosmic-Survivor/
 │       └── weaponSystem.js # Weapon types and projectiles
 └── README.md               # This file
 ```
+
+## 🏗️ Building for Production
+
+### Prerequisites
+- Node.js (v18 or higher recommended)
+- npm (comes with Node.js)
+
+### Development Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/Festas/Cosmic-Survivor.git
+   cd Cosmic-Survivor
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Run development server**
+   ```bash
+   npm run dev
+   ```
+   This will start a local development server at `http://localhost:3000`
+
+### Production Build
+
+1. **Build for production**
+   ```bash
+   npm run build
+   ```
+   This creates an optimized build in the `dist/` directory
+
+2. **Preview production build**
+   ```bash
+   npm run preview
+   ```
+   This serves the production build locally for testing
+
+### Deployment
+
+#### Static Hosting (GitHub Pages, Netlify, Vercel, etc.)
+
+1. Build the project:
+   ```bash
+   npm run build
+   ```
+
+2. Deploy the `dist/` folder to your hosting service
+
+3. Make sure your hosting service is configured to serve `index-enhanced.html` as the default page or create a redirect
+
+#### Important Notes for Production
+
+- **Icons**: Replace placeholder icon files with actual game icons:
+  - `icon-192.png` - 192x192px icon
+  - `icon-512.png` - 512x512px icon
+  
+- **Service Worker**: The service worker is configured to cache all game assets for offline play. Update the cache name in `sw.js` when deploying new versions.
+
+- **HTTPS**: PWAs require HTTPS in production (localhost works for development). Most modern hosting services provide HTTPS by default.
+
+- **Base Path**: If deploying to a subdirectory, update the `base` property in `vite.config.js`:
+  ```javascript
+  base: '/your-subdirectory/'
+  ```
+
+### Quick Play (No Build Required)
+
+You can also play without building by simply opening `index-enhanced.html` in a modern web browser. The build process is only needed for:
+- Production optimization
+- PWA installation on hosted domains
+- Deployment to static hosting services
 
 ## 🎨 Theme & Design
 

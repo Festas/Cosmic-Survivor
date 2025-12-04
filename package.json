@@ -1,0 +1,24 @@
+{
+  "name": "cosmic-survivor",
+  "version": "1.0.0",
+  "description": "A top-down arena survival game. Survive waves of alien creatures on a hostile planet!",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "vite preview"
+  },
+  "keywords": [
+    "game",
+    "html5",
+    "canvas",
+    "survival",
+    "pwa"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

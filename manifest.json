@@ -1,0 +1,26 @@
+{
+  "name": "Cosmic Survivor",
+  "short_name": "Cosmic Survivor",
+  "description": "A top-down arena survival game. Survive waves of alien creatures on a hostile planet!",
+  "start_url": "/index-enhanced.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "theme_color": "#00ff88",
+  "background_color": "#0a0a1a",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "screenshots": []
+}

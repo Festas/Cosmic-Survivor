@@ -4,6 +4,18 @@
     box-sizing: border-box;
 }
 
+/* Mobile Optimizations */
+html, body {
+    overscroll-behavior: none; /* Disable pull-to-refresh */
+    -webkit-user-select: none; /* Disable text selection on mobile */
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent; /* Disable tap highlight */
+    -webkit-touch-callout: none; /* Disable callout on long press */
+    touch-action: manipulation; /* Disable double-tap zoom */
+}
+
 body {
     font-family: 'Courier New', monospace;
     background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 100%);
@@ -12,6 +24,7 @@ body {
     align-items: center;
     min-height: 100vh;
     color: #fff;
+    overflow: hidden; /* Prevent scrolling on mobile */
 }
 
 #game-container {
@@ -25,6 +38,10 @@ body {
     display: block;
     background: #1a1a2e;
     border: 3px solid #16213e;
+    touch-action: none; /* Prevent zoom on canvas */
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
 }
 
 #ui-overlay {
@@ -731,5 +748,256 @@ body {
     
     .achievements-btn {
         right: 60px;
+    }
+}
+
+/* Orientation Lock - Portrait Warning */
+#rotate-message {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    backdrop-filter: blur(10px);
+}
+
+#rotate-message.hidden {
+    display: none;
+}
+
+.rotate-content {
+    text-align: center;
+    padding: 40px;
+    color: #00ff88;
+}
+
+.phone-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+    animation: phoneRotate 2s ease-in-out infinite;
+}
+
+@keyframes phoneRotate {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(90deg); }
+}
+
+.rotate-content p {
+    font-size: 24px;
+    margin: 20px 0;
+    font-weight: bold;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+.rotate-icon {
+    font-size: 48px;
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Hide rotate message on landscape or desktop */
+@media (orientation: landscape) and (max-width: 1024px) {
+    #rotate-message {
+        display: none !important;
+    }
+}
+
+@media (min-width: 1025px) {
+    #rotate-message {
+        display: none !important;
+    }
+}
+
+/* Loading Screen */
+#loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 100%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    transition: opacity 0.5s ease-out;
+}
+
+#loading-screen.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.loading-content {
+    text-align: center;
+    padding: 40px;
+}
+
+.loading-title {
+    font-size: 48px;
+    color: #00ff88;
+    margin-bottom: 40px;
+    text-shadow: 0 0 20px rgba(0, 255, 136, 0.6);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    margin: 30px auto;
+    border: 5px solid rgba(0, 255, 136, 0.2);
+    border-top: 5px solid #00ff88;
+    border-radius: 50%;
+    animation: spinLoader 1s linear infinite;
+}
+
+@keyframes spinLoader {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    font-size: 20px;
+    color: #4ecdc4;
+    margin: 20px 0;
+    animation: fadeInOut 1.5s ease-in-out infinite;
+}
+
+@keyframes fadeInOut {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+}
+
+.loading-bar-container {
+    width: 300px;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid #00ff88;
+    border-radius: 10px;
+    margin: 30px auto 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.loading-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #00ff88 0%, #4ecdc4 100%);
+    width: 0%;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
+    position: relative;
+}
+
+.loading-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+        rgba(255, 255, 255, 0) 0%, 
+        rgba(255, 255, 255, 0.3) 50%, 
+        rgba(255, 255, 255, 0) 100%);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Pause Overlay */
+#pause-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9000;
+    pointer-events: all;
+}
+
+#pause-overlay.active {
+    display: flex;
+}
+
+.pause-menu {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    padding: 40px;
+    border-radius: 15px;
+    border: 3px solid #00ff88;
+    box-shadow: 0 0 40px rgba(0, 255, 136, 0.4);
+    text-align: center;
+    max-width: 500px;
+}
+
+.pause-menu h2 {
+    font-size: 48px;
+    color: #ffd93d;
+    margin-bottom: 30px;
+    text-shadow: 0 0 15px rgba(255, 217, 61, 0.6);
+}
+
+.pause-menu p {
+    font-size: 18px;
+    color: #ccc;
+    margin: 15px 0;
+}
+
+.pause-menu .btn-primary {
+    margin: 10px;
+}
+
+/* Pause Button */
+#pause-btn {
+    position: fixed;
+    top: 20px;
+    right: 140px;
+    background: rgba(255, 217, 61, 0.2);
+    border: 2px solid #ffd93d;
+    color: #fff;
+    font-size: 24px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: all;
+}
+
+#pause-btn:hover {
+    background: rgba(255, 217, 61, 0.4);
+    transform: scale(1.1);
+}
+
+@media (max-width: 768px) {
+    #pause-btn {
+        right: 110px;
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
     }
 }
