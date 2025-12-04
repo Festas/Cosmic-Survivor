@@ -1059,6 +1059,11 @@ body {
         height: 36px;
         font-size: 18px;
     }
+    
+    /* Ensure rotate message is hidden in portrait mode */
+    #rotate-message {
+        display: none !important;
+    }
 }
 
 /* Additional responsive adjustments for very narrow screens */
@@ -1096,12 +1101,5 @@ body {
     
     #pause-btn {
         right: 80px;
-    }
-}
-
-/* Ensure rotate message is hidden in portrait mode */
-@media (orientation: portrait) {
-    #rotate-message {
-        display: none !important;
     }
 }
