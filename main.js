@@ -744,12 +744,17 @@ class Player {
         
         // Poison damage over time
         if (this.poisonTimer > 0) {
-            this.health -= this.poisonDamage / CONFIG.TARGET_FPS;
+            const poisonDmg = this.poisonDamage / CONFIG.TARGET_FPS;
+            this.health -= poisonDmg;
             this.poisonTimer--;
             if (this.poisonTimer % 30 === 0) {
                 createTextParticle(this.x, this.y, `☠️`, '#65a30d', 14);
             }
-            if (this.health <= 0) gameOver();
+            if (this.health <= 0) {
+                this.health = 0;
+                gameOver();
+                return; // Stop further updates
+            }
         }
         
         // Dash update
@@ -979,18 +984,18 @@ class Player {
         this.health -= finalDamage;
         game.stats.damageTaken += finalDamage;
         
-        // Thorns passive - reflect damage
+        // Thorns passive - reflect damage to nearest enemy
         if (this.thorns > 0) {
             const thornsDamage = Math.floor(finalDamage * this.thorns);
-            if (thornsDamage > 0) {
-                // Find the nearest enemy and damage it
-                const nearest = game.enemies.sort((a, b) => 
-                    Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y)
-                )[0];
-                if (nearest) {
-                    nearest.takeDamage(thornsDamage, false);
-                    createTextParticle(nearest.x, nearest.y, `🌵${thornsDamage}`, '#65a30d', 14);
+            if (thornsDamage > 0 && game.enemies.length > 0) {
+                let nearest = game.enemies[0];
+                let nearestDist = Math.hypot(nearest.x - this.x, nearest.y - this.y);
+                for (let i = 1; i < game.enemies.length; i++) {
+                    const d = Math.hypot(game.enemies[i].x - this.x, game.enemies[i].y - this.y);
+                    if (d < nearestDist) { nearest = game.enemies[i]; nearestDist = d; }
                 }
+                nearest.takeDamage(thornsDamage, false);
+                createTextParticle(nearest.x, nearest.y, `🌵${thornsDamage}`, '#65a30d', 14);
             }
         }
         
@@ -3416,9 +3421,17 @@ function updateDPS() {
     }
 }
 
+let cachedDPS = 0;
+let lastDPSHistoryLength = 0;
+
 function getAverageDPS() {
     if (game.playerDPS.history.length === 0) return 0;
-    return Math.floor(game.playerDPS.history.reduce((a, b) => a + b, 0) / game.playerDPS.history.length);
+    // Only recalculate when history changes
+    if (game.playerDPS.history.length !== lastDPSHistoryLength) {
+        lastDPSHistoryLength = game.playerDPS.history.length;
+        cachedDPS = Math.floor(game.playerDPS.history.reduce((a, b) => a + b, 0) / game.playerDPS.history.length);
+    }
+    return cachedDPS;
 }
 
 function drawDPSMeter(ctx) {
@@ -3968,9 +3981,12 @@ window.addEventListener('keydown', e => {
         
         // Default dash direction: toward nearest enemy if no movement keys
         if (dx === 0 && dy === 0 && game.enemies.length > 0) {
-            const nearest = game.enemies.sort((a, b) => 
-                Math.hypot(a.x - game.player.x, a.y - game.player.y) - Math.hypot(b.x - game.player.x, b.y - game.player.y)
-            )[0];
+            let nearest = game.enemies[0];
+            let nearestDist = Math.hypot(nearest.x - game.player.x, nearest.y - game.player.y);
+            for (let i = 1; i < game.enemies.length; i++) {
+                const d = Math.hypot(game.enemies[i].x - game.player.x, game.enemies[i].y - game.player.y);
+                if (d < nearestDist) { nearest = game.enemies[i]; nearestDist = d; }
+            }
             dx = nearest.x - game.player.x;
             dy = nearest.y - game.player.y;
         }
