@@ -13,17 +13,31 @@ const CONFIG = {
     BULLET_SPEED: 8,
     PICKUP_SIZE: 15,
     BOSS_WAVE_INTERVAL: 5,
-    // Performance settings
     MAX_PARTICLES: 500,
     PARTICLE_POOL_SIZE: 1000,
     GRID_CELL_SIZE: 100,
     TARGET_FPS: 60,
-    // Interactivity settings
-    COMBO_TIMEOUT: 3000, // 3 seconds
-    POWERUP_DURATION: 8000, // 8 seconds
+    COMBO_TIMEOUT: 3000,
+    POWERUP_DURATION: 8000,
     SCREEN_SHAKE_INTENSITY: 10,
-    POWERUP_DROP_CHANCE: 0.15, // 15% chance for regular enemies
-    POWERUP_DROP_CHANCE_BOSS: 0.8, // 80% chance for bosses
+    POWERUP_DROP_CHANCE: 0.15,
+    POWERUP_DROP_CHANCE_BOSS: 0.8,
+    // New balance constants
+    DASH_COOLDOWN: 90, // frames (1.5 seconds)
+    DASH_DISTANCE: 120,
+    DASH_INVULNERABLE_FRAMES: 12,
+    XP_BASE: 10, // XP needed for level 2
+    XP_SCALING: 1.15, // Each level needs 15% more XP
+    ELITE_CHANCE: 0.08, // 8% chance for elite enemies after wave 5
+    MINIMAP_SIZE: 140,
+    MINIMAP_MARGIN: 10,
+    // Difficulty presets
+    DIFFICULTY: {
+        easy: { enemyHealthMult: 0.7, enemyDamageMult: 0.6, enemySpeedMult: 0.85, creditMult: 1.3, xpMult: 1.2 },
+        normal: { enemyHealthMult: 1.0, enemyDamageMult: 1.0, enemySpeedMult: 1.0, creditMult: 1.0, xpMult: 1.0 },
+        hard: { enemyHealthMult: 1.4, enemyDamageMult: 1.3, enemySpeedMult: 1.1, creditMult: 0.85, xpMult: 0.9 },
+        nightmare: { enemyHealthMult: 2.0, enemyDamageMult: 1.6, enemySpeedMult: 1.2, creditMult: 0.7, xpMult: 0.8 },
+    },
 };
 
 // Helper function for time conversion
@@ -36,111 +50,136 @@ const CHARACTERS = [
     {
         id: 'balanced',
         name: '⚖️ Balanced',
-        description: 'Well-rounded stats',
+        description: 'Well-rounded stats for all situations',
         maxHealth: 100, speed: 3, damage: 10, fireRate: 30,
     },
     {
         id: 'tank',
         name: '🛡️ Tank',
-        description: 'High health, slow',
-        maxHealth: 150, speed: 2, damage: 8, fireRate: 40, armor: 5,
+        description: 'Heavy armor, solid damage',
+        maxHealth: 180, speed: 2.2, damage: 9, fireRate: 38, armor: 6,
     },
     {
         id: 'speedster',
         name: '⚡ Speedster',
-        description: 'Fast and agile',
-        maxHealth: 75, speed: 5, damage: 7, fireRate: 15, dodge: 0.1,
+        description: 'Lightning fast, elusive fighter',
+        maxHealth: 85, speed: 4.5, damage: 8, fireRate: 18, dodge: 0.08,
     },
     {
         id: 'sniper',
         name: '🎯 Sniper',
-        description: 'Long range, high crit',
-        maxHealth: 80, speed: 2.5, damage: 25, fireRate: 50, critChance: 0.3, critDamage: 2.5, range: 600,
+        description: 'Precision shots from afar',
+        maxHealth: 80, speed: 2.5, damage: 22, fireRate: 48, critChance: 0.2, critDamage: 2.2, range: 650,
     },
     {
         id: 'gunslinger',
         name: '🔫 Gunslinger',
         description: 'Multi-shot specialist',
-        maxHealth: 85, speed: 3.5, damage: 8, fireRate: 20, projectileCount: 3, dodge: 0.05,
+        maxHealth: 90, speed: 3.2, damage: 7, fireRate: 22, projectileCount: 3, dodge: 0.05,
     },
     {
         id: 'vampire',
         name: '🧛 Vampire',
-        description: 'Life drain on hit',
-        maxHealth: 90, speed: 2.8, damage: 12, fireRate: 35, armor: 2, lifeSteal: 0.25,
+        description: 'Sustain through life drain',
+        maxHealth: 95, speed: 2.8, damage: 11, fireRate: 34, armor: 2, lifeSteal: 0.2,
     },
     {
         id: 'berserker',
         name: '⚔️ Berserker',
-        description: 'High damage glass cannon',
-        maxHealth: 60, speed: 4, damage: 18, fireRate: 25, critChance: 0.25, critDamage: 2.0, dodge: 0.15,
+        description: 'Aggressive glass cannon',
+        maxHealth: 75, speed: 3.8, damage: 16, fireRate: 24, critChance: 0.2, critDamage: 1.8, dodge: 0.1,
     },
     {
         id: 'engineer',
         name: '🔧 Engineer',
-        description: 'Defensive armor specialist',
-        maxHealth: 120, speed: 2.2, damage: 9, fireRate: 38, armor: 8, range: 500, pickupRange: 65,
+        description: 'Defensive specialist with range',
+        maxHealth: 130, speed: 2.3, damage: 9, fireRate: 36, armor: 7, range: 500, pickupRange: 65,
     },
     {
         id: 'medic',
         name: '💊 Medic',
         description: 'Regenerates health over time',
-        maxHealth: 110, speed: 2.5, damage: 8, fireRate: 35, armor: 3, lifeSteal: 0.15, healthRegen: 0.5,
+        maxHealth: 120, speed: 2.6, damage: 8, fireRate: 34, armor: 3, lifeSteal: 0.1, healthRegen: 0.4,
     },
     {
         id: 'assassin',
         name: '🗡️ Assassin',
-        description: 'High dodge and critical backstab',
-        maxHealth: 70, speed: 4.5, damage: 15, fireRate: 28, critChance: 0.35, critDamage: 3.0, dodge: 0.25,
+        description: 'High dodge and deadly criticals',
+        maxHealth: 70, speed: 4.2, damage: 14, fireRate: 26, critChance: 0.25, critDamage: 2.5, dodge: 0.2,
     },
     {
         id: 'summoner',
         name: '🔮 Summoner',
-        description: 'Spawns helper drones',
-        maxHealth: 95, speed: 2.6, damage: 6, fireRate: 45, armor: 2, dodge: 0.05, maxDrones: 3,
+        description: 'Commands powerful attack drones',
+        maxHealth: 100, speed: 2.6, damage: 8, fireRate: 42, armor: 2, dodge: 0.05, maxDrones: 2,
     },
     {
         id: 'juggernaut',
         name: '💪 Juggernaut',
-        description: 'Extreme tank with knockback immunity',
-        maxHealth: 200, speed: 1.5, damage: 12, fireRate: 50, armor: 12, lifeSteal: 0.1, knockbackImmune: true,
+        description: 'Unstoppable force, immovable object',
+        maxHealth: 200, speed: 1.8, damage: 12, fireRate: 45, armor: 10, lifeSteal: 0.08, knockbackImmune: true,
     },
 ];
 
 // Weapon types
 const WEAPON_TYPES = {
-    basic: { name: '🔫 Blaster', fireRate: 1, color: '#00ff88' },
-    laser: { name: '⚡ Laser', fireRate: 0.2, damage: 0.3, color: '#ff00ff', continuous: true },
-    rocket: { name: '🚀 Rocket', fireRate: 2, damage: 3, color: '#ff6b6b', explosion: 80 },
-    spread: { name: '🌟 Spread', fireRate: 1.3, projectiles: 5, color: '#ffd93d' },
-    flamethrower: { name: '🔥 Flamethrower', fireRate: 0.1, damage: 0.5, color: '#ff4500', cone: true },
-    lightning: { name: '⚡ Lightning', fireRate: 1.2, damage: 1.2, color: '#00d4ff', chains: 3 },
-    freeze: { name: '❄️ Freeze Ray', fireRate: 0.7, damage: 0.8, color: '#87ceeb', slows: true },
-    plasma: { name: '💥 Plasma', fireRate: 1.5, damage: 1.6, color: '#9d00ff', pierces: true },
+    basic: { name: '🔫 Blaster', fireRate: 1, damage: 1, color: '#00ff88', desc: 'Reliable all-rounder' },
+    laser: { name: '⚡ Laser', fireRate: 0.25, damage: 0.35, color: '#ff00ff', continuous: true, desc: 'Continuous beam' },
+    rocket: { name: '🚀 Rocket', fireRate: 2.2, damage: 2.5, color: '#ff6b6b', explosion: 70, desc: 'Explosive area damage' },
+    spread: { name: '🌟 Spread', fireRate: 1.4, damage: 0.6, projectiles: 5, color: '#ffd93d', desc: 'Wide coverage' },
+    flamethrower: { name: '🔥 Flamethrower', fireRate: 0.15, damage: 0.4, color: '#ff4500', cone: true, desc: 'Close range inferno' },
+    lightning: { name: '⚡ Chain Lightning', fireRate: 1.3, damage: 1.0, color: '#00d4ff', chains: 3, desc: 'Chains between enemies' },
+    freeze: { name: '❄️ Freeze Ray', fireRate: 0.8, damage: 0.7, color: '#87ceeb', slows: true, desc: 'Slows enemies on hit' },
+    plasma: { name: '💥 Plasma', fireRate: 1.6, damage: 1.4, color: '#9d00ff', pierces: true, desc: 'Pierces through enemies' },
 };
 
 // Enemy types with behaviors
 const ENEMY_TYPES = {
-    normal: { color: '#a855f7', speed: 1, health: 1, damage: 1, credits: 1 },
-    fast: { color: '#ff6b6b', speed: 1.5, health: 0.7, damage: 0.8, credits: 1.2 },
-    tank: { color: '#10b981', speed: 0.6, health: 2.5, damage: 1.5, credits: 2 },
-    swarm: { color: '#f59e0b', speed: 1.2, health: 0.4, damage: 0.5, credits: 0.5, size: 0.6 },
-    teleporter: { color: '#8b5cf6', speed: 0.8, health: 1, damage: 1.2, credits: 1.5, canTeleport: true },
-    shooter: { color: '#ec4899', speed: 0.5, health: 0.8, damage: 1, credits: 1.8, ranged: true },
-    healer: { color: '#22d3ee', speed: 0.7, health: 1.2, damage: 0.6, credits: 2.5, heals: true },
-    splitter: { color: '#fb923c', speed: 0.9, health: 1.3, damage: 1.1, credits: 2.2, splits: 3 },
-    freezer: { color: '#38bdf8', speed: 0.8, health: 1.1, damage: 0.9, credits: 2, freezes: true },
-    berserker: { color: '#dc2626', speed: 1, health: 1.5, damage: 1.8, credits: 2.3, enrages: true },
+    normal: { color: '#a855f7', speed: 1, health: 1, damage: 1, credits: 1, xp: 1 },
+    fast: { color: '#ff6b6b', speed: 1.4, health: 0.6, damage: 0.7, credits: 1.2, xp: 1.1 },
+    tank: { color: '#10b981', speed: 0.55, health: 2.2, damage: 1.3, credits: 2, xp: 1.5 },
+    swarm: { color: '#f59e0b', speed: 1.15, health: 0.35, damage: 0.4, credits: 0.5, xp: 0.4, size: 0.6 },
+    teleporter: { color: '#8b5cf6', speed: 0.75, health: 0.9, damage: 1.1, credits: 1.5, xp: 1.3, canTeleport: true },
+    shooter: { color: '#ec4899', speed: 0.45, health: 0.75, damage: 0.9, credits: 1.8, xp: 1.4, ranged: true },
+    healer: { color: '#22d3ee', speed: 0.65, health: 1.1, damage: 0.5, credits: 2.5, xp: 2, heals: true },
+    splitter: { color: '#fb923c', speed: 0.85, health: 1.2, damage: 1.0, credits: 2.2, xp: 1.8, splits: 3 },
+    freezer: { color: '#38bdf8', speed: 0.75, health: 1.0, damage: 0.8, credits: 2, xp: 1.5, freezes: true },
+    berserker: { color: '#dc2626', speed: 0.95, health: 1.4, damage: 1.5, credits: 2.3, xp: 2, enrages: true },
 };
 
 // Boss types
 const BOSS_TYPES = {
-    destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 15, damage: 3, credits: 100 },
-    broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 12, damage: 2, credits: 120, summons: true },
-    voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 10, damage: 2.5, credits: 150, teleports: true },
-    necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 13, damage: 2.2, credits: 180, resurrects: true },
-    titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 20, damage: 4, credits: 200, earthquake: true },
+    destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 12, damage: 2.5, credits: 100, xp: 50 },
+    broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 10, damage: 1.8, credits: 120, xp: 60, summons: true },
+    voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 8, damage: 2.2, credits: 150, xp: 70, teleports: true },
+    necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 11, damage: 2.0, credits: 180, xp: 80, resurrects: true },
+    titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 16, damage: 3.5, credits: 200, xp: 100, earthquake: true },
 };
+
+// Elite enemy modifiers - rare empowered enemies
+const ELITE_MODIFIERS = {
+    vampiric: { name: '🧛 Vampiric', color: '#991b1b', healthMult: 1.5, damageMult: 1.2, speedMult: 1.0, healsOnHit: true, creditMult: 2.5, xpMult: 2.5 },
+    shielded: { name: '🛡️ Shielded', color: '#1e40af', healthMult: 2.0, damageMult: 1.0, speedMult: 0.9, hasShield: true, creditMult: 2.0, xpMult: 2.0 },
+    enraged: { name: '🔥 Enraged', color: '#ea580c', healthMult: 1.2, damageMult: 1.8, speedMult: 1.3, creditMult: 2.5, xpMult: 2.5 },
+    toxic: { name: '☠️ Toxic', color: '#65a30d', healthMult: 1.3, damageMult: 1.0, speedMult: 1.0, poisonOnHit: true, creditMult: 2.0, xpMult: 2.0 },
+    ghostly: { name: '👻 Ghostly', color: '#94a3b8', healthMult: 0.8, damageMult: 1.5, speedMult: 1.4, phasing: true, creditMult: 3.0, xpMult: 3.0 },
+};
+
+// XP level-up passive abilities (pick 1 of 3)
+const PASSIVE_ABILITIES = [
+    { id: 'glass_cannon', name: '🔥 Glass Cannon', desc: '+15% Damage, -10% Max HP', apply: p => { p.damage = Math.floor(p.damage * 1.15); p.maxHealth = Math.floor(p.maxHealth * 0.9); p.health = Math.min(p.health, p.maxHealth); } },
+    { id: 'fortify', name: '🛡️ Fortify', desc: '+2 Armor, +15 Max HP', apply: p => { p.armor += 2; p.maxHealth += 15; p.health += 15; } },
+    { id: 'quick_hands', name: '⚡ Quick Hands', desc: '+10% Fire Rate', apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.9)); } },
+    { id: 'nimble', name: '🏃 Nimble', desc: '+0.3 Speed, +5% Dodge', apply: p => { p.speed += 0.3; p.dodge = Math.min(0.7, p.dodge + 0.05); } },
+    { id: 'vampirism', name: '🧛 Vampirism', desc: '+8% Life Steal', apply: p => { p.lifeSteal += 0.08; } },
+    { id: 'eagle_eye', name: '🎯 Eagle Eye', desc: '+8% Crit Chance, +0.3x Crit Damage', apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.08); p.critDamage += 0.3; } },
+    { id: 'thick_skin', name: '💚 Thick Skin', desc: '+25 Max HP, Full Heal', apply: p => { p.maxHealth += 25; p.health = p.maxHealth; } },
+    { id: 'bullet_storm', name: '🌟 Bullet Storm', desc: '+1 Projectile', apply: p => { p.projectileCount += 1; } },
+    { id: 'scavenger', name: '🧲 Scavenger', desc: '+25 Pickup Range', apply: p => { p.pickupRange += 25; } },
+    { id: 'regeneration', name: '💊 Regeneration', desc: '+0.3 HP/s Regen', apply: p => { p.healthRegen = (p.healthRegen || 0) + 0.3; } },
+    { id: 'adrenaline', name: '💉 Adrenaline', desc: '+0.5 Speed when below 50% HP', apply: p => { p.adrenaline = (p.adrenaline || 0) + 1; } },
+    { id: 'thorns', name: '🌵 Thorns', desc: 'Reflect 20% melee damage back', apply: p => { p.thorns = (p.thorns || 0) + 0.2; } },
+];
 
 // Powerup types
 const POWERUP_TYPES = {
@@ -220,10 +259,20 @@ const game = {
         waveStartDamage: 0,
         comboKills: 0,
         comboTimer: 0,
+        xp: 0,
+        level: 1,
+        xpToNext: 10,
+        totalXpEarned: 0,
     },
     persistentStats: loadPersistentStats(),
     achievements: loadAchievements(),
     highScores: loadHighScores(),
+    difficulty: 'normal',
+    difficultySettings: null,
+    levelUpChoices: [],
+    passivesChosen: [],
+    playerDPS: { damage: 0, timer: 0, history: [] },
+    eliteKills: 0,
     soundEnabled: (() => {
         try {
             return localStorage.getItem('soundEnabled') !== 'false';
@@ -420,6 +469,67 @@ function checkAchievements() {
     }
 }
 
+function triggerLevelUp() {
+    // Pause the game briefly for level-up choice
+    game.paused = true;
+    Sound.play('levelUp');
+    screenShake(8);
+    showNotification(`⬆️ LEVEL ${game.stats.level}!`, '#ffd93d', 3000);
+    
+    // Pick 3 random passives
+    const available = PASSIVE_ABILITIES; // All available
+    const choices = [];
+    const shuffled = [...available].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < Math.min(3, shuffled.length); i++) {
+        choices.push(shuffled[i]);
+    }
+    
+    game.levelUpChoices = choices;
+    showLevelUpModal();
+}
+
+function showLevelUpModal() {
+    // Remove existing if present
+    const existing = document.getElementById('level-up-modal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'level-up-modal';
+    modal.className = 'modal level-up-modal';
+    modal.innerHTML = `
+        <div class="modal-content level-up-content">
+            <h2>⬆️ Level ${game.stats.level}!</h2>
+            <p class="level-up-subtitle">Choose a passive ability:</p>
+            <div class="level-up-choices">
+                ${game.levelUpChoices.map((choice, i) => `
+                    <div class="level-up-choice" data-index="${i}">
+                        <h3>${choice.name}</h3>
+                        <p>${choice.desc}</p>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('game-container').appendChild(modal);
+    
+    // Add click handlers
+    modal.querySelectorAll('.level-up-choice').forEach(el => {
+        el.addEventListener('click', () => {
+            const index = parseInt(el.dataset.index);
+            const chosen = game.levelUpChoices[index];
+            chosen.apply(game.player);
+            game.passivesChosen.push(chosen.id);
+            
+            showNotification(`${chosen.name} acquired!`, '#ffd93d', 2000);
+            Sound.play('powerup');
+            
+            modal.remove();
+            game.paused = false;
+        });
+    });
+}
+
 // ==================== VISUAL FEEDBACK HELPERS ====================
 function screenShake(intensity = CONFIG.SCREEN_SHAKE_INTENSITY) {
     game.camera.shake = Math.max(game.camera.shake, intensity);
@@ -609,6 +719,15 @@ class Player {
         this.droneRespawnCooldown = 0;
         this.slowDebuff = 0; // Frames remaining for slow effect
         this.slowAmount = 0; // Slow percentage
+        this.dashCooldown = 0;
+        this.dashInvulnerable = 0;
+        this.isDashing = false;
+        this.dashVx = 0;
+        this.dashVy = 0;
+        this.adrenaline = 0;
+        this.thorns = 0;
+        this.poisonDamage = 0;
+        this.poisonTimer = 0;
     }
 
     update() {
@@ -617,9 +736,44 @@ class Player {
             this.heal(this.healthRegen / CONFIG.TARGET_FPS); // Convert per-second to per-frame
         }
         
+        // Adrenaline passive - bonus stats when below 50% HP
+        let adrenalineBonus = 0;
+        if (this.adrenaline > 0 && this.health < this.maxHealth * 0.5) {
+            adrenalineBonus = this.adrenaline;
+        }
+        
+        // Poison damage over time
+        if (this.poisonTimer > 0) {
+            const poisonDmg = this.poisonDamage / CONFIG.TARGET_FPS;
+            this.health -= poisonDmg;
+            this.poisonTimer--;
+            if (this.poisonTimer % 30 === 0) {
+                createTextParticle(this.x, this.y, `☠️`, '#65a30d', 14);
+            }
+            if (this.health <= 0) {
+                this.health = 0;
+                gameOver();
+                return; // Stop further updates
+            }
+        }
+        
+        // Dash update
+        if (this.dashCooldown > 0) this.dashCooldown--;
+        if (this.dashInvulnerable > 0) this.dashInvulnerable--;
+        
+        if (this.isDashing) {
+            this.x += this.dashVx;
+            this.y += this.dashVy;
+            this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
+            this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
+            createParticles(this.x, this.y, '#4ecdc4', 2);
+            this.isDashing = false;
+        }
+        
         // Apply powerup modifiers
         const speedMult = getPowerupMultiplier('speed');
         let currentSpeed = this.speed * speedMult;
+        currentSpeed += adrenalineBonus * 0.5;
         
         // Apply slow debuff (from Freezer enemies)
         if (this.slowDebuff > 0) {
@@ -799,6 +953,12 @@ class Player {
     }
 
     takeDamage(amount) {
+        // Dash invulnerability
+        if (this.dashInvulnerable > 0) {
+            createTextParticle(this.x, this.y, 'INVULNERABLE!', '#4ecdc4', 16);
+            return;
+        }
+        
         // Shield powerup protection
         if (hasPowerup('shield')) {
             const shield = game.activePowerups.find(p => p.data.effect === 'shield');
@@ -824,6 +984,21 @@ class Player {
         this.health -= finalDamage;
         game.stats.damageTaken += finalDamage;
         
+        // Thorns passive - reflect damage to nearest enemy
+        if (this.thorns > 0) {
+            const thornsDamage = Math.floor(finalDamage * this.thorns);
+            if (thornsDamage > 0 && game.enemies.length > 0) {
+                let nearest = game.enemies[0];
+                let nearestDist = Math.hypot(nearest.x - this.x, nearest.y - this.y);
+                for (let i = 1; i < game.enemies.length; i++) {
+                    const d = Math.hypot(game.enemies[i].x - this.x, game.enemies[i].y - this.y);
+                    if (d < nearestDist) { nearest = game.enemies[i]; nearestDist = d; }
+                }
+                nearest.takeDamage(thornsDamage, false);
+                createTextParticle(nearest.x, nearest.y, `🌵${thornsDamage}`, '#65a30d', 14);
+            }
+        }
+        
         // Enhanced damage feedback
         createTextParticle(this.x, this.y, `-${finalDamage}`, '#ff6b6b', 18);
         createParticles(this.x, this.y, '#ff6b6b', 5);
@@ -840,6 +1015,21 @@ class Player {
             createTextParticle(this.x, this.y, `+${heal}`, '#00ff88', 18);
             createParticles(this.x, this.y, '#00ff88', 8);
         }
+    }
+
+    dash(dx, dy) {
+        if (this.dashCooldown > 0) return;
+        if (dx === 0 && dy === 0) return;
+        
+        const dist = Math.hypot(dx, dy);
+        this.dashVx = (dx / dist) * CONFIG.DASH_DISTANCE / 4;
+        this.dashVy = (dy / dist) * CONFIG.DASH_DISTANCE / 4;
+        this.isDashing = true;
+        this.dashCooldown = CONFIG.DASH_COOLDOWN;
+        this.dashInvulnerable = CONFIG.DASH_INVULNERABLE_FRAMES;
+        
+        createParticles(this.x, this.y, '#4ecdc4', 15);
+        Sound.play('powerup');
     }
 
     draw(ctx) {
@@ -1183,11 +1373,12 @@ class Enemy {
             const bossType = BOSS_TYPES[type] || BOSS_TYPES.destroyer;
             this.type = type;
             this.size = CONFIG.ENEMY_SIZE * bossType.size;
-            this.speed = (0.5 + wave * 0.05) * 0.4;
-            this.maxHealth = (20 + wave * 5) * bossType.health;
+            const diffSettings = game.difficultySettings || CONFIG.DIFFICULTY.normal;
+            this.speed = (0.4 + Math.log2(1 + wave * 0.15)) * 0.4 * diffSettings.enemySpeedMult;
+            this.maxHealth = (15 + wave * 3 + Math.pow(wave, 1.3)) * bossType.health * diffSettings.enemyHealthMult;
             this.health = this.maxHealth;
-            this.damage = (5 + wave * 2) * bossType.damage;
-            this.creditValue = bossType.credits;
+            this.damage = (4 + wave * 1.2 + Math.pow(wave, 1.1) * 0.3) * bossType.damage * diffSettings.enemyDamageMult;
+            this.creditValue = Math.floor(bossType.credits * (diffSettings.creditMult || 1));
             this.color = bossType.color;
             this.name = bossType.name;
             this.canSummon = bossType.summons;
@@ -1198,11 +1389,12 @@ class Enemy {
             const enemyType = ENEMY_TYPES[type] || ENEMY_TYPES.normal;
             this.type = type;
             this.size = CONFIG.ENEMY_SIZE * (enemyType.size || 1);
-            this.speed = (1 + wave * 0.1) * enemyType.speed;
-            this.maxHealth = (20 + wave * 5) * enemyType.health;
+            const diffSettings = game.difficultySettings || CONFIG.DIFFICULTY.normal;
+            this.speed = (1 + Math.log2(1 + wave * 0.3)) * enemyType.speed * diffSettings.enemySpeedMult;
+            this.maxHealth = (15 + wave * 3 + Math.pow(wave, 1.3)) * enemyType.health * diffSettings.enemyHealthMult;
             this.health = this.maxHealth;
-            this.damage = (5 + wave * 2) * enemyType.damage;
-            this.creditValue = Math.floor((2 + wave) * enemyType.credits);
+            this.damage = (4 + wave * 1.2 + Math.pow(wave, 1.1) * 0.3) * enemyType.damage * diffSettings.enemyDamageMult;
+            this.creditValue = Math.floor((2 + wave * 0.8) * enemyType.credits * (diffSettings.creditMult || 1));
             this.color = enemyType.color;
             this.canTeleport = enemyType.canTeleport;
             this.isRanged = enemyType.ranged;
@@ -1215,6 +1407,24 @@ class Enemy {
             this.healCooldown = 0;
             this.enraged = false;
             this.splitGeneration = 0; // Track split depth to prevent infinite splitting
+            
+            // Elite enemy modification
+            this.isElite = false;
+            if (!isBoss && game.wave >= 5 && Math.random() < CONFIG.ELITE_CHANCE) {
+                this.isElite = true;
+                const modKeys = Object.keys(ELITE_MODIFIERS);
+                const modKey = modKeys[Math.floor(Math.random() * modKeys.length)];
+                this.eliteModifier = ELITE_MODIFIERS[modKey];
+                this.eliteType = modKey;
+                
+                this.maxHealth *= this.eliteModifier.healthMult;
+                this.health = this.maxHealth;
+                this.damage *= this.eliteModifier.damageMult;
+                this.speed *= this.eliteModifier.speedMult;
+                this.creditValue = Math.floor(this.creditValue * this.eliteModifier.creditMult);
+                this.size *= 1.25; // Slightly larger
+                this.eliteShield = this.eliteModifier.hasShield ? this.maxHealth * 0.3 : 0;
+            }
         }
         
         // Boss-specific abilities
@@ -1416,6 +1626,19 @@ class Enemy {
     }
 
     takeDamage(amount, isCrit = false) {
+        // Elite shield absorbs damage first
+        if (this.isElite && this.eliteShield > 0) {
+            const absorbed = Math.min(amount, this.eliteShield);
+            this.eliteShield -= absorbed;
+            amount -= absorbed;
+            createTextParticle(this.x, this.y - 20, `🛡️${Math.floor(absorbed)}`, '#60a5fa', 14);
+            if (this.eliteShield <= 0) {
+                createTextParticle(this.x, this.y - 30, 'SHIELD BROKEN!', '#f59e0b', 18);
+                createParticles(this.x, this.y, '#60a5fa', 15);
+            }
+            if (amount <= 0) return false;
+        }
+        
         this.health -= amount;
         game.stats.damageDealt += amount;
         
@@ -1436,6 +1659,26 @@ class Enemy {
     die() {
         game.stats.enemiesKilled++;
         game.persistentStats.totalKills++;
+        
+        // XP gain
+        const baseXP = this.isBoss ? (BOSS_TYPES[this.type]?.xp || 50) : (ENEMY_TYPES[this.type]?.xp || 1);
+        const xpMult = game.difficultySettings?.xpMult || 1;
+        const xpGain = Math.floor(baseXP * xpMult * (this.isElite ? 2 : 1));
+        game.stats.xp += xpGain;
+        game.stats.totalXpEarned += xpGain;
+        
+        // Check level up
+        while (game.stats.xp >= game.stats.xpToNext) {
+            game.stats.xp -= game.stats.xpToNext;
+            game.stats.level++;
+            game.stats.xpToNext = Math.floor(CONFIG.XP_BASE * Math.pow(CONFIG.XP_SCALING, game.stats.level - 1));
+            triggerLevelUp();
+        }
+        
+        // Elite kill tracking
+        if (this.isElite) {
+            game.eliteKills++;
+        }
         
         // Enhanced combo system
         game.stats.comboKills++;
@@ -1959,15 +2202,43 @@ class Enemy {
         ctx.arc(this.x + this.size * 0.3, this.y - this.size * 0.2, this.size * 0.1, 0, Math.PI * 2);
         ctx.fill();
         
-        // Health bar
+        // Elite indicator
+        if (this.isElite && !this.isBoss) {
+            ctx.strokeStyle = this.eliteModifier.color;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size + 5, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Elite name tag
+            ctx.fillStyle = this.eliteModifier.color;
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.eliteModifier.name, this.x, this.y - this.size - 15);
+        }
+        
+        // Health bar for all enemies
         if (this.health < this.maxHealth) {
-            const barWidth = this.size * 1.5;
-            const barX = this.x - barWidth / 2;
-            const barY = this.y - this.size - 10;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(barX, barY, barWidth, 4);
-            ctx.fillStyle = this.isBoss ? '#ffd93d' : '#ff6b6b';
-            ctx.fillRect(barX, barY, barWidth * (this.health / this.maxHealth), 4);
+            const barWidth = this.size * 2;
+            const barHeight = 4;
+            const barY = this.y - this.size - 8;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(this.x - barWidth / 2, barY, barWidth, barHeight);
+            
+            const healthPercent = this.health / this.maxHealth;
+            const healthColor = healthPercent > 0.5 ? '#00ff88' : healthPercent > 0.25 ? '#ffd93d' : '#ff6b6b';
+            ctx.fillStyle = healthColor;
+            ctx.fillRect(this.x - barWidth / 2, barY, barWidth * healthPercent, barHeight);
+            
+            // Elite shield bar
+            if (this.isElite && this.eliteShield > 0 && this.eliteModifier?.hasShield) {
+                const shieldMax = this.maxHealth * 0.3;
+                ctx.fillStyle = '#60a5fa';
+                ctx.fillRect(this.x - barWidth / 2, barY - 3, barWidth * (this.eliteShield / shieldMax), 2);
+            }
         }
         
         ctx.restore();
@@ -2006,6 +2277,7 @@ class Bullet {
                 const damageMult = getPowerupMultiplier('damage');
                 const isCrit = Math.random() < this.critChance;
                 const finalDamage = Math.floor(this.damage * damageMult * (isCrit ? this.critDamage : 1));
+                game.playerDPS.damage += finalDamage;
                 
                 if (this.explosion) {
                     this.explode();
@@ -2558,6 +2830,7 @@ function rerollShop() {
 
 // ==================== WAVE SYSTEM ====================
 function spawnWave() {
+    showWaveAnnouncement();
     const isBoss = game.wave % CONFIG.BOSS_WAVE_INTERVAL === 0;
     
     if (isBoss) {
@@ -2628,9 +2901,8 @@ function gameOver() {
     checkAchievements();
     Sound.play('gameOver');
     
-    // High score
-    const score = game.wave * 1000 + game.stats.enemiesKilled * 10 + game.stats.bossesDefeated * 500;
-    game.highScores.push({ wave: game.wave, score, timestamp: Date.now() });
+    const score = game.wave * 1000 + game.stats.enemiesKilled * 10 + game.stats.bossesDefeated * 500 + game.stats.level * 200;
+    game.highScores.push({ wave: game.wave, score, difficulty: game.difficulty, timestamp: Date.now() });
     game.highScores.sort((a, b) => b.score - a.score);
     game.highScores = game.highScores.slice(0, 10);
     saveHighScores();
@@ -2638,26 +2910,74 @@ function gameOver() {
     document.getElementById('game-over-modal').classList.remove('hidden');
     document.getElementById('final-wave').textContent = game.wave;
     
+    const avgDPS = getAverageDPS();
+    const survivalTime = game.wave * CONFIG.WAVE_DURATION;
+    const minutes = Math.floor(survivalTime / 60);
+    const seconds = survivalTime % 60;
+    
     const stats = document.getElementById('final-stats');
     stats.innerHTML = `
-        <h3>Mission Statistics</h3>
-        <p>🌊 Waves Survived: ${game.wave}</p>
-        <p>👾 Enemies Eliminated: ${game.stats.enemiesKilled}</p>
-        <p>👹 Bosses Defeated: ${game.stats.bossesDefeated}</p>
-        <p>💥 Damage Dealt: ${game.stats.damageDealt}</p>
-        <p>❤️ Damage Taken: ${game.stats.damageTaken}</p>
-        <p>💰 Credits Earned: ${game.credits}</p>
-        <p>🏆 Score: ${score}</p>
+        <h3>📊 Mission Report</h3>
+        <div class="final-stats-grid">
+            <div class="stat-group">
+                <h4>⚔️ Combat</h4>
+                <p>🌊 Waves Survived: ${game.wave}</p>
+                <p>👾 Enemies Eliminated: ${game.stats.enemiesKilled}</p>
+                <p>👹 Bosses Defeated: ${game.stats.bossesDefeated}</p>
+                <p>⭐ Elites Slain: ${game.eliteKills}</p>
+                <p>💥 Total Damage: ${game.stats.damageDealt.toLocaleString()}</p>
+                <p>📊 Avg DPS: ${avgDPS}</p>
+            </div>
+            <div class="stat-group">
+                <h4>📈 Progression</h4>
+                <p>⬆️ Level Reached: ${game.stats.level}</p>
+                <p>🎯 Difficulty: ${game.difficulty.charAt(0).toUpperCase() + game.difficulty.slice(1)}</p>
+                <p>⏱️ Survival Time: ${minutes}m ${seconds}s</p>
+                <p>❤️ Damage Taken: ${game.stats.damageTaken.toLocaleString()}</p>
+                <p>💰 Credits Earned: ${game.credits}</p>
+                <p>🎭 Character: ${game.selectedCharacter?.name || 'Unknown'}</p>
+            </div>
+        </div>
+        <div class="passives-summary">
+            <h4>🔮 Passives Acquired (${game.passivesChosen.length})</h4>
+            <p>${game.passivesChosen.length > 0 ? game.passivesChosen.map(id => {
+                const p = PASSIVE_ABILITIES.find(a => a.id === id);
+                return p ? p.name : id;
+            }).join(', ') : 'None'}</p>
+        </div>
+        <p class="score-display">🏆 Score: ${score.toLocaleString()}</p>
     `;
     
     const title = document.getElementById('game-over-title');
-    title.textContent = game.wave >= 10 ? '🏆 Mission Success! 🏆' : '💀 Mission Failed 💀';
+    if (game.wave >= 20) {
+        title.textContent = '🌟 LEGENDARY SURVIVOR! 🌟';
+    } else if (game.wave >= 10) {
+        title.textContent = '🏆 Mission Success! 🏆';
+    } else if (game.wave >= 5) {
+        title.textContent = '⚔️ Valiant Effort ⚔️';
+    } else {
+        title.textContent = '💀 Mission Failed 💀';
+    }
 }
 
 function restartGame() {
     document.getElementById('game-over-modal').classList.add('hidden');
+    // Remove level up modal if present
+    const levelUpModal = document.getElementById('level-up-modal');
+    if (levelUpModal) levelUpModal.remove();
+    
+    // Reset new systems
+    game.stats.xp = 0;
+    game.stats.level = 1;
+    game.stats.xpToNext = CONFIG.XP_BASE;
+    game.stats.totalXpEarned = 0;
+    game.levelUpChoices = [];
+    game.passivesChosen = [];
+    game.playerDPS = { damage: 0, timer: 0, history: [] };
+    game.eliteKills = 0;
+    
     game.state = 'characterSelect';
-    document.getElementById('character-select-modal').classList.remove('hidden');
+    showDifficultySelect();
 }
 
 // ==================== UI & NOTIFICATIONS ====================
@@ -2899,8 +3219,14 @@ function drawPauseMenu(ctx) {
     // Current weapon
     ctx.fillStyle = '#4ecdc4';
     ctx.font = '20px monospace';
-    const weaponName = WEAPON_TYPES[game.currentWeapon].name;
+    const weapon = WEAPON_TYPES[game.currentWeapon];
+    const weaponName = weapon.name;
     ctx.fillText(`Current Weapon: ${weaponName}`, CONFIG.CANVAS_WIDTH / 2, menuY + 250);
+    
+    // Player stats in pause
+    ctx.fillStyle = '#888';
+    ctx.font = '14px monospace';
+    ctx.fillText(`Level: ${game.stats.level} | DPS: ${getAverageDPS()} | Difficulty: ${game.difficulty}`, CONFIG.CANVAS_WIDTH / 2, menuY + 270);
     
     // Active powerups
     if (game.activePowerups.length > 0) {
@@ -2925,39 +3251,235 @@ function drawPauseMenu(ctx) {
 
 // Draw weapon indicator
 function drawWeaponIndicator(ctx) {
-    const weapons = ['basic', 'laser', 'rocket', 'spread'];
-    const x = CONFIG.CANVAS_WIDTH - 200;
-    const y = CONFIG.CANVAS_HEIGHT - 60;
+    const weapons = ['basic', 'laser', 'rocket', 'spread', 'flamethrower', 'lightning', 'freeze', 'plasma'];
+    const x = CONFIG.CANVAS_WIDTH - 350;
+    const y = CONFIG.CANVAS_HEIGHT - 45;
     
     ctx.save();
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(x, y, 190, 50);
-    
-    ctx.fillStyle = '#00ff88';
-    ctx.font = '14px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('Weapon:', x + 5, y + 20);
+    ctx.fillRect(x, y, 340, 38);
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, 340, 38);
     
     weapons.forEach((weapon, i) => {
-        const wx = x + 5 + i * 45;
-        const wy = y + 30;
+        const wx = x + 5 + i * 42;
+        const wy = y + 5;
         
         if (game.currentWeapon === weapon) {
             ctx.fillStyle = WEAPON_TYPES[weapon].color;
-            ctx.fillRect(wx, wy, 40, 15);
+            ctx.globalAlpha = 0.4;
+            ctx.fillRect(wx, wy, 38, 28);
+            ctx.globalAlpha = 1;
         }
         
-        ctx.strokeStyle = WEAPON_TYPES[weapon].color;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(wx, wy, 40, 15);
+        ctx.strokeStyle = game.currentWeapon === weapon ? WEAPON_TYPES[weapon].color : '#475569';
+        ctx.lineWidth = game.currentWeapon === weapon ? 2 : 1;
+        ctx.strokeRect(wx, wy, 38, 28);
         
         ctx.fillStyle = '#fff';
-        ctx.font = '12px monospace';
+        ctx.font = '10px monospace';
         ctx.textAlign = 'center';
-        ctx.fillText(`${i + 1}`, wx + 20, wy + 12);
+        ctx.fillText(`${i + 1}`, wx + 19, wy + 12);
+        
+        ctx.fillStyle = WEAPON_TYPES[weapon].color;
+        ctx.font = '10px monospace';
+        ctx.fillText(WEAPON_TYPES[weapon].name.split(' ')[0], wx + 19, wy + 24);
     });
     
     ctx.restore();
+}
+
+function drawMinimap(ctx) {
+    const size = CONFIG.MINIMAP_SIZE;
+    const margin = CONFIG.MINIMAP_MARGIN;
+    const x = CONFIG.CANVAS_WIDTH - size - margin;
+    const y = CONFIG.CANVAS_HEIGHT - size - margin;
+    const scaleX = size / CONFIG.CANVAS_WIDTH;
+    const scaleY = size / CONFIG.CANVAS_HEIGHT;
+    
+    // Background
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(x, y, size, size);
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, size, size);
+    
+    // Player dot
+    ctx.fillStyle = '#4ecdc4';
+    ctx.beginPath();
+    ctx.arc(x + game.player.x * scaleX, y + game.player.y * scaleY, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Enemy dots
+    game.enemies.forEach(e => {
+        if (e.isBoss) {
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(x + e.x * scaleX, y + e.y * scaleY, 3, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (e.isElite) {
+            ctx.fillStyle = e.eliteModifier?.color || '#ffd93d';
+            ctx.beginPath();
+            ctx.arc(x + e.x * scaleX, y + e.y * scaleY, 2, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fillRect(x + e.x * scaleX - 1, y + e.y * scaleY - 1, 2, 2);
+        }
+    });
+    
+    // Powerup dots
+    game.powerups.forEach(p => {
+        ctx.fillStyle = p.data.color;
+        ctx.beginPath();
+        ctx.arc(x + p.x * scaleX, y + p.y * scaleY, 2, 0, Math.PI * 2);
+        ctx.fill();
+    });
+    
+    ctx.restore();
+}
+
+function drawXPBar(ctx) {
+    const barWidth = 300;
+    const barHeight = 8;
+    const x = CONFIG.CANVAS_WIDTH / 2 - barWidth / 2;
+    const y = CONFIG.CANVAS_HEIGHT - 25;
+    
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(x, y, barWidth, barHeight);
+    
+    // XP progress
+    const xpPercent = game.stats.xp / game.stats.xpToNext;
+    ctx.fillStyle = '#a855f7';
+    ctx.fillRect(x, y, barWidth * xpPercent, barHeight);
+    
+    // Border
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, barWidth, barHeight);
+    
+    // Level text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = 1;
+    ctx.fillText(`Lv.${game.stats.level}`, x + barWidth / 2, y - 5);
+    
+    ctx.restore();
+}
+
+function drawDashIndicator(ctx) {
+    if (!game.player) return;
+    const x = 20;
+    const y = CONFIG.CANVAS_HEIGHT - 50;
+    
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    
+    const ready = game.player.dashCooldown <= 0;
+    const progress = ready ? 1 : 1 - (game.player.dashCooldown / CONFIG.DASH_COOLDOWN);
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(x, y, 100, 30);
+    
+    // Progress bar
+    ctx.fillStyle = ready ? '#4ecdc4' : '#334155';
+    ctx.fillRect(x, y, 100 * progress, 30);
+    
+    // Border
+    ctx.strokeStyle = ready ? '#4ecdc4' : '#475569';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, y, 100, 30);
+    
+    // Text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(ready ? '⚡ DASH' : `⚡ ${(game.player.dashCooldown / CONFIG.TARGET_FPS).toFixed(1)}s`, x + 50, y + 20);
+    
+    ctx.restore();
+}
+
+function updateDPS() {
+    const now = Date.now();
+    if (game.playerDPS.timer === 0) game.playerDPS.timer = now;
+    
+    const elapsed = (now - game.playerDPS.timer) / 1000;
+    if (elapsed >= 1) {
+        game.playerDPS.history.push(game.playerDPS.damage);
+        if (game.playerDPS.history.length > 10) game.playerDPS.history.shift();
+        game.playerDPS.damage = 0;
+        game.playerDPS.timer = now;
+    }
+}
+
+let cachedDPS = 0;
+let lastDPSHistoryLength = 0;
+
+function getAverageDPS() {
+    if (game.playerDPS.history.length === 0) return 0;
+    // Only recalculate when history changes
+    if (game.playerDPS.history.length !== lastDPSHistoryLength) {
+        lastDPSHistoryLength = game.playerDPS.history.length;
+        cachedDPS = Math.floor(game.playerDPS.history.reduce((a, b) => a + b, 0) / game.playerDPS.history.length);
+    }
+    return cachedDPS;
+}
+
+function drawDPSMeter(ctx) {
+    const dps = getAverageDPS();
+    if (dps === 0) return;
+    
+    ctx.save();
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = '#ff6b6b';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`DPS: ${dps}`, CONFIG.CANVAS_WIDTH - 20, 40);
+    ctx.restore();
+}
+
+function showWaveAnnouncement() {
+    const isBoss = game.wave % CONFIG.BOSS_WAVE_INTERVAL === 0;
+    
+    if (isBoss) {
+        const bossTypes = Object.keys(BOSS_TYPES);
+        const bossType = bossTypes[Math.floor(game.wave / CONFIG.BOSS_WAVE_INTERVAL) % bossTypes.length];
+        const boss = BOSS_TYPES[bossType];
+        showNotification(`⚠️ BOSS WAVE ${game.wave}: ${boss.name} ⚠️`, '#ff0000', 3000);
+    } else {
+        const enemyCount = 5 + game.wave * 3;
+        const availableTypes = Object.keys(ENEMY_TYPES).filter(t => {
+            if (t === 'tank') return game.wave >= 3;
+            if (t === 'swarm') return game.wave >= 5;
+            if (t === 'teleporter') return game.wave >= 7;
+            if (t === 'shooter') return game.wave >= 10;
+            if (t === 'healer') return game.wave >= 12;
+            if (t === 'splitter') return game.wave >= 15;
+            if (t === 'freezer') return game.wave >= 18;
+            if (t === 'berserker') return game.wave >= 20;
+            return true;
+        });
+        
+        const newType = availableTypes.find(t => {
+            const unlockWaves = { tank: 3, swarm: 5, teleporter: 7, shooter: 10, healer: 12, splitter: 15, freezer: 18, berserker: 20 };
+            return unlockWaves[t] === game.wave;
+        });
+        
+        let msg = `Wave ${game.wave}: ${enemyCount} enemies`;
+        if (newType) {
+            msg += ` | NEW: 🆕 ${newType.charAt(0).toUpperCase() + newType.slice(1)}!`;
+        }
+        showNotification(msg, '#00ff88', 2500);
+    }
 }
 
 // ==================== GAME LOOP ====================
@@ -3124,6 +3646,11 @@ function gameLoop(timestamp) {
         ctx.restore();
         ctx.save();
         drawWeaponIndicator(ctx);
+        drawMinimap(game.ctx);
+        drawXPBar(game.ctx);
+        drawDashIndicator(game.ctx);
+        drawDPSMeter(game.ctx);
+        updateDPS();
     } else if (game.paused) {
         // Still draw everything when paused
         game.pickups.forEach(p => p.draw(ctx));
@@ -3255,6 +3782,53 @@ function handleVisibilityChange() {
     }
 }
 
+function showDifficultySelect() {
+    const existing = document.getElementById('difficulty-modal');
+    if (existing) existing.remove();
+    
+    const modal = document.createElement('div');
+    modal.id = 'difficulty-modal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <h2>⚙️ Select Difficulty</h2>
+            <div class="difficulty-list">
+                <div class="difficulty-card" data-diff="easy">
+                    <h3>🟢 Easy</h3>
+                    <p>Enemies are weaker, more credits earned</p>
+                    <div class="diff-stats">-30% Enemy HP, -40% Enemy Damage, +30% Credits</div>
+                </div>
+                <div class="difficulty-card" data-diff="normal">
+                    <h3>🟡 Normal</h3>
+                    <p>The intended experience</p>
+                    <div class="diff-stats">Standard enemies and rewards</div>
+                </div>
+                <div class="difficulty-card" data-diff="hard">
+                    <h3>🔴 Hard</h3>
+                    <p>For experienced survivors</p>
+                    <div class="diff-stats">+40% Enemy HP, +30% Enemy Damage, -15% Credits</div>
+                </div>
+                <div class="difficulty-card" data-diff="nightmare">
+                    <h3>💀 Nightmare</h3>
+                    <p>Only the strongest survive</p>
+                    <div class="diff-stats">+100% Enemy HP, +60% Enemy Damage, -30% Credits</div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('game-container').appendChild(modal);
+    
+    modal.querySelectorAll('.difficulty-card').forEach(el => {
+        el.addEventListener('click', () => {
+            game.difficulty = el.dataset.diff;
+            game.difficultySettings = CONFIG.DIFFICULTY[game.difficulty];
+            modal.remove();
+            document.getElementById('character-select-modal').classList.remove('hidden');
+        });
+    });
+}
+
 function init() {
     game.canvas = document.getElementById('gameCanvas');
     game.ctx = game.canvas.getContext('2d');
@@ -3300,6 +3874,7 @@ function init() {
                 <span>❤️ ${char.maxHealth}</span>
                 <span>⚡ ${char.speed}</span>
                 <span>💪 ${char.damage}</span>
+                <span>🔫 ${Math.round(60 / char.fireRate * 10) / 10}/s</span>
             </div>
         `;
         div.addEventListener('click', () => {
@@ -3316,7 +3891,7 @@ function init() {
     // Buttons
     document.getElementById('start-btn')?.addEventListener('click', () => {
         document.getElementById('start-modal').classList.add('hidden');
-        charSelect.classList.remove('hidden');
+        showDifficultySelect();
     });
     
     document.getElementById('next-wave-btn').addEventListener('click', nextWave);
@@ -3396,10 +3971,34 @@ window.addEventListener('keydown', e => {
         e.preventDefault();
     }
     
+    // Dash ability
+    if (e.key === ' ' && game.state === 'playing' && !game.paused && game.player) {
+        let dx = 0, dy = 0;
+        if (game.keys['w'] || game.keys['ArrowUp']) dy -= 1;
+        if (game.keys['s'] || game.keys['ArrowDown']) dy += 1;
+        if (game.keys['a'] || game.keys['ArrowLeft']) dx -= 1;
+        if (game.keys['d'] || game.keys['ArrowRight']) dx += 1;
+        
+        // Default dash direction: toward nearest enemy if no movement keys
+        if (dx === 0 && dy === 0 && game.enemies.length > 0) {
+            let nearest = game.enemies[0];
+            let nearestDist = Math.hypot(nearest.x - game.player.x, nearest.y - game.player.y);
+            for (let i = 1; i < game.enemies.length; i++) {
+                const d = Math.hypot(game.enemies[i].x - game.player.x, game.enemies[i].y - game.player.y);
+                if (d < nearestDist) { nearest = game.enemies[i]; nearestDist = d; }
+            }
+            dx = nearest.x - game.player.x;
+            dy = nearest.y - game.player.y;
+        }
+        
+        game.player.dash(dx, dy);
+        e.preventDefault();
+    }
+    
     // Weapon switching
     if (game.state === 'playing' && !game.paused) {
-        const weapons = ['basic', 'laser', 'rocket', 'spread'];
-        if (e.key >= '1' && e.key <= '4') {
+        const weapons = ['basic', 'laser', 'rocket', 'spread', 'flamethrower', 'lightning', 'freeze', 'plasma'];
+        if (e.key >= '1' && e.key <= '8') {
             const weaponIndex = parseInt(e.key) - 1;
             if (weaponIndex < weapons.length) {
                 game.currentWeapon = weapons[weaponIndex];

@@ -1536,3 +1536,205 @@ body {
     transform: scale(1.05);
     box-shadow: 0 0 15px rgba(255, 217, 61, 0.8);
 }
+
+/* ==================== REWORK: Level-Up Modal ==================== */
+.level-up-modal {
+    z-index: 1000;
+}
+
+.level-up-content {
+    max-width: 600px;
+}
+
+.level-up-content h2 {
+    color: #ffd93d;
+    font-size: 28px;
+    text-shadow: 0 0 20px rgba(255, 217, 61, 0.6);
+    margin-bottom: 5px;
+}
+
+.level-up-subtitle {
+    color: #a855f7;
+    font-size: 16px;
+    margin-bottom: 20px;
+}
+
+.level-up-choices {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.level-up-choice {
+    flex: 1;
+    min-width: 150px;
+    max-width: 180px;
+    background: rgba(168, 85, 247, 0.1);
+    border: 2px solid #a855f7;
+    border-radius: 10px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.level-up-choice:hover {
+    background: rgba(168, 85, 247, 0.3);
+    border-color: #ffd93d;
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(168, 85, 247, 0.4);
+}
+
+.level-up-choice h3 {
+    color: #ffd93d;
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.level-up-choice p {
+    color: #d1d5db;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* ==================== REWORK: Difficulty Selection ==================== */
+.difficulty-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 20px 0;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.difficulty-card {
+    background: rgba(0, 0, 0, 0.4);
+    border: 2px solid #475569;
+    border-radius: 10px;
+    padding: 15px 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.difficulty-card:hover {
+    transform: translateX(5px);
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+}
+
+.difficulty-card[data-diff="easy"] { border-color: #22c55e; }
+.difficulty-card[data-diff="easy"]:hover { background: rgba(34, 197, 94, 0.15); border-color: #4ade80; }
+.difficulty-card[data-diff="easy"] h3 { color: #4ade80; }
+
+.difficulty-card[data-diff="normal"] { border-color: #fbbf24; }
+.difficulty-card[data-diff="normal"]:hover { background: rgba(251, 191, 36, 0.15); border-color: #fde047; }
+.difficulty-card[data-diff="normal"] h3 { color: #fde047; }
+
+.difficulty-card[data-diff="hard"] { border-color: #ef4444; }
+.difficulty-card[data-diff="hard"]:hover { background: rgba(239, 68, 68, 0.15); border-color: #f87171; }
+.difficulty-card[data-diff="hard"] h3 { color: #f87171; }
+
+.difficulty-card[data-diff="nightmare"] { border-color: #a855f7; }
+.difficulty-card[data-diff="nightmare"]:hover { background: rgba(168, 85, 247, 0.15); border-color: #c084fc; }
+.difficulty-card[data-diff="nightmare"] h3 { color: #c084fc; }
+
+.difficulty-card h3 {
+    font-size: 20px;
+    margin-bottom: 4px;
+}
+
+.difficulty-card p {
+    color: #9ca3af;
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+.diff-stats {
+    color: #6b7280;
+    font-size: 12px;
+    font-style: italic;
+}
+
+/* ==================== REWORK: Game Over Stats ==================== */
+.final-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 15px 0;
+    text-align: left;
+}
+
+.stat-group {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.stat-group h4 {
+    color: #ffd93d;
+    font-size: 16px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 217, 61, 0.2);
+    padding-bottom: 5px;
+}
+
+.stat-group p {
+    font-size: 13px;
+    margin: 4px 0;
+    color: #d1d5db;
+}
+
+.passives-summary {
+    background: rgba(168, 85, 247, 0.1);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 8px;
+    padding: 10px;
+    margin: 10px 0;
+    text-align: center;
+}
+
+.passives-summary h4 {
+    color: #a855f7;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.passives-summary p {
+    color: #d1d5db;
+    font-size: 12px;
+}
+
+.score-display {
+    font-size: 24px;
+    color: #ffd93d;
+    text-align: center;
+    margin-top: 15px;
+    text-shadow: 0 0 15px rgba(255, 217, 61, 0.5);
+}
+
+/* ==================== REWORK: Enhanced Character Cards ==================== */
+.char-stats span:nth-child(4) {
+    color: #ff6b6b;
+}
+
+/* ==================== REWORK: Responsive adjustments for new features ==================== */
+@media (max-width: 768px) {
+    .level-up-choices {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .level-up-choice {
+        max-width: 100%;
+        width: 100%;
+    }
+    
+    .final-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .difficulty-card h3 {
+        font-size: 16px;
+    }
+}
