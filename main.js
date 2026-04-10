@@ -175,9 +175,9 @@ const PASSIVE_ABILITIES = [
     { id: 'eagle_eye', name: '🎯 Eagle Eye', desc: '+8% Crit Chance, +0.3x Crit Damage', apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.08); p.critDamage += 0.3; } },
     { id: 'thick_skin', name: '💚 Thick Skin', desc: '+25 Max HP, Full Heal', apply: p => { p.maxHealth += 25; p.health = p.maxHealth; } },
     { id: 'bullet_storm', name: '🌟 Bullet Storm', desc: '+1 Projectile', apply: p => { p.projectileCount += 1; } },
-    { id: 'scavenger', name: '🧲 Scavenger', desc: '+25 Pickup Range, +10% Credits', apply: p => { p.pickupRange += 25; } },
+    { id: 'scavenger', name: '🧲 Scavenger', desc: '+25 Pickup Range', apply: p => { p.pickupRange += 25; } },
     { id: 'regeneration', name: '💊 Regeneration', desc: '+0.3 HP/s Regen', apply: p => { p.healthRegen = (p.healthRegen || 0) + 0.3; } },
-    { id: 'adrenaline', name: '💉 Adrenaline', desc: '+0.5 Speed, +5 Damage when below 50% HP', apply: p => { p.adrenaline = (p.adrenaline || 0) + 1; } },
+    { id: 'adrenaline', name: '💉 Adrenaline', desc: '+0.5 Speed when below 50% HP', apply: p => { p.adrenaline = (p.adrenaline || 0) + 1; } },
     { id: 'thorns', name: '🌵 Thorns', desc: 'Reflect 20% melee damage back', apply: p => { p.thorns = (p.thorns || 0) + 0.2; } },
 ];
 
@@ -477,7 +477,7 @@ function triggerLevelUp() {
     showNotification(`⬆️ LEVEL ${game.stats.level}!`, '#ffd93d', 3000);
     
     // Pick 3 random passives
-    const available = PASSIVE_ABILITIES.filter(p => true); // All available
+    const available = PASSIVE_ABILITIES; // All available
     const choices = [];
     const shuffled = [...available].sort(() => Math.random() - 0.5);
     for (let i = 0; i < Math.min(3, shuffled.length); i++) {
@@ -3463,7 +3463,7 @@ function showWaveAnnouncement() {
         
         let msg = `Wave ${game.wave}: ${enemyCount} enemies`;
         if (newType) {
-            msg += ` | NEW: ${ENEMY_TYPES[newType].color ? '🆕' : ''} ${newType.charAt(0).toUpperCase() + newType.slice(1)}!`;
+            msg += ` | NEW: 🆕 ${newType.charAt(0).toUpperCase() + newType.slice(1)}!`;
         }
         showNotification(msg, '#00ff88', 2500);
     }
