@@ -854,7 +854,7 @@ class Player {
         else if (dx < 0) this.facingRight = false;
         if (this.isMoving) {
             this.walkTimer++;
-            if (this.walkTimer >= 10) { this.walkTimer = 0; this.walkFrame = this.walkFrame === 0 ? 1 : 0; }
+            if (this.walkTimer >= ARENA_CONSTANTS.WALK_ANIM_FRAME_DURATION) { this.walkTimer = 0; this.walkFrame = this.walkFrame === 0 ? 1 : 0; }
         } else { this.walkTimer = 0; this.walkFrame = 0; }
 
         this.shoot();
@@ -881,7 +881,7 @@ class Player {
         }
         // Fire trail
         if (this.fireTrail && this.isMoving && game.frameCount % 5 === 0) {
-            game.particles.push({ x: this.x, y: this.y + this.size * 0.5, vx: 0, vy: 0, color: '#ff4500', life: 90, maxLife: 90, size: 12, type: 'fire_trail', damage: 3 });
+            game.particles.push({ x: this.x, y: this.y + this.size * 0.5, vx: 0, vy: 0, color: '#ff4500', life: ARENA_CONSTANTS.FIRE_TRAIL_LIFE, maxLife: ARENA_CONSTANTS.FIRE_TRAIL_LIFE, size: ARENA_CONSTANTS.FIRE_TRAIL_SIZE, type: 'fire_trail', damage: ARENA_CONSTANTS.FIRE_TRAIL_DAMAGE });
         }
         // Poison cloud
         if (this.poisonCloudDmg > 0 && game.frameCount % 30 === 0) {
@@ -890,9 +890,9 @@ class Player {
         // Decoy management
         if (this.hasDecoy && this.decoy && this.decoy.health > 0) { /* Decoy alive, enemies target it */ }
         else if (this.hasDecoy) {
-            if (!this.decoy) this.decoy = { x: this.x - 80, y: this.y, health: 30, maxHealth: 30, respawnTimer: 0 };
-            else { this.decoy.respawnTimer = (this.decoy.respawnTimer || 300) - 1;
-                if (this.decoy.respawnTimer <= 0) this.decoy = { x: this.x - 80, y: this.y, health: 30, maxHealth: 30, respawnTimer: 0 };
+            if (!this.decoy) this.decoy = { x: this.x - 80, y: this.y, health: ARENA_CONSTANTS.DECOY_HEALTH, maxHealth: ARENA_CONSTANTS.DECOY_HEALTH, respawnTimer: 0 };
+            else { this.decoy.respawnTimer = (this.decoy.respawnTimer || ARENA_CONSTANTS.DECOY_RESPAWN_TIME) - 1;
+                if (this.decoy.respawnTimer <= 0) this.decoy = { x: this.x - 80, y: this.y, health: ARENA_CONSTANTS.DECOY_HEALTH, maxHealth: ARENA_CONSTANTS.DECOY_HEALTH, respawnTimer: 0 };
             }
         }
         // Magnetic field
@@ -930,8 +930,8 @@ class Player {
             if (this.rageTimer <= 0) { this.rageActive = false; this.damage -= this.rageDmgBonus; this.speed -= this.rageSpdBonus; this.rageDmgBonus = 0; this.rageSpdBonus = 0; this.rageMeter = 0; }
         }
         if (this.characterId === 'engineer') {
-            if (this.turrets.length < 3 && game.frameCount % 300 === 0) {
-                this.turrets.push({ x: this.x + (Math.random() - 0.5) * 100, y: this.y + (Math.random() - 0.5) * 100, health: 50, shootCooldown: 0 });
+            if (this.turrets.length < ARENA_CONSTANTS.TURRET_MAX && game.frameCount % ARENA_CONSTANTS.TURRET_SPAWN_INTERVAL === 0) {
+                this.turrets.push({ x: this.x + (Math.random() - 0.5) * ARENA_CONSTANTS.TURRET_SPREAD, y: this.y + (Math.random() - 0.5) * ARENA_CONSTANTS.TURRET_SPREAD, health: ARENA_CONSTANTS.TURRET_HEALTH, shootCooldown: 0 });
             }
             this.turrets = this.turrets.filter(t => {
                 if (t.shootCooldown > 0) t.shootCooldown--;
@@ -2375,9 +2375,9 @@ class Bullet {
                 // Split shot
                 if (game.player && game.player.splitShot && !this.isSplit) {
                     [this.angle + 0.5, this.angle - 0.5].forEach(a => {
-                        const sb = new Bullet(this.x, this.y, a, game.player, WEAPON_TYPES[game.currentWeapon] || WEAPON_TYPES.basic);
-                        sb.damage *= 0.5; sb.isSplit = true; sb.size *= 0.7;
-                        game.bullets.push(sb);
+                        const splitBullet = new Bullet(this.x, this.y, a, game.player, WEAPON_TYPES[game.currentWeapon] || WEAPON_TYPES.basic);
+                        splitBullet.damage *= 0.5; splitBullet.isSplit = true; splitBullet.size *= 0.7;
+                        game.bullets.push(splitBullet);
                     });
                 }
                 if (this.hitEnemies.length >= this.piercing) return false;
@@ -2964,6 +2964,23 @@ const ARENA_THEMES = {
     final: { name: 'Final Station', bgColor: '#0a0a0a', gridColor: 'rgba(255,217,61,0.03)', obstacleColor: '#ffd93d', hazardColor: '#ff0000', waves: [21, 999] },
 };
 
+// Hazard type icons (module-level for reuse)
+const HAZARD_ICONS = { ice_patch: '❄️', lava_pool: '🔥', void_zone: '🌀' };
+
+// Arena tuning constants
+const ARENA_CONSTANTS = {
+    WALK_ANIM_FRAME_DURATION: 10,
+    FIRE_TRAIL_LIFE: 90,
+    FIRE_TRAIL_SIZE: 12,
+    FIRE_TRAIL_DAMAGE: 3,
+    DECOY_HEALTH: 30,
+    DECOY_RESPAWN_TIME: 300,
+    TURRET_MAX: 3,
+    TURRET_SPAWN_INTERVAL: 300,
+    TURRET_HEALTH: 50,
+    TURRET_SPREAD: 100,
+};
+
 function getCurrentTheme() {
     for (const key of Object.keys(ARENA_THEMES)) {
         const t = ARENA_THEMES[key];
@@ -3011,8 +3028,7 @@ function drawArenaObstacles(ctx) {
             ctx.beginPath(); ctx.arc(hz.x, hz.y, hz.radius, 0, Math.PI * 2); ctx.fill();
             ctx.globalAlpha = 0.8;
             ctx.fillStyle = '#fff'; ctx.font = '16px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            const icons = { ice_patch: '❄️', lava_pool: '🔥', void_zone: '🌀' };
-            ctx.fillText(icons[hz.type] || '⚠️', hz.x, hz.y);
+            ctx.fillText(HAZARD_ICONS[hz.type] || '⚠️', hz.x, hz.y);
             ctx.restore();
         });
     }
