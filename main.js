@@ -273,6 +273,10 @@ const game = {
     passivesChosen: [],
     playerDPS: { damage: 0, timer: 0, history: [] },
     eliteKills: 0,
+    activeWeaponSlot: 0,
+    obstacles: [],
+    hazards: [],
+    arenaTheme: null,
     soundEnabled: (() => {
         try {
             return localStorage.getItem('soundEnabled') !== 'false';
@@ -728,6 +732,44 @@ class Player {
         this.thorns = 0;
         this.poisonDamage = 0;
         this.poisonTimer = 0;
+        // Walk animation
+        this.walkFrame = 0;
+        this.walkTimer = 0;
+        this.isMoving = false;
+        this.facingRight = true;
+        this.aimAngle = 0;
+        // Multi-weapon system
+        this.weaponSlots = [{ type: 'basic', cooldown: 0 }];
+        this.maxWeaponSlots = 4;
+        // Gameplay-changing item flags
+        this.bulletBounce = 0;
+        this.splitShot = false;
+        this.orbitalCount = 0;
+        this.orbitalAngle = 0;
+        this.fireTrail = false;
+        this.hasDecoy = false;
+        this.decoy = null;
+        this.timeDilation = 0;
+        this.magnetField = false;
+        this.poisonCloudDmg = 0;
+        // Character abilities
+        this.shieldActive = false;
+        this.shieldTimer = 0;
+        this.afterImages = [];
+        this.bloodPools = [];
+        this.rageMeter = 0;
+        this.rageActive = false;
+        this.rageTimer = 0;
+        this.rageDmgBonus = 0;
+        this.rageSpdBonus = 0;
+        this.turrets = [];
+        this.isInvisible = false;
+        // Character-specific starting weapon slots
+        if (character.id === 'balanced') {
+            this.weaponSlots = [{ type: 'basic', cooldown: 0 }, { type: 'basic', cooldown: 0 }];
+        } else if (character.id === 'gunslinger') {
+            this.weaponSlots = [{ type: 'basic', cooldown: 0 }, { type: 'basic', cooldown: 0 }, { type: 'basic', cooldown: 0 }];
+        }
     }
 
     update() {
@@ -806,13 +848,102 @@ class Player {
         this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
         this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
 
-        if (this.fireCooldown > 0) {
-            this.fireCooldown--;
-        } else {
-            this.shoot();
-        }
+        // Movement tracking for walk animation
+        this.isMoving = (dx !== 0 || dy !== 0);
+        if (dx > 0) this.facingRight = true;
+        else if (dx < 0) this.facingRight = false;
+        if (this.isMoving) {
+            this.walkTimer++;
+            if (this.walkTimer >= 10) { this.walkTimer = 0; this.walkFrame = this.walkFrame === 0 ? 1 : 0; }
+        } else { this.walkTimer = 0; this.walkFrame = 0; }
+
+        this.shoot();
 
         this.collectPickups();
+
+        // Orbital Shield
+        if (this.orbitalCount > 0) {
+            this.orbitalAngle += 0.04;
+            for (let i = 0; i < this.orbitalCount; i++) {
+                const oAngle = this.orbitalAngle + (i / this.orbitalCount) * Math.PI * 2;
+                const orbX = this.x + Math.cos(oAngle) * 50;
+                const orbY = this.y + Math.sin(oAngle) * 50;
+                for (let j = game.enemies.length - 1; j >= 0; j--) {
+                    const e = game.enemies[j];
+                    if (Math.hypot(e.x - orbX, e.y - orbY) < e.size + 8) {
+                        if (e.takeDamage(Math.floor(this.damage * 0.3), false)) {
+                            game.enemies.splice(j, 1);
+                            checkWaveClear();
+                        }
+                    }
+                }
+            }
+        }
+        // Fire trail
+        if (this.fireTrail && this.isMoving && game.frameCount % 5 === 0) {
+            game.particles.push({ x: this.x, y: this.y + this.size * 0.5, vx: 0, vy: 0, color: '#ff4500', life: 90, maxLife: 90, size: 12, type: 'fire_trail', damage: 3 });
+        }
+        // Poison cloud
+        if (this.poisonCloudDmg > 0 && game.frameCount % 30 === 0) {
+            game.enemies.forEach(e => { if (Math.hypot(e.x - this.x, e.y - this.y) < 100) e.takeDamage(this.poisonCloudDmg, false); });
+        }
+        // Decoy management
+        if (this.hasDecoy && this.decoy && this.decoy.health > 0) { /* Decoy alive, enemies target it */ }
+        else if (this.hasDecoy) {
+            if (!this.decoy) this.decoy = { x: this.x - 80, y: this.y, health: 30, maxHealth: 30, respawnTimer: 0 };
+            else { this.decoy.respawnTimer = (this.decoy.respawnTimer || 300) - 1;
+                if (this.decoy.respawnTimer <= 0) this.decoy = { x: this.x - 80, y: this.y, health: 30, maxHealth: 30, respawnTimer: 0 };
+            }
+        }
+        // Magnetic field
+        if (this.magnetField) {
+            game.pickups.forEach(p => {
+                const pDist = Math.hypot(p.x - this.x, p.y - this.y);
+                if (pDist < this.pickupRange * 3 && pDist > 5) { p.x += (this.x - p.x) / pDist * 2; p.y += (this.y - p.y) / pDist * 2; }
+            });
+        }
+        // Character abilities
+        if (this.characterId === 'tank') {
+            if (this.shieldTimer > 0) this.shieldTimer--;
+            if (this.shieldTimer <= 0) this.shieldActive = true;
+        }
+        if (this.characterId === 'speedster' && this.isMoving && game.frameCount % 8 === 0) {
+            this.afterImages.push({ x: this.x, y: this.y, life: 20, damage: this.damage * 0.1 });
+            if (this.afterImages.length > 5) this.afterImages.shift();
+        }
+        if (this.afterImages.length > 0) {
+            this.afterImages = this.afterImages.filter(ai => {
+                ai.life--;
+                game.enemies.forEach(e => { if (Math.hypot(e.x - ai.x, e.y - ai.y) < e.size + 10) e.takeDamage(ai.damage, false); });
+                return ai.life > 0;
+            });
+        }
+        if (this.characterId === 'vampire' && this.bloodPools.length > 0) {
+            this.bloodPools = this.bloodPools.filter(bp => {
+                bp.life--;
+                if (Math.hypot(this.x - bp.x, this.y - bp.y) < 20) { this.heal(2); return false; }
+                return bp.life > 0;
+            });
+        }
+        if (this.characterId === 'berserker' && this.rageActive) {
+            this.rageTimer--;
+            if (this.rageTimer <= 0) { this.rageActive = false; this.damage -= this.rageDmgBonus; this.speed -= this.rageSpdBonus; this.rageDmgBonus = 0; this.rageSpdBonus = 0; this.rageMeter = 0; }
+        }
+        if (this.characterId === 'engineer') {
+            if (this.turrets.length < 3 && game.frameCount % 300 === 0) {
+                this.turrets.push({ x: this.x + (Math.random() - 0.5) * 100, y: this.y + (Math.random() - 0.5) * 100, health: 50, shootCooldown: 0 });
+            }
+            this.turrets = this.turrets.filter(t => {
+                if (t.shootCooldown > 0) t.shootCooldown--;
+                if (t.shootCooldown <= 0) {
+                    const near = game.enemies.filter(e => Math.hypot(e.x - t.x, e.y - t.y) < 250).sort((a, b) => Math.hypot(a.x - t.x, a.y - t.y) - Math.hypot(b.x - t.x, b.y - t.y))[0];
+                    if (near) { const a = Math.atan2(near.y - t.y, near.x - t.x); game.bullets.push(new Bullet(t.x, t.y, a, this, WEAPON_TYPES.basic)); t.shootCooldown = 45; }
+                }
+                return t.health > 0;
+            });
+        }
+        if (this.characterId === 'medic' && !this.isMoving && game.frameCount % 30 === 0) this.heal(2);
+        if (this.characterId === 'assassin') this.isInvisible = this.dashInvulnerable > 0;
         
         // Drone system (Summoner ability)
         if (this.maxDrones > 0) {
@@ -907,24 +1038,28 @@ class Player {
     }
 
     shoot() {
-        // Apply multishot powerup
-        let projectiles = this.projectileCount;
-        if (hasPowerup('multishot')) {
-            const powerup = game.activePowerups.find(p => p.data.effect === 'multishot');
-            projectiles += powerup.data.value;
-        }
-        
         const nearest = game.enemies
             .filter(e => Math.hypot(e.x - this.x, e.y - this.y) <= this.range)
-            .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y))
-            .slice(0, projectiles);
-        
-        if (nearest.length > 0) {
-            const weapon = WEAPON_TYPES[game.currentWeapon];
-            nearest.forEach(enemy => {
+            .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y));
+
+        if (nearest.length === 0) return;
+        this.aimAngle = Math.atan2(nearest[0].y - this.y, nearest[0].x - this.x);
+
+        this.weaponSlots.forEach((slot, slotIndex) => {
+            if (slot.cooldown > 0) { slot.cooldown--; return; }
+            const weapon = WEAPON_TYPES[slot.type];
+            if (!weapon) return;
+
+            let projectiles = this.projectileCount;
+            if (hasPowerup('multishot')) {
+                const powerup = game.activePowerups.find(p => p.data.effect === 'multishot');
+                if (powerup) projectiles += powerup.data.value;
+            }
+
+            const targets = nearest.slice(0, projectiles);
+            targets.forEach((enemy, ti) => {
                 const angle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
-                
-                if (game.currentWeapon === 'spread') {
+                if (slot.type === 'spread') {
                     for (let i = 0; i < 5; i++) {
                         const spreadAngle = angle + (i - 2) * 0.15;
                         game.bullets.push(new Bullet(this.x, this.y, spreadAngle, this, weapon));
@@ -933,9 +1068,10 @@ class Player {
                     game.bullets.push(new Bullet(this.x, this.y, angle, this, weapon));
                 }
             });
-            this.fireCooldown = this.fireRate * (weapon.fireRate || 1);
+            slot.cooldown = Math.floor(this.fireRate * (weapon.fireRate || 1));
+            slot.maxCooldown = slot.cooldown;
             Sound.play('shoot');
-        }
+        });
     }
 
     collectPickups() {
@@ -956,6 +1092,16 @@ class Player {
         // Dash invulnerability
         if (this.dashInvulnerable > 0) {
             createTextParticle(this.x, this.y, 'INVULNERABLE!', '#4ecdc4', 16);
+            return;
+        }
+        
+        // Tank shield block
+        if (this.shieldActive && this.characterId === 'tank') {
+            this.shieldActive = false;
+            this.shieldTimer = 900;
+            createTextParticle(this.x, this.y, '🛡️ BLOCKED!', '#60a5fa', 22);
+            createParticles(this.x, this.y, '#60a5fa', 15);
+            screenShake(5);
             return;
         }
         
@@ -1004,6 +1150,18 @@ class Player {
         createParticles(this.x, this.y, '#ff6b6b', 5);
         screenShake(finalDamage * 0.5);
         
+        // Berserker rage
+        if (this.characterId === 'berserker' && !this.rageActive) {
+            this.rageMeter = (this.rageMeter || 0) + finalDamage * 2;
+            if (this.rageMeter >= 100) {
+                this.rageActive = true; this.rageTimer = 300;
+                this.rageDmgBonus = Math.floor(this.damage * 0.5); this.rageSpdBonus = 1;
+                this.damage += this.rageDmgBonus; this.speed += this.rageSpdBonus;
+                createTextParticle(this.x, this.y, '🔥 RAGE!', '#ff0000', 24);
+                screenShake(15);
+            }
+        }
+        
         Sound.play('hit');
         if (this.health <= 0) gameOver();
     }
@@ -1034,329 +1192,229 @@ class Player {
 
     draw(ctx) {
         ctx.save();
-        
-        // Different visuals for each character
-        switch(this.characterId) {
-            case 'balanced':
-                // Balanced: Classic astronaut with cyan helmet
-                ctx.fillStyle = '#4ecdc4';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = 'rgba(78, 205, 196, 0.5)';
-                ctx.beginPath();
-                ctx.arc(this.x - this.size * 0.2, this.y - this.size * 0.2, this.size * 0.2, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#00ff88';
-                ctx.fillRect(this.x - this.size * 0.4, this.y + this.size * 0.3, this.size * 0.8, this.size * 0.6);
-                break;
-                
-            case 'tank':
-                // Tank: Heavy armor plating with shield emblem
-                ctx.fillStyle = '#64748b';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.8, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#334155';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.6, 0, Math.PI * 2);
-                ctx.fill();
-                // Shield emblem
-                ctx.fillStyle = '#94a3b8';
-                ctx.beginPath();
-                ctx.moveTo(this.x, this.y - this.size * 0.4);
-                ctx.lineTo(this.x - this.size * 0.3, this.y);
-                ctx.lineTo(this.x, this.y + this.size * 0.5);
-                ctx.lineTo(this.x + this.size * 0.3, this.y);
-                ctx.closePath();
-                ctx.fill();
-                break;
-                
-            case 'speedster':
-                // Speedster: Sleek design with lightning pattern
+        const s = this.size;
+        const cx = this.x;
+        const cy = this.y;
+        const headR = s * 0.3;
+        const headY = cy - s * 0.55;
+        const torsoW = s * 0.45;
+        const torsoH = s * 0.5;
+        const torsoTop = cy - s * 0.25;
+        const armW = s * 0.1;
+        const armLen = s * 0.4;
+        const legW = s * 0.1;
+        const legLen = s * 0.35;
+        const walkSwing = this.walkFrame === 0 ? 0.3 : -0.3;
+        const aimAngle = this.aimAngle;
+
+        // Character color map
+        const CHAR_COLORS = {
+            balanced:   { head: '#4ecdc4', body: '#e2e8f0', limb: '#94a3b8', accent: '#00ff88' },
+            tank:       { head: '#64748b', body: '#475569', limb: '#64748b', accent: '#94a3b8' },
+            speedster:  { head: '#fbbf24', body: '#fef08a', limb: '#fbbf24', accent: '#fef08a' },
+            sniper:     { head: '#22c55e', body: '#166534', limb: '#166534', accent: '#86efac' },
+            gunslinger: { head: '#f97316', body: '#92400e', limb: '#92400e', accent: '#fdba74' },
+            vampire:    { head: '#fecaca', body: '#1c1917', limb: '#450a0a', accent: '#ef4444' },
+            berserker:  { head: '#fca5a5', body: '#b91c1c', limb: '#991b1b', accent: '#dc2626' },
+            engineer:   { head: '#3b82f6', body: '#1e40af', limb: '#1e40af', accent: '#60a5fa' },
+            medic:      { head: '#fff', body: '#fecdd3', limb: '#fecdd3', accent: '#dc2626' },
+            assassin:   { head: '#c4b5fd', body: '#1e1b4b', limb: '#1e1b4b', accent: '#7c3aed' },
+            summoner:   { head: '#7c3aed', body: '#581c87', limb: '#581c87', accent: '#c084fc' },
+            juggernaut: { head: '#d97706', body: '#92400e', limb: '#78350f', accent: '#fbbf24' },
+        };
+        const cc = CHAR_COLORS[this.characterId] || CHAR_COLORS.balanced;
+
+        // Speedster afterimages
+        if (this.characterId === 'speedster' && this.afterImages.length > 0) {
+            this.afterImages.forEach(ai => {
+                ctx.save(); ctx.globalAlpha = ai.life / 20 * 0.3;
                 ctx.fillStyle = '#fbbf24';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.6, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.4, 0, Math.PI * 2);
-                ctx.fill();
-                // Lightning bolt
-                ctx.fillStyle = '#fef08a';
-                ctx.beginPath();
-                ctx.moveTo(this.x, this.y - this.size * 0.5);
-                ctx.lineTo(this.x - this.size * 0.2, this.y);
-                ctx.lineTo(this.x + this.size * 0.1, this.y);
-                ctx.lineTo(this.x, this.y + this.size * 0.5);
-                ctx.lineTo(this.x + this.size * 0.2, this.y - this.size * 0.1);
-                ctx.lineTo(this.x - this.size * 0.1, this.y - this.size * 0.1);
-                ctx.closePath();
-                ctx.fill();
-                break;
-                
-            case 'sniper':
-                // Sniper: Scope/targeting reticle design
-                ctx.fillStyle = '#22c55e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.65, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.45, 0, Math.PI * 2);
-                ctx.fill();
-                // Crosshair
-                ctx.strokeStyle = '#86efac';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(this.x - this.size * 0.6, this.y);
-                ctx.lineTo(this.x + this.size * 0.6, this.y);
-                ctx.moveTo(this.x, this.y - this.size * 0.6);
-                ctx.lineTo(this.x, this.y + this.size * 0.6);
-                ctx.stroke();
-                break;
-                
-            case 'gunslinger':
-                // Gunslinger: Dual-wielding with bullets
-                ctx.fillStyle = '#f97316';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-                // Bullets
-                ctx.fillStyle = '#fdba74';
-                for (let i = 0; i < 3; i++) {
-                    const angle = (i - 1) * 0.4;
-                    const dx = Math.cos(angle) * this.size * 0.5;
-                    const dy = Math.sin(angle) * this.size * 0.5;
-                    ctx.fillRect(this.x + dx - 2, this.y + dy - 4, 4, 8);
-                }
-                break;
-                
-            case 'medic':
-                // Medic: Cross emblem with healing aura
-                ctx.fillStyle = '#ec4899';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#fff';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-                // Cross emblem
-                ctx.fillStyle = '#dc2626';
-                ctx.fillRect(this.x - this.size * 0.35, this.y - this.size * 0.1, this.size * 0.7, this.size * 0.2);
-                ctx.fillRect(this.x - this.size * 0.1, this.y - this.size * 0.35, this.size * 0.2, this.size * 0.7);
-                // Healing aura particles
-                if (this.healthRegen > 0) {
-                    const pulse = Math.sin(Date.now() * 0.005) * 0.3 + 0.7;
-                    ctx.fillStyle = `rgba(134, 239, 172, ${pulse * 0.5})`;
-                    for (let i = 0; i < 4; i++) {
-                        const angle = (i / 4) * Math.PI * 2 + Date.now() * 0.002;
-                        const dist = this.size * (1.2 + Math.sin(Date.now() * 0.003 + i) * 0.3);
-                        ctx.beginPath();
-                        ctx.arc(
-                            this.x + Math.cos(angle) * dist,
-                            this.y + Math.sin(angle) * dist,
-                            this.size * 0.15,
-                            0,
-                            Math.PI * 2
-                        );
-                        ctx.fill();
-                    }
-                }
-                break;
-                
-            case 'assassin':
-                // Assassin: Hooded figure with shadow trail
-                ctx.fillStyle = '#7c3aed';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-                // Hood
-                ctx.fillStyle = '#581c87';
-                ctx.beginPath();
-                ctx.moveTo(this.x - this.size * 0.5, this.y - this.size * 0.8);
-                ctx.lineTo(this.x, this.y - this.size * 0.9);
-                ctx.lineTo(this.x + this.size * 0.5, this.y - this.size * 0.8);
-                ctx.lineTo(this.x + this.size * 0.4, this.y - this.size * 0.3);
-                ctx.lineTo(this.x - this.size * 0.4, this.y - this.size * 0.3);
-                ctx.closePath();
-                ctx.fill();
-                // Shadow trail effect
-                const shadowPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.5;
-                ctx.fillStyle = `rgba(88, 28, 135, ${shadowPulse * 0.4})`;
-                for (let i = 0; i < 3; i++) {
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size * (1.2 + i * 0.2), 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-                
-            case 'summoner':
-                // Summoner: Floating orbs with mystical runes
-                ctx.fillStyle = '#a855f7';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-                // Mystical runes
-                ctx.strokeStyle = '#c084fc';
-                ctx.lineWidth = 2;
-                for (let i = 0; i < 6; i++) {
-                    const angle = (i / 6) * Math.PI * 2 + Date.now() * 0.001;
-                    const x = this.x + Math.cos(angle) * this.size * 0.3;
-                    const y = this.y + Math.sin(angle) * this.size * 0.3;
-                    ctx.beginPath();
-                    ctx.moveTo(x, y - 3);
-                    ctx.lineTo(x, y + 3);
-                    ctx.moveTo(x - 3, y);
-                    ctx.lineTo(x + 3, y);
-                    ctx.stroke();
-                }
-                // Draw drones
-                this.drones.forEach(drone => {
-                    const orbitRadius = 60;
-                    const droneX = this.x + Math.cos(drone.angle) * orbitRadius;
-                    const droneY = this.y + Math.sin(drone.angle) * orbitRadius;
-                    
-                    ctx.fillStyle = '#a855f7';
-                    ctx.beginPath();
-                    ctx.arc(droneX, droneY, 8, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#c084fc';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    
-                    // Drone health bar
-                    if (drone.health < drone.maxHealth) {
-                        const barWidth = 16;
-                        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-                        ctx.fillRect(droneX - barWidth / 2, droneY - 12, barWidth, 2);
-                        ctx.fillStyle = '#00ff88';
-                        ctx.fillRect(droneX - barWidth / 2, droneY - 12, barWidth * (drone.health / drone.maxHealth), 2);
-                    }
-                });
-                break;
-                
-            case 'juggernaut':
-                // Juggernaut: Massive armored titan with glowing core
-                ctx.fillStyle = '#d97706';
-                // Larger outer armor
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.9, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#92400e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-                // Glowing core
-                const corePulse = Math.sin(Date.now() * 0.004) * 0.3 + 0.7;
-                ctx.fillStyle = `rgba(251, 191, 36, ${corePulse})`;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.4, 0, Math.PI * 2);
-                ctx.fill();
-                // Armor plates
-                ctx.strokeStyle = '#fbbf24';
-                ctx.lineWidth = 3;
-                for (let i = 0; i < 8; i++) {
-                    const angle = (i / 8) * Math.PI * 2;
-                    ctx.beginPath();
-                    ctx.moveTo(this.x + Math.cos(angle) * this.size * 0.5, this.y + Math.sin(angle) * this.size * 0.5);
-                    ctx.lineTo(this.x + Math.cos(angle) * this.size * 0.85, this.y + Math.sin(angle) * this.size * 0.85);
-                    ctx.stroke();
-                }
-                break;
-                
-            case 'vampire':
-                // Vampire: Dark with blood-red accents
-                ctx.fillStyle = '#7c2d12';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-                // Fangs
-                ctx.fillStyle = '#ef4444';
-                ctx.beginPath();
-                ctx.moveTo(this.x - this.size * 0.2, this.y + this.size * 0.2);
-                ctx.lineTo(this.x - this.size * 0.1, this.y + this.size * 0.4);
-                ctx.lineTo(this.x, this.y + this.size * 0.2);
-                ctx.lineTo(this.x + this.size * 0.1, this.y + this.size * 0.4);
-                ctx.lineTo(this.x + this.size * 0.2, this.y + this.size * 0.2);
-                ctx.closePath();
-                ctx.fill();
-                break;
-                
-            case 'berserker':
-                // Berserker: Aggressive spiky design
-                ctx.fillStyle = '#dc2626';
-                // Spiky circle
-                ctx.beginPath();
-                for (let i = 0; i < 8; i++) {
-                    const angle = (i / 8) * Math.PI * 2;
-                    const radius = i % 2 === 0 ? this.size * 0.8 : this.size * 0.5;
-                    const x = this.x + Math.cos(angle) * radius;
-                    const y = this.y + Math.sin(angle) * radius;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.closePath();
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.4, 0, Math.PI * 2);
-                ctx.fill();
-                break;
-                
-            case 'engineer':
-                // Engineer: Mechanical/gear design
-                ctx.fillStyle = '#3b82f6';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
-                // Gear teeth
-                ctx.fillStyle = '#60a5fa';
-                for (let i = 0; i < 6; i++) {
-                    const angle = (i / 6) * Math.PI * 2;
-                    const x = this.x + Math.cos(angle) * this.size * 0.6;
-                    const y = this.y + Math.sin(angle) * this.size * 0.6;
-                    ctx.fillRect(x - 3, y - 3, 6, 6);
-                }
-                break;
-                
-            default:
-                // Fallback to balanced design
-                ctx.fillStyle = '#4ecdc4';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.fillStyle = '#1a1a2e';
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(ai.x, ai.y, s * 0.4, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            });
         }
-        
+
+        // Assassin invisibility
+        if (this.isInvisible) ctx.globalAlpha = 0.3;
+
+        // === LEGS ===
+        const legY = cy + s * 0.25;
+        ctx.fillStyle = cc.limb;
+        ctx.save(); ctx.translate(cx - s * 0.12, legY);
+        ctx.rotate(walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
+        ctx.save(); ctx.translate(cx + s * 0.12, legY);
+        ctx.rotate(-walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
+
+        // === TORSO ===
+        ctx.fillStyle = cc.body;
+        ctx.fillRect(cx - torsoW / 2, torsoTop, torsoW, torsoH);
+        // Character-specific torso detail
+        if (this.characterId === 'tank') {
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(cx - torsoW / 2 - 4, torsoTop, 4, 10);
+            ctx.fillRect(cx + torsoW / 2, torsoTop, 4, 10);
+        } else if (this.characterId === 'medic') {
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(cx - 3, torsoTop + 3, 6, torsoH - 6);
+            ctx.fillRect(cx - torsoW / 4, torsoTop + torsoH / 2 - 2, torsoW / 2, 4);
+        } else if (this.characterId === 'berserker') {
+            ctx.strokeStyle = '#f87171'; ctx.lineWidth = 1;
+            for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(cx - 4 + i * 4, torsoTop + 2); ctx.lineTo(cx - 2 + i * 4, torsoTop + torsoH - 2); ctx.stroke(); }
+        } else if (this.characterId === 'engineer') {
+            ctx.fillStyle = '#3b82f6'; ctx.fillRect(cx - torsoW / 2 + 2, torsoTop + torsoH / 2, torsoW - 4, torsoH / 2 - 2);
+        } else if (this.characterId === 'vampire') {
+            ctx.fillStyle = '#450a0a';
+            ctx.beginPath(); ctx.moveTo(cx - torsoW / 2 - 6, torsoTop); ctx.lineTo(cx - torsoW / 2, torsoTop + torsoH); ctx.lineTo(cx - torsoW / 2, torsoTop); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(cx + torsoW / 2 + 6, torsoTop); ctx.lineTo(cx + torsoW / 2, torsoTop + torsoH); ctx.lineTo(cx + torsoW / 2, torsoTop); ctx.fill();
+        }
+
+        // === ARMS ===
+        ctx.fillStyle = cc.limb;
+        ctx.save(); ctx.translate(cx - s * 0.25, cy - s * 0.2);
+        ctx.rotate(aimAngle * 0.4 - 0.3); ctx.fillRect(-armW / 2, 0, armW, armLen); ctx.restore();
+        ctx.save(); ctx.translate(cx + s * 0.25, cy - s * 0.2);
+        ctx.rotate(aimAngle * 0.6); ctx.fillRect(-armW / 2, 0, armW, armLen);
+        // Weapon at hand
+        const weaponColor = WEAPON_TYPES[this.weaponSlots[0]?.type || 'basic']?.color || '#00ff88';
+        ctx.fillStyle = weaponColor; ctx.fillRect(-2, armLen - 2, 5, 8); ctx.restore();
+
+        // === HEAD ===
+        ctx.fillStyle = cc.head;
+        ctx.beginPath(); ctx.arc(cx, headY, headR, 0, Math.PI * 2); ctx.fill();
+        // Character-specific head detail
+        if (this.characterId === 'balanced') {
+            ctx.fillStyle = '#1a1a2e'; ctx.beginPath(); ctx.arc(cx, headY, headR * 0.7, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(cx - 2, headY - 2, headR * 0.25, 0, Math.PI * 2); ctx.fill();
+        } else if (this.characterId === 'tank') {
+            ctx.strokeStyle = '#334155'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = '#334155'; ctx.fillRect(cx - headR * 0.6, headY - 1, headR * 1.2, 4);
+        } else if (this.characterId === 'speedster') {
+            ctx.fillStyle = '#fef08a'; ctx.beginPath();
+            ctx.moveTo(cx - headR, headY); ctx.lineTo(cx + headR * 1.2, headY); ctx.lineTo(cx + headR, headY + headR * 0.4);
+            ctx.closePath(); ctx.fill();
+        } else if (this.characterId === 'sniper') {
+            ctx.fillStyle = '#86efac'; ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY, headR * 0.3, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#86efac'; ctx.lineWidth = 1; ctx.stroke();
+        } else if (this.characterId === 'gunslinger') {
+            ctx.fillStyle = '#92400e'; ctx.beginPath();
+            ctx.ellipse(cx, headY - headR * 0.3, headR * 1.3, headR * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillRect(cx - headR * 0.7, headY - headR * 0.4, headR * 1.4, headR * 0.25);
+        } else if (this.characterId === 'vampire') {
+            ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(cx - 3, headY - 2, 2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + 3, headY - 2, 2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#1c1917'; ctx.beginPath();
+            ctx.moveTo(cx - headR * 0.4, headY - headR); ctx.lineTo(cx, headY - headR * 0.5); ctx.lineTo(cx + headR * 0.4, headY - headR); ctx.fill();
+        } else if (this.characterId === 'berserker') {
+            ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(cx - 4, headY - 2); ctx.lineTo(cx - 2, headY + 2); ctx.moveTo(cx + 4, headY - 2); ctx.lineTo(cx + 2, headY + 2); ctx.stroke();
+            ctx.fillStyle = '#dc2626';
+            for (let i = 0; i < 4; i++) { const a = -Math.PI / 2 + (i - 1.5) * 0.4; ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * headR, headY + Math.sin(a) * headR); ctx.lineTo(cx + Math.cos(a) * (headR + 5), headY + Math.sin(a) * (headR + 5) - 2); ctx.lineTo(cx + Math.cos(a) * (headR + 1), headY + Math.sin(a) * (headR + 1)); ctx.fill(); }
+        } else if (this.characterId === 'engineer') {
+            ctx.fillStyle = '#fbbf24'; ctx.fillRect(cx - headR * 0.7, headY - headR * 0.4, headR * 1.4, headR * 0.4);
+            ctx.fillStyle = '#93c5fd'; ctx.beginPath(); ctx.arc(cx - 3, headY - 1, 2.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + 3, headY - 1, 2.5, 0, Math.PI * 2); ctx.fill();
+        } else if (this.characterId === 'medic') {
+            ctx.fillStyle = '#dc2626'; ctx.fillRect(cx - 2, headY - headR + 1, 4, headR * 0.35);
+            ctx.fillRect(cx - headR * 0.25, headY - headR + 4, headR * 0.5, 2.5);
+        } else if (this.characterId === 'assassin') {
+            ctx.fillStyle = '#1e1b4b'; ctx.beginPath();
+            ctx.moveTo(cx - headR * 1.1, headY + headR * 0.4); ctx.lineTo(cx, headY - headR * 1.1); ctx.lineTo(cx + headR * 1.1, headY + headR * 0.4);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#c4b5fd'; ctx.beginPath(); ctx.arc(cx - 2, headY, 1.5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + 2, headY, 1.5, 0, Math.PI * 2); ctx.fill();
+        } else if (this.characterId === 'summoner') {
+            ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(cx, headY - headR * 0.2, headR * 1.05, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke();
+            ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(cx, headY - headR * 1.05, 2.5, 0, Math.PI * 2); ctx.fill();
+        } else if (this.characterId === 'juggernaut') {
+            ctx.fillStyle = '#92400e'; ctx.fillRect(cx - headR * 0.7, headY - 2, headR * 1.4, 6);
+            ctx.fillStyle = '#fbbf24'; ctx.beginPath(); ctx.arc(cx, headY, headR * 0.25, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // Equipment overlays
+        if (this.armor > 5) {
+            ctx.fillStyle = 'rgba(100,116,139,0.5)';
+            ctx.fillRect(cx - torsoW / 2 - 3, torsoTop, 3, 8);
+            ctx.fillRect(cx + torsoW / 2, torsoTop, 3, 8);
+        }
+        if (this.lifeSteal > 0.1) {
+            ctx.save(); ctx.globalAlpha = 0.12; ctx.fillStyle = '#ef4444';
+            ctx.beginPath(); ctx.arc(cx, cy, s * 1.1, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        }
+        if (this.speed > 4 && this.isMoving) {
+            ctx.save(); ctx.globalAlpha = 0.2; ctx.strokeStyle = '#4ecdc4'; ctx.lineWidth = 1.5;
+            const dir = this.facingRight ? -1 : 1;
+            for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(cx + dir * i * 6, cy - 4); ctx.lineTo(cx + dir * i * 6, cy + 4); ctx.stroke(); }
+            ctx.restore();
+        }
+
+        // Orbital shield
+        if (this.orbitalCount > 0) {
+            for (let i = 0; i < this.orbitalCount; i++) {
+                const oAngle = this.orbitalAngle + (i / this.orbitalCount) * Math.PI * 2;
+                const ox = cx + Math.cos(oAngle) * 50;
+                const oy = cy + Math.sin(oAngle) * 50;
+                ctx.fillStyle = '#4ecdc4'; ctx.shadowColor = '#4ecdc4'; ctx.shadowBlur = 8;
+                ctx.beginPath(); ctx.arc(ox, oy, 7, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
+            }
+        }
+
+        // Tank shield aura
+        if (this.shieldActive && this.characterId === 'tank') {
+            ctx.strokeStyle = 'rgba(96,165,250,0.5)'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.arc(cx, cy, s * 1.3, 0, Math.PI * 2); ctx.stroke();
+        }
+        // Berserker rage aura
+        if (this.rageActive) {
+            const p = Math.sin(Date.now() * 0.015) * 0.3 + 0.7;
+            ctx.strokeStyle = `rgba(255,0,0,${p})`; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(cx, cy, s * 1.4, 0, Math.PI * 2); ctx.stroke();
+        }
+        // Blood pools
+        if (this.bloodPools.length > 0) {
+            this.bloodPools.forEach(bp => {
+                ctx.save(); ctx.globalAlpha = Math.min(1, bp.life / 100) * 0.5;
+                ctx.fillStyle = '#dc2626'; ctx.beginPath(); ctx.arc(bp.x, bp.y, 8, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            });
+        }
+        // Turrets
+        if (this.turrets.length > 0) {
+            this.turrets.forEach(t => {
+                ctx.fillStyle = '#3b82f6'; ctx.fillRect(t.x - 7, t.y - 7, 14, 14);
+                ctx.strokeStyle = '#60a5fa'; ctx.lineWidth = 1.5; ctx.strokeRect(t.x - 7, t.y - 7, 14, 14);
+            });
+        }
+        // Decoy
+        if (this.decoy && this.decoy.health > 0) {
+            ctx.save(); ctx.globalAlpha = 0.4 + Math.sin(Date.now() * 0.01) * 0.15;
+            ctx.fillStyle = cc.head; ctx.beginPath(); ctx.arc(this.decoy.x, this.decoy.y, s * 0.4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#fff'; ctx.font = '9px monospace'; ctx.textAlign = 'center';
+            ctx.fillText('DECOY', this.decoy.x, this.decoy.y - s * 0.5); ctx.restore();
+        }
+        // Poison cloud
+        if (this.poisonCloudDmg > 0) {
+            ctx.save(); ctx.globalAlpha = 0.12; ctx.fillStyle = '#65a30d';
+            ctx.beginPath(); ctx.arc(cx, cy, 100, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        }
+        // Time dilation field
+        if (this.timeDilation > 0) {
+            ctx.save(); ctx.globalAlpha = 0.08; ctx.strokeStyle = '#8b5cf6'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(cx, cy, 200, 0, Math.PI * 2); ctx.stroke(); ctx.restore();
+        }
+
+        // Summoner drones
+        this.drones.forEach(drone => {
+            const orbitRadius = 60;
+            const droneX = cx + Math.cos(drone.angle) * orbitRadius;
+            const droneY = cy + Math.sin(drone.angle) * orbitRadius;
+            ctx.fillStyle = '#a855f7'; ctx.beginPath(); ctx.arc(droneX, droneY, 8, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#c084fc'; ctx.lineWidth = 2; ctx.stroke();
+            if (drone.health < drone.maxHealth) {
+                ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(droneX - 8, droneY - 12, 16, 2);
+                ctx.fillStyle = '#00ff88'; ctx.fillRect(droneX - 8, droneY - 12, 16 * (drone.health / drone.maxHealth), 2);
+            }
+        });
+
         ctx.restore();
     }
 }
@@ -1441,8 +1499,14 @@ class Enemy {
     }
 
     update() {
-        const dx = game.player.x - this.x;
-        const dy = game.player.y - this.y;
+        let targetX = game.player.x, targetY = game.player.y;
+        if (game.player.decoy && game.player.decoy.health > 0 && !this.isBoss) {
+            const distDecoy = Math.hypot(game.player.decoy.x - this.x, game.player.decoy.y - this.y);
+            const distPlayer = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+            if (distDecoy < distPlayer * 0.8) { targetX = game.player.decoy.x; targetY = game.player.decoy.y; }
+        }
+        const dx = targetX - this.x;
+        const dy = targetY - this.y;
         const dist = Math.hypot(dx, dy);
 
         // Boss abilities
@@ -1503,8 +1567,10 @@ class Enemy {
 
         // Move toward player
         if (dist > (this.isRanged ? 200 : 0)) {
-            this.x += (dx / dist) * this.speed;
-            this.y += (dy / dist) * this.speed;
+            let moveSpeed = this.speed;
+            if (game.player && game.player.timeDilation > 0 && dist < 200) moveSpeed *= (1 - game.player.timeDilation);
+            this.x += (dx / dist) * moveSpeed;
+            this.y += (dy / dist) * moveSpeed;
         }
 
         // Attack player
@@ -1738,6 +1804,11 @@ class Enemy {
         }
         
         game.pickups.push(new Pickup(this.x, this.y, this.creditValue));
+        // Vampire blood pools
+        if (game.player && game.player.characterId === 'vampire') {
+            if (!game.player.bloodPools) game.player.bloodPools = [];
+            game.player.bloodPools.push({ x: this.x, y: this.y, life: 300 });
+        }
         Sound.play('death');
         checkAchievements();
     }
@@ -2301,7 +2372,24 @@ class Bullet {
                 }
                 
                 this.hitEnemies.push(enemy);
+                // Split shot
+                if (game.player && game.player.splitShot && !this.isSplit) {
+                    [this.angle + 0.5, this.angle - 0.5].forEach(a => {
+                        const sb = new Bullet(this.x, this.y, a, game.player, WEAPON_TYPES[game.currentWeapon] || WEAPON_TYPES.basic);
+                        sb.damage *= 0.5; sb.isSplit = true; sb.size *= 0.7;
+                        game.bullets.push(sb);
+                    });
+                }
                 if (this.hitEnemies.length >= this.piercing) return false;
+            }
+        }
+
+        // Bouncing bullets
+        if (game.player && game.player.bulletBounce > 0) {
+            if (this.bounceLeft === undefined) this.bounceLeft = game.player.bulletBounce;
+            if (this.bounceLeft > 0) {
+                if (this.x < 0 || this.x > CONFIG.CANVAS_WIDTH) { this.angle = Math.PI - this.angle; this.x = Math.max(1, Math.min(CONFIG.CANVAS_WIDTH - 1, this.x)); this.bounceLeft--; return true; }
+                if (this.y < 0 || this.y > CONFIG.CANVAS_HEIGHT) { this.angle = -this.angle; this.y = Math.max(1, Math.min(CONFIG.CANVAS_HEIGHT - 1, this.y)); this.bounceLeft--; return true; }
             }
         }
 
@@ -2444,6 +2532,13 @@ function updateParticles() {
             p.vy *= 0.96;
             p.life--;
             return p.life > 0;
+        } else if (p.type === 'fire_trail') {
+            p.life--;
+            p.size *= 0.98;
+            if (p.life % 15 === 0) {
+                game.enemies.forEach(e => { if (Math.hypot(e.x - p.x, e.y - p.y) < p.size + e.size) e.takeDamage(p.damage, false); });
+            }
+            return p.life > 0;
         } else {
             p.x += p.vx;
             p.y += p.vy;
@@ -2483,6 +2578,13 @@ function drawParticles(ctx) {
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size * (1 - p.life / p.maxLife), 0, Math.PI * 2);
             ctx.fill();
+            ctx.restore();
+        } else if (p.type === 'fire_trail') {
+            ctx.save();
+            ctx.globalAlpha = p.life / p.maxLife * 0.7;
+            ctx.fillStyle = p.color;
+            ctx.shadowColor = '#ff4500'; ctx.shadowBlur = 8;
+            ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (p.life / p.maxLife), 0, Math.PI * 2); ctx.fill();
             ctx.restore();
         } else {
             ctx.save();
@@ -2601,6 +2703,31 @@ const SHOP_ITEMS = [
       effects: ['+25 Damage', '+3 Projectiles', '-30% Fire Rate'], apply: p => { p.damage += 25; p.projectileCount += 3; p.fireRate = Math.floor(p.fireRate * 1.3); } },
     { name: '🌟 Cosmic Cannon', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.LEGENDARY, basePrice: 42,
       effects: ['+40 Damage', '+4 Projectiles', '+300 Range', '-40% Fire Rate'], apply: p => { p.damage += 40; p.projectileCount += 4; p.range += 300; p.fireRate = Math.floor(p.fireRate * 1.4); } },
+    
+    // Gameplay-Changing Items
+    { name: '🏀 Rubber Bullets', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 22,
+      effects: ['Bullets bounce off walls', '+1 Bounce'], apply: p => { p.bulletBounce = (p.bulletBounce || 0) + 1; } },
+    { name: '💔 Split Shot', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 24,
+      effects: ['Bullets split on hit', '-20% Damage'], apply: p => { p.splitShot = true; p.damage = Math.floor(p.damage * 0.8); } },
+    { name: '🔵 Orbital Shield', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.EPIC, basePrice: 28,
+      effects: ['+3 Orbital orbs', 'Deal contact damage'], apply: p => { p.orbitalCount = (p.orbitalCount || 0) + 3; } },
+    { name: '🌶️ Ghost Pepper', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.UNCOMMON, basePrice: 18,
+      effects: ['Leave fire trail when moving'], apply: p => { p.fireTrail = true; } },
+    { name: '🪞 Mirror Image', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.EPIC, basePrice: 30,
+      effects: ['Create a decoy that enemies target'], apply: p => { p.hasDecoy = true; } },
+    { name: '⏳ Time Dilation', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 20,
+      effects: ['Nearby enemies 25% slower'], apply: p => { p.timeDilation = (p.timeDilation || 0) + 0.25; } },
+    { name: '🌀 Magnetic Field', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.UNCOMMON, basePrice: 16,
+      effects: ['Pull nearby pickups', '+50 Range'], apply: p => { p.magnetField = true; p.pickupRange += 50; } },
+    { name: '☠️ Poison Cloud', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 22,
+      effects: ['Enemies near you take 2 DPS'], apply: p => { p.poisonCloudDmg = (p.poisonCloudDmg || 0) + 2; } },
+    // Weapon Slot Items
+    { name: '🔧 Weapon Mount', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.UNCOMMON, basePrice: 20,
+      effects: ['+1 Weapon Slot'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'basic', cooldown: 0 }); } },
+    { name: '⚡ Auto-Turret Mount', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.RARE, basePrice: 30,
+      effects: ['+1 Slot (Laser)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'laser', cooldown: 0 }); } },
+    { name: '🚀 Heavy Mount', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.EPIC, basePrice: 40,
+      effects: ['+1 Slot (Rocket)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'rocket', cooldown: 0 }); } },
 ];
 
 // Shop state management
@@ -2828,8 +2955,95 @@ function rerollShop() {
     renderShop();
 }
 
+// ==================== ARENA SYSTEM ====================
+const ARENA_THEMES = {
+    asteroid: { name: 'Asteroid Field', bgColor: '#0a0a1a', gridColor: 'rgba(78,205,196,0.05)', obstacleColor: '#4a4a5a', waves: [1, 5] },
+    ice: { name: 'Ice Cavern', bgColor: '#0a1a2e', gridColor: 'rgba(135,206,235,0.05)', obstacleColor: '#87ceeb', hazardColor: '#38bdf8', waves: [6, 10] },
+    lava: { name: 'Lava Planet', bgColor: '#1a0a0a', gridColor: 'rgba(255,69,0,0.05)', obstacleColor: '#8b4513', hazardColor: '#ff4500', waves: [11, 15] },
+    void: { name: 'Void Dimension', bgColor: '#0a0020', gridColor: 'rgba(139,92,246,0.05)', obstacleColor: '#4c1d95', hazardColor: '#8b5cf6', waves: [16, 20] },
+    final: { name: 'Final Station', bgColor: '#0a0a0a', gridColor: 'rgba(255,217,61,0.03)', obstacleColor: '#ffd93d', hazardColor: '#ff0000', waves: [21, 999] },
+};
+
+function getCurrentTheme() {
+    for (const key of Object.keys(ARENA_THEMES)) {
+        const t = ARENA_THEMES[key];
+        if (game.wave >= t.waves[0] && game.wave <= t.waves[1]) return { key, ...t };
+    }
+    return { key: 'asteroid', ...ARENA_THEMES.asteroid };
+}
+
+function generateArenaObstacles() {
+    game.obstacles = [];
+    game.hazards = [];
+    game.arenaTheme = getCurrentTheme();
+    const theme = game.arenaTheme;
+    const count = Math.min(3 + Math.floor(game.wave / 3), 12);
+    const margin = 80;
+    for (let i = 0; i < count; i++) {
+        const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
+        const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
+        if (Math.hypot(x - CONFIG.CANVAS_WIDTH / 2, y - CONFIG.CANVAS_HEIGHT / 2) < 120) continue;
+        const types = ['rock', 'crater', 'pillar'];
+        const type = types[Math.floor(Math.random() * types.length)];
+        const radius = 20 + Math.random() * 25;
+        const hp = type === 'pillar' ? 50 + game.wave * 5 : Infinity;
+        game.obstacles.push({ x, y, radius, type, health: hp, maxHealth: hp, color: theme.obstacleColor });
+    }
+    if (theme.hazardColor) {
+        const hzCount = Math.min(2 + Math.floor(game.wave / 5), 6);
+        for (let i = 0; i < hzCount; i++) {
+            const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
+            const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
+            if (Math.hypot(x - CONFIG.CANVAS_WIDTH / 2, y - CONFIG.CANVAS_HEIGHT / 2) < 150) continue;
+            const htype = theme.key === 'ice' ? 'ice_patch' : theme.key === 'lava' ? 'lava_pool' : 'void_zone';
+            game.hazards.push({ x, y, radius: 40 + Math.random() * 30, type: htype, color: theme.hazardColor, damage: 1 + game.wave * 0.2 });
+        }
+    }
+}
+
+function drawArenaObstacles(ctx) {
+    if (game.hazards) {
+        game.hazards.forEach(hz => {
+            ctx.save();
+            const pulse = Math.sin(Date.now() * 0.003) * 0.2 + 0.4;
+            ctx.globalAlpha = pulse;
+            ctx.fillStyle = hz.color;
+            ctx.beginPath(); ctx.arc(hz.x, hz.y, hz.radius, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 0.8;
+            ctx.fillStyle = '#fff'; ctx.font = '16px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            const icons = { ice_patch: '❄️', lava_pool: '🔥', void_zone: '🌀' };
+            ctx.fillText(icons[hz.type] || '⚠️', hz.x, hz.y);
+            ctx.restore();
+        });
+    }
+    if (game.obstacles) {
+        game.obstacles.forEach(obs => {
+            if (obs.health <= 0) return;
+            ctx.save();
+            if (obs.type === 'rock') {
+                ctx.fillStyle = obs.color; ctx.beginPath();
+                for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; const r = obs.radius * (0.7 + Math.sin(i * 2.3) * 0.3); const ox = obs.x + Math.cos(a) * r; const oy = obs.y + Math.sin(a) * r; i === 0 ? ctx.moveTo(ox, oy) : ctx.lineTo(ox, oy); }
+                ctx.closePath(); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 2; ctx.stroke();
+            } else if (obs.type === 'crater') {
+                ctx.strokeStyle = obs.color; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(obs.x, obs.y, obs.radius, 0, Math.PI * 2); ctx.stroke();
+                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
+            } else if (obs.type === 'pillar') {
+                ctx.fillStyle = obs.color; ctx.fillRect(obs.x - obs.radius * 0.5, obs.y - obs.radius, obs.radius, obs.radius * 2);
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.strokeRect(obs.x - obs.radius * 0.5, obs.y - obs.radius, obs.radius, obs.radius * 2);
+                if (obs.health < obs.maxHealth && obs.maxHealth !== Infinity) {
+                    const bw = obs.radius;
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(obs.x - bw / 2, obs.y - obs.radius - 8, bw, 4);
+                    ctx.fillStyle = '#00ff88'; ctx.fillRect(obs.x - bw / 2, obs.y - obs.radius - 8, bw * (obs.health / obs.maxHealth), 4);
+                }
+            }
+            ctx.restore();
+        });
+    }
+}
+
 // ==================== WAVE SYSTEM ====================
 function spawnWave() {
+    generateArenaObstacles();
     showWaveAnnouncement();
     const isBoss = game.wave % CONFIG.BOSS_WAVE_INTERVAL === 0;
     
@@ -3251,42 +3465,31 @@ function drawPauseMenu(ctx) {
 
 // Draw weapon indicator
 function drawWeaponIndicator(ctx) {
-    const weapons = ['basic', 'laser', 'rocket', 'spread', 'flamethrower', 'lightning', 'freeze', 'plasma'];
-    const x = CONFIG.CANVAS_WIDTH - 350;
-    const y = CONFIG.CANVAS_HEIGHT - 45;
-    
+    if (!game.player) return;
+    const slots = game.player.weaponSlots;
+    const slotWidth = 80;
+    const totalWidth = slots.length * slotWidth + (slots.length - 1) * 5;
+    const x = CONFIG.CANVAS_WIDTH - totalWidth - 10;
+    const y = CONFIG.CANVAS_HEIGHT - 50;
     ctx.save();
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(x, y, 340, 38);
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x, y, 340, 38);
-    
-    weapons.forEach((weapon, i) => {
-        const wx = x + 5 + i * 42;
-        const wy = y + 5;
-        
-        if (game.currentWeapon === weapon) {
-            ctx.fillStyle = WEAPON_TYPES[weapon].color;
-            ctx.globalAlpha = 0.4;
-            ctx.fillRect(wx, wy, 38, 28);
-            ctx.globalAlpha = 1;
+    slots.forEach((slot, i) => {
+        const sx = x + i * (slotWidth + 5);
+        const weapon = WEAPON_TYPES[slot.type];
+        const isActive = i === (game.activeWeaponSlot || 0);
+        ctx.fillStyle = isActive ? 'rgba(0,255,136,0.15)' : 'rgba(0,0,0,0.7)';
+        ctx.fillRect(sx, y, slotWidth, 38);
+        if (slot.cooldown > 0 && slot.maxCooldown > 0) {
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(sx, y, slotWidth * (slot.cooldown / slot.maxCooldown), 38);
         }
-        
-        ctx.strokeStyle = game.currentWeapon === weapon ? WEAPON_TYPES[weapon].color : '#475569';
-        ctx.lineWidth = game.currentWeapon === weapon ? 2 : 1;
-        ctx.strokeRect(wx, wy, 38, 28);
-        
-        ctx.fillStyle = '#fff';
-        ctx.font = '10px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${i + 1}`, wx + 19, wy + 12);
-        
-        ctx.fillStyle = WEAPON_TYPES[weapon].color;
-        ctx.font = '10px monospace';
-        ctx.fillText(WEAPON_TYPES[weapon].name.split(' ')[0], wx + 19, wy + 24);
+        ctx.strokeStyle = isActive ? '#00ff88' : (weapon ? weapon.color : '#475569');
+        ctx.lineWidth = isActive ? 3 : 1;
+        ctx.strokeRect(sx, y, slotWidth, 38);
+        ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.textAlign = 'left';
+        ctx.fillText(`S${i + 1}`, sx + 3, y + 12);
+        ctx.fillStyle = weapon ? weapon.color : '#fff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
+        ctx.fillText(weapon ? weapon.name.split(' ').pop() : '???', sx + slotWidth / 2, y + 28);
     });
-    
     ctx.restore();
 }
 
@@ -3448,6 +3651,8 @@ function drawDPSMeter(ctx) {
 }
 
 function showWaveAnnouncement() {
+    const waveTheme = getCurrentTheme();
+    if (waveTheme.waves[0] === game.wave) showNotification(`🌍 ${waveTheme.name}`, '#ffd93d', 3000);
     const isBoss = game.wave % CONFIG.BOSS_WAVE_INTERVAL === 0;
     
     if (isBoss) {
@@ -3548,7 +3753,8 @@ function gameLoop(timestamp) {
     ctx.translate(game.camera.offsetX, game.camera.offsetY);
     
     // Background
-    ctx.fillStyle = '#0a0a1a';
+    const theme = game.arenaTheme || getCurrentTheme();
+    ctx.fillStyle = theme.bgColor;
     ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
     
     // Animated starfield
@@ -3559,7 +3765,7 @@ function gameLoop(timestamp) {
     // Use timestamp divided by ~33ms (approximately 30 FPS) for consistent rendering pattern
     if (Math.floor(timestamp / 33) % 2 === 0) {
         const gridPulse = Math.sin(timestamp * 0.0005) * 0.02 + 0.05;
-        ctx.strokeStyle = `rgba(78, 205, 196, ${gridPulse})`;
+        ctx.strokeStyle = theme.gridColor || `rgba(78, 205, 196, ${gridPulse})`;
         ctx.lineWidth = 1;
         for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += 50) {
             ctx.beginPath();
@@ -3574,6 +3780,9 @@ function gameLoop(timestamp) {
             ctx.stroke();
         }
     }
+    
+    // Draw arena obstacles
+    drawArenaObstacles(ctx);
     
     if (game.state === 'playing' && !game.paused) {
         timer += deltaTime;
@@ -3995,16 +4204,25 @@ window.addEventListener('keydown', e => {
         e.preventDefault();
     }
     
-    // Weapon switching
+    // Tab cycles active weapon slot
+    if (e.key === 'Tab' && game.state === 'playing' && !game.paused && game.player) {
+        game.activeWeaponSlot = ((game.activeWeaponSlot || 0) + 1) % game.player.weaponSlots.length;
+        showNotification(`Slot ${game.activeWeaponSlot + 1} selected`, '#4ecdc4', 800);
+        e.preventDefault();
+    }
+    // Number keys assign weapon to active slot
     if (game.state === 'playing' && !game.paused) {
         const weapons = ['basic', 'laser', 'rocket', 'spread', 'flamethrower', 'lightning', 'freeze', 'plasma'];
         if (e.key >= '1' && e.key <= '8') {
             const weaponIndex = parseInt(e.key) - 1;
-            if (weaponIndex < weapons.length) {
-                game.currentWeapon = weapons[weaponIndex];
-                const weaponName = WEAPON_TYPES[game.currentWeapon].name;
-                showNotification(`Switched to ${weaponName}`, '#4ecdc4', 1000);
-                Sound.play('pickup');
+            if (weaponIndex < weapons.length && game.player) {
+                const slot = game.activeWeaponSlot || 0;
+                if (slot < game.player.weaponSlots.length) {
+                    game.player.weaponSlots[slot].type = weapons[weaponIndex];
+                    game.currentWeapon = weapons[weaponIndex];
+                    showNotification(`Slot ${slot + 1}: ${WEAPON_TYPES[weapons[weaponIndex]].name}`, '#4ecdc4', 1000);
+                    Sound.play('pickup');
+                }
             }
         }
     }
