@@ -76,12 +76,8 @@ jobs:
                 container_name: cosmic-survivor
                 image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
                 restart: unless-stopped
-                networks:
-                  - caddy-network
-            
-            networks:
-              caddy-network:
-                external: true
+                ports:
+                  - "127.0.0.1:8200:80"
             EOF
             
             # Pull latest image and restart container
