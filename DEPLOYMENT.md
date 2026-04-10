@@ -9,7 +9,7 @@ The game is automatically deployed to a Hetzner server whenever changes are push
 - GitHub Container Registry (GHCR) for image storage
 - GitHub Actions for CI/CD
 - Nginx for serving static files
-- Caddy (external) for reverse proxy and HTTPS
+- Nginx (host) for reverse proxy and HTTPS
 
 ## Architecture
 
@@ -26,9 +26,9 @@ SSH to Hetzner Server
     ↓
 Pull Image & Deploy via Docker Compose
     ↓
-Join caddy-network
+Bind to 127.0.0.1:8200
     ↓
-Caddy Reverse Proxy (managed by Link-in-Bio repo)
+Nginx Reverse Proxy (managed by Link-in-Bio repo)
     ↓
 cs.festas-builds.com (public access)
 ```
@@ -82,25 +82,13 @@ services:
     container_name: cosmic-survivor
     image: ghcr.io/festas/cosmic-survivor:latest
     restart: unless-stopped
-    networks:
-      - caddy-network
-
-networks:
-  caddy-network:
-    external: true
+    ports:
+      - "127.0.0.1:8200:80"
 ```
 
-## Caddy Configuration
+## Reverse Proxy Configuration
 
-The reverse proxy is managed by the Link-in-Bio repository. Add this to the Caddyfile:
-
-```caddyfile
-cs.festas-builds.com {
-    tls eric@festas-builds.com
-    encode gzip zstd
-    reverse_proxy cosmic-survivor:80
-}
-```
+The reverse proxy is centrally managed in the [Link-in-Bio repository](https://github.com/Festas/Link-in-Bio) via `nginx/sites-available/cs.festas-builds.com.conf`. It proxies requests from `cs.festas-builds.com` to `127.0.0.1:8200` on the host.
 
 ## Deployment Directory
 
