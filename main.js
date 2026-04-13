@@ -1657,6 +1657,16 @@ class Enemy {
         if (this.healCooldown > 0) this.healCooldown--;
         if (this.shieldCooldown > 0) this.shieldCooldown--;
         if (this.reviveCooldown > 0) this.reviveCooldown--;
+        
+        // Command buff expiry
+        if (this.isCommandBuffed) {
+            this.commandBuffTimer--;
+            if (this.commandBuffTimer <= 0) {
+                this.isCommandBuffed = false;
+                this.speed = this.baseSpeed;
+                this.damage = this.baseDamage;
+            }
+        }
 
         // Move toward player
         if (dist > (this.isRanged ? 200 : 0)) {
@@ -1803,14 +1813,18 @@ class Enemy {
     }
     
     commandAllies() {
-        // Hivemind buffs all nearby enemies
+        // Hivemind buffs all nearby enemies temporarily
         const commandRadius = 250;
         game.enemies.forEach(enemy => {
-            if (enemy !== this && !enemy.isBoss) {
+            if (enemy !== this && !enemy.isBoss && !enemy.isCommandBuffed) {
                 const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
                 if (dist <= commandRadius) {
-                    enemy.speed *= 1.3;
-                    enemy.damage *= 1.2;
+                    enemy.isCommandBuffed = true;
+                    enemy.commandBuffTimer = 300; // 5 seconds
+                    enemy.baseSpeed = enemy.baseSpeed || enemy.speed;
+                    enemy.baseDamage = enemy.baseDamage || enemy.damage;
+                    enemy.speed = enemy.baseSpeed * 1.3;
+                    enemy.damage = enemy.baseDamage * 1.2;
                     createTextParticle(enemy.x, enemy.y, 'BUFFED!', '#c084fc', 14);
                 }
             }
