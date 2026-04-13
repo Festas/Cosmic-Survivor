@@ -135,25 +135,52 @@ const WEAPON_TYPES = {
 
 // Enemy types with behaviors
 const ENEMY_TYPES = {
-    normal: { color: '#a855f7', speed: 1, health: 1, damage: 1, credits: 1, xp: 1 },
-    fast: { color: '#ff6b6b', speed: 1.4, health: 0.6, damage: 0.7, credits: 1.2, xp: 1.1 },
-    tank: { color: '#10b981', speed: 0.55, health: 2.2, damage: 1.3, credits: 2, xp: 1.5 },
-    swarm: { color: '#f59e0b', speed: 1.15, health: 0.35, damage: 0.4, credits: 0.5, xp: 0.4, size: 0.6 },
-    teleporter: { color: '#8b5cf6', speed: 0.75, health: 0.9, damage: 1.1, credits: 1.5, xp: 1.3, canTeleport: true },
-    shooter: { color: '#ec4899', speed: 0.45, health: 0.75, damage: 0.9, credits: 1.8, xp: 1.4, ranged: true },
-    healer: { color: '#22d3ee', speed: 0.65, health: 1.1, damage: 0.5, credits: 2.5, xp: 2, heals: true },
-    splitter: { color: '#fb923c', speed: 0.85, health: 1.2, damage: 1.0, credits: 2.2, xp: 1.8, splits: 3 },
-    freezer: { color: '#38bdf8', speed: 0.75, health: 1.0, damage: 0.8, credits: 2, xp: 1.5, freezes: true },
-    berserker: { color: '#dc2626', speed: 0.95, health: 1.4, damage: 1.5, credits: 2.3, xp: 2, enrages: true },
+    normal: { name: '👾 Grunt', color: '#a855f7', speed: 1, health: 1, damage: 1, credits: 1, xp: 1,
+        palette: { body: '#a855f7', head: '#c084fc', limb: '#7c3aed', accent: '#e9d5ff' } },
+    fast: { name: '💨 Stalker', color: '#ff6b6b', speed: 1.4, health: 0.6, damage: 0.7, credits: 1.2, xp: 1.1,
+        palette: { body: '#ff6b6b', head: '#fca5a5', limb: '#dc2626', accent: '#fef2f2' } },
+    tank: { name: '🪨 Golem', color: '#10b981', speed: 0.55, health: 2.2, damage: 1.3, credits: 2, xp: 1.5,
+        palette: { body: '#10b981', head: '#34d399', limb: '#065f46', accent: '#6ee7b7' } },
+    swarm: { name: '🦟 Drone', color: '#f59e0b', speed: 1.15, health: 0.35, damage: 0.4, credits: 0.5, xp: 0.4, size: 0.6,
+        palette: { body: '#f59e0b', head: '#fbbf24', limb: '#b45309', accent: '#fef3c7' } },
+    teleporter: { name: '🌀 Warper', color: '#8b5cf6', speed: 0.75, health: 0.9, damage: 1.1, credits: 1.5, xp: 1.3, canTeleport: true,
+        palette: { body: '#8b5cf6', head: '#a78bfa', limb: '#6d28d9', accent: '#c4b5fd' } },
+    shooter: { name: '🔫 Marksman', color: '#ec4899', speed: 0.45, health: 0.75, damage: 0.9, credits: 1.8, xp: 1.4, ranged: true,
+        palette: { body: '#ec4899', head: '#f472b6', limb: '#be185d', accent: '#fce7f3' } },
+    healer: { name: '💚 Medic', color: '#22d3ee', speed: 0.65, health: 1.1, damage: 0.5, credits: 2.5, xp: 2, heals: true,
+        palette: { body: '#22d3ee', head: '#67e8f9', limb: '#0891b2', accent: '#cffafe' } },
+    splitter: { name: '🧬 Mitotic', color: '#fb923c', speed: 0.85, health: 1.2, damage: 1.0, credits: 2.2, xp: 1.8, splits: 3,
+        palette: { body: '#fb923c', head: '#fdba74', limb: '#c2410c', accent: '#fed7aa' } },
+    freezer: { name: '❄️ Cryo', color: '#38bdf8', speed: 0.75, health: 1.0, damage: 0.8, credits: 2, xp: 1.5, freezes: true,
+        palette: { body: '#38bdf8', head: '#7dd3fc', limb: '#0284c7', accent: '#bae6fd' } },
+    berserker: { name: '🔥 Ravager', color: '#dc2626', speed: 0.95, health: 1.4, damage: 1.5, credits: 2.3, xp: 2, enrages: true,
+        palette: { body: '#dc2626', head: '#f87171', limb: '#991b1b', accent: '#fecaca' } },
+    bomber: { name: '💣 Detonator', color: '#ff3300', speed: 0.7, health: 0.9, damage: 1.0, credits: 2.5, xp: 2.2, explodes: true,
+        palette: { body: '#ff3300', head: '#ff6633', limb: '#cc2900', accent: '#ff9966' } },
+    parasite: { name: '🦠 Parasite', color: '#84cc16', speed: 1.1, health: 0.5, damage: 0.6, credits: 1.8, xp: 1.6, drains: true,
+        palette: { body: '#84cc16', head: '#a3e635', limb: '#4d7c0f', accent: '#d9f99d' } },
+    shielder: { name: '🛡️ Sentinel', color: '#6366f1', speed: 0.6, health: 1.5, damage: 0.8, credits: 2.8, xp: 2.5, shields: true,
+        palette: { body: '#6366f1', head: '#818cf8', limb: '#4338ca', accent: '#c7d2fe' } },
+    necro: { name: '💀 Revenant', color: '#a3a3a3', speed: 0.7, health: 1.3, damage: 1.2, credits: 3.0, xp: 2.8, revives: true,
+        palette: { body: '#a3a3a3', head: '#d4d4d4', limb: '#525252', accent: '#e5e5e5' } },
 };
 
 // Boss types
 const BOSS_TYPES = {
-    destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 12, damage: 2.5, credits: 100, xp: 50 },
-    broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 10, damage: 1.8, credits: 120, xp: 60, summons: true },
-    voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 8, damage: 2.2, credits: 150, xp: 70, teleports: true },
-    necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 11, damage: 2.0, credits: 180, xp: 80, resurrects: true },
-    titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 16, damage: 3.5, credits: 200, xp: 100, earthquake: true },
+    destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 12, damage: 2.5, credits: 100, xp: 50,
+        palette: { body: '#dc2626', head: '#f87171', limb: '#991b1b', accent: '#fecaca', glow: '#ff0000' } },
+    broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 10, damage: 1.8, credits: 120, xp: 60, summons: true,
+        palette: { body: '#7c2d12', head: '#a16207', limb: '#451a03', accent: '#d97706', glow: '#f59e0b' } },
+    voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 8, damage: 2.2, credits: 150, xp: 70, teleports: true,
+        palette: { body: '#581c87', head: '#7c3aed', limb: '#3b0764', accent: '#a78bfa', glow: '#8b5cf6' } },
+    necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 11, damage: 2.0, credits: 180, xp: 80, resurrects: true,
+        palette: { body: '#4c1d95', head: '#6d28d9', limb: '#2e1065', accent: '#a78bfa', glow: '#8b5cf6' } },
+    titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 16, damage: 3.5, credits: 200, xp: 100, earthquake: true,
+        palette: { body: '#b91c1c', head: '#92400e', limb: '#7f1d1d', accent: '#fbbf24', glow: '#f59e0b' } },
+    hivemind: { name: '🧠 Hivemind', color: '#7e22ce', size: 2.5, health: 14, damage: 1.5, credits: 220, xp: 90, commands: true,
+        palette: { body: '#7e22ce', head: '#a855f7', limb: '#581c87', accent: '#d8b4fe', glow: '#c084fc' } },
+    leviathan: { name: '🐉 Leviathan', color: '#0f766e', size: 3.5, health: 20, damage: 3.0, credits: 280, xp: 120, charges: true,
+        palette: { body: '#0f766e', head: '#14b8a6', limb: '#134e4a', accent: '#5eead4', glow: '#2dd4bf' } },
 };
 
 // Elite enemy modifiers - rare empowered enemies
@@ -163,6 +190,8 @@ const ELITE_MODIFIERS = {
     enraged: { name: '🔥 Enraged', color: '#ea580c', healthMult: 1.2, damageMult: 1.8, speedMult: 1.3, creditMult: 2.5, xpMult: 2.5 },
     toxic: { name: '☠️ Toxic', color: '#65a30d', healthMult: 1.3, damageMult: 1.0, speedMult: 1.0, poisonOnHit: true, creditMult: 2.0, xpMult: 2.0 },
     ghostly: { name: '👻 Ghostly', color: '#94a3b8', healthMult: 0.8, damageMult: 1.5, speedMult: 1.4, phasing: true, creditMult: 3.0, xpMult: 3.0 },
+    thorned: { name: '🌵 Thorned', color: '#166534', healthMult: 1.6, damageMult: 1.0, speedMult: 0.85, reflectDamage: 0.25, creditMult: 2.5, xpMult: 2.5 },
+    arcane: { name: '🔮 Arcane', color: '#7e22ce', healthMult: 1.1, damageMult: 1.4, speedMult: 1.1, aoeAttack: true, creditMult: 3.0, xpMult: 3.0 },
 };
 
 // XP level-up passive abilities (pick 1 of 3)
@@ -1427,6 +1456,12 @@ class Enemy {
         this.wave = wave;
         this.isBoss = isBoss;
         
+        // Walk animation state
+        this.walkFrame = 0;
+        this.walkTimer = 0;
+        this.facingRight = true;
+        this.prevX = x;
+        
         if (isBoss) {
             const bossType = BOSS_TYPES[type] || BOSS_TYPES.destroyer;
             this.type = type;
@@ -1441,8 +1476,15 @@ class Enemy {
             this.name = bossType.name;
             this.canSummon = bossType.summons;
             this.canTeleport = bossType.teleports;
+            this.canCommand = bossType.commands;
+            this.canCharge = bossType.charges;
             this.summonCooldown = 0;
             this.teleportCooldown = 0;
+            this.commandCooldown = 0;
+            this.chargeCooldown = 0;
+            this.isCharging = false;
+            this.chargeTargetX = 0;
+            this.chargeTargetY = 0;
         } else {
             const enemyType = ENEMY_TYPES[type] || ENEMY_TYPES.normal;
             this.type = type;
@@ -1460,10 +1502,18 @@ class Enemy {
             this.canSplit = enemyType.splits;
             this.canFreeze = enemyType.freezes;
             this.canEnrage = enemyType.enrages;
+            this.canExplode = enemyType.explodes;
+            this.canDrain = enemyType.drains;
+            this.canShield = enemyType.shields;
+            this.canRevive = enemyType.revives;
             this.teleportCooldown = 0;
             this.shootCooldown = 0;
             this.healCooldown = 0;
+            this.shieldCooldown = 0;
+            this.reviveCooldown = 0;
             this.enraged = false;
+            this.shieldActive = false;
+            this.shieldHealth = 0;
             this.splitGeneration = 0; // Track split depth to prevent infinite splitting
             
             // Elite enemy modification
@@ -1495,10 +1545,20 @@ class Enemy {
             this.resurrectedEnemies = [];
         }
         
+        // Sentinel shield initialization
+        if (this.canShield && !isBoss) {
+            this.shieldActive = true;
+            this.shieldHealth = this.maxHealth * 0.4;
+            this.shieldMaxHealth = this.maxHealth * 0.4;
+        }
+        
         this.attackCooldown = 0;
     }
 
     update() {
+        // Track movement for walk animation
+        this.prevX = this.x;
+        
         let targetX = game.player.x, targetY = game.player.y;
         if (game.player.decoy && game.player.decoy.health > 0 && !this.isBoss) {
             const distDecoy = Math.hypot(game.player.decoy.x - this.x, game.player.decoy.y - this.y);
@@ -1529,10 +1589,25 @@ class Enemy {
                 this.earthquake();
                 this.earthquakeCooldown = 480; // 8 seconds
             }
+            // Hivemind command ability - buffs nearby enemies
+            if (this.canCommand && this.commandCooldown <= 0) {
+                this.commandAllies();
+                this.commandCooldown = 360; // 6 seconds
+            }
+            // Leviathan charge ability
+            if (this.canCharge && !this.isCharging && this.chargeCooldown <= 0 && dist > 100) {
+                this.startCharge();
+                this.chargeCooldown = 420; // 7 seconds
+            }
+            if (this.isCharging) {
+                this.updateCharge();
+            }
             if (this.summonCooldown > 0) this.summonCooldown--;
             if (this.teleportCooldown > 0) this.teleportCooldown--;
             if (this.resurrectCooldown > 0) this.resurrectCooldown--;
             if (this.earthquakeCooldown > 0) this.earthquakeCooldown--;
+            if (this.commandCooldown > 0) this.commandCooldown--;
+            if (this.chargeCooldown > 0) this.chargeCooldown--;
         }
 
         // Regular enemy abilities
@@ -1560,10 +1635,28 @@ class Enemy {
             createTextParticle(this.x, this.y - 30, 'ENRAGED!', '#ff0000', 20);
             createParticles(this.x, this.y, '#ff0000', 20);
         }
+        
+        // Sentinel shield - regenerate shield when not active
+        if (this.canShield && !this.shieldActive && this.shieldCooldown <= 0) {
+            this.shieldActive = true;
+            this.shieldHealth = this.shieldMaxHealth;
+            createTextParticle(this.x, this.y - 30, 'SHIELDED!', '#818cf8', 16);
+            createParticles(this.x, this.y, '#6366f1', 12);
+        }
+        
+        // Parasite drain - steal health on hit (handled in attack)
+        
+        // Revenant revive - raise dead enemies nearby
+        if (this.canRevive && this.reviveCooldown <= 0 && game.enemies.length < 40) {
+            this.reviveNearby();
+            this.reviveCooldown = 480; // 8 seconds
+        }
 
         if (this.teleportCooldown > 0) this.teleportCooldown--;
         if (this.shootCooldown > 0) this.shootCooldown--;
         if (this.healCooldown > 0) this.healCooldown--;
+        if (this.shieldCooldown > 0) this.shieldCooldown--;
+        if (this.reviveCooldown > 0) this.reviveCooldown--;
 
         // Move toward player
         if (dist > (this.isRanged ? 200 : 0)) {
@@ -1571,6 +1664,17 @@ class Enemy {
             if (game.player && game.player.timeDilation > 0 && dist < 200) moveSpeed *= (1 - game.player.timeDilation);
             this.x += (dx / dist) * moveSpeed;
             this.y += (dy / dist) * moveSpeed;
+        }
+        
+        // Update walk animation
+        const movedX = this.x - this.prevX;
+        if (Math.abs(movedX) > 0.1) {
+            this.facingRight = movedX > 0;
+            this.walkTimer++;
+            if (this.walkTimer >= 12) { this.walkTimer = 0; this.walkFrame = this.walkFrame === 0 ? 1 : 0; }
+        } else {
+            this.walkTimer = 0;
+            this.walkFrame = 0;
         }
 
         // Attack player
@@ -1589,6 +1693,13 @@ class Enemy {
                 game.player.slowDebuff = 120; // 2 seconds
                 createTextParticle(game.player.x, game.player.y - 30, 'FROZEN!', '#38bdf8', 16);
                 createParticles(game.player.x, game.player.y, '#38bdf8', 10);
+            }
+            
+            // Parasite drain - heal self on hit
+            if (this.canDrain) {
+                const drainAmount = this.damage * 0.3;
+                this.health = Math.min(this.maxHealth, this.health + drainAmount);
+                createTextParticle(this.x, this.y, `+${Math.floor(drainAmount)}`, '#84cc16', 14);
             }
             
             this.attackCooldown = 60;
@@ -1690,8 +1801,100 @@ class Enemy {
         // Visual shockwave effect
         createParticles(this.x, this.y, '#fbbf24', 40);
     }
+    
+    commandAllies() {
+        // Hivemind buffs all nearby enemies
+        const commandRadius = 250;
+        game.enemies.forEach(enemy => {
+            if (enemy !== this && !enemy.isBoss) {
+                const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+                if (dist <= commandRadius) {
+                    enemy.speed *= 1.3;
+                    enemy.damage *= 1.2;
+                    createTextParticle(enemy.x, enemy.y, 'BUFFED!', '#c084fc', 14);
+                }
+            }
+        });
+        createTextParticle(this.x, this.y - 50, 'COMMAND!', '#a855f7', 20);
+        createParticles(this.x, this.y, '#c084fc', 30);
+    }
+    
+    startCharge() {
+        this.isCharging = true;
+        this.chargeTargetX = game.player.x;
+        this.chargeTargetY = game.player.y;
+        this.chargeFrames = 0;
+        createTextParticle(this.x, this.y - 50, 'CHARGE!', '#2dd4bf', 22);
+    }
+    
+    updateCharge() {
+        this.chargeFrames++;
+        if (this.chargeFrames <= 30) {
+            // Wind-up phase - glow effect
+            return;
+        }
+        // Rush toward target
+        const dx = this.chargeTargetX - this.x;
+        const dy = this.chargeTargetY - this.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 10) {
+            const chargeSpeed = this.speed * 5;
+            this.x += (dx / dist) * chargeSpeed;
+            this.y += (dy / dist) * chargeSpeed;
+            createParticles(this.x, this.y, '#2dd4bf', 3);
+            
+            // Damage player if colliding during charge
+            const playerDist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+            if (playerDist < this.size + game.player.size) {
+                game.player.takeDamage(this.damage * 2);
+                screenShake(12);
+                this.isCharging = false;
+            }
+        } else {
+            this.isCharging = false;
+            screenShake(8);
+            createParticles(this.x, this.y, '#2dd4bf', 25);
+        }
+        if (this.chargeFrames > 60) this.isCharging = false;
+    }
+    
+    reviveNearby() {
+        // Revenant spawns a ghostly copy of a random enemy type
+        const types = ['normal', 'fast', 'swarm'];
+        const revType = types[Math.floor(Math.random() * types.length)];
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 60 + Math.random() * 40;
+        const x = this.x + Math.cos(angle) * dist;
+        const y = this.y + Math.sin(angle) * dist;
+        
+        const revived = new Enemy(x, y, this.wave, revType, false);
+        revived.maxHealth *= 0.4;
+        revived.health = revived.maxHealth;
+        revived.color = '#d4d4d4';
+        revived.isZombie = true;
+        revived.creditValue = Math.floor(revived.creditValue * 0.3);
+        
+        game.enemies.push(revived);
+        createTextParticle(this.x, this.y - 30, 'REVIVE!', '#a3a3a3', 16);
+        createParticles(x, y, '#d4d4d4', 15);
+    }
 
     takeDamage(amount, isCrit = false) {
+        // Sentinel shield absorbs damage first
+        if (this.canShield && this.shieldActive && this.shieldHealth > 0) {
+            const absorbed = Math.min(amount, this.shieldHealth);
+            this.shieldHealth -= absorbed;
+            amount -= absorbed;
+            createTextParticle(this.x, this.y - 20, `🛡️${Math.floor(absorbed)}`, '#818cf8', 14);
+            if (this.shieldHealth <= 0) {
+                this.shieldActive = false;
+                this.shieldCooldown = 300; // 5 seconds to regenerate
+                createTextParticle(this.x, this.y - 30, 'SHIELD DOWN!', '#f59e0b', 18);
+                createParticles(this.x, this.y, '#818cf8', 15);
+            }
+            if (amount <= 0) return false;
+        }
+        
         // Elite shield absorbs damage first
         if (this.isElite && this.eliteShield > 0) {
             const absorbed = Math.min(amount, this.eliteShield);
@@ -1787,6 +1990,19 @@ class Enemy {
             createTextParticle(this.x, this.y - 30, 'SPLIT!', '#fb923c', 18);
         }
         
+        // Bomber explosion on death - damages player if close
+        if (this.canExplode) {
+            const explosionRadius = 100;
+            const playerDist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+            if (playerDist <= explosionRadius) {
+                game.player.takeDamage(this.damage * 1.5);
+                createTextParticle(game.player.x, game.player.y - 30, 'EXPLOSION!', '#ff3300', 20);
+            }
+            screenShake(10);
+            createExplosion(this.x, this.y, '#ff3300', 40);
+            createExplosion(this.x, this.y, '#ff6633', 30);
+        }
+        
         if (this.isBoss) {
             game.stats.bossesDefeated++;
             showNotification(`${this.name} Defeated!`, '#ffd93d');
@@ -1816,462 +2032,66 @@ class Enemy {
     draw(ctx) {
         ctx.save();
         
+        const s = this.size;
+        const cx = this.x;
+        const cy = this.y;
+        const walkSwing = this.walkFrame === 0 ? 0.25 : -0.25;
         const typeData = ENEMY_TYPES[this.type] || ENEMY_TYPES.normal;
+        const palette = typeData.palette || { body: this.color, head: this.color, limb: this.color, accent: '#fff' };
+        
+        // Humanoid proportions
+        const headR = s * 0.28;
+        const headY = cy - s * 0.5;
+        const torsoW = s * 0.4;
+        const torsoH = s * 0.45;
+        const torsoTop = cy - s * 0.2;
+        const armW = s * 0.08;
+        const armLen = s * 0.35;
+        const legW = s * 0.09;
+        const legLen = s * 0.3;
         
         if (this.isBoss) {
-            // Boss design - large and imposing
-            const bossType = BOSS_TYPES[this.type] || BOSS_TYPES.destroyer;
-            
-            // Main body
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Boss-specific features
-            if (this.type === 'destroyer' || this.type === 'normal') {
-                // Horns for destroyer
-                ctx.fillStyle = '#991b1b';
-                ctx.beginPath();
-                ctx.moveTo(this.x - this.size * 0.8, this.y - this.size * 0.5);
-                ctx.lineTo(this.x - this.size * 0.5, this.y - this.size);
-                ctx.lineTo(this.x - this.size * 0.3, this.y - this.size * 0.5);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(this.x + this.size * 0.8, this.y - this.size * 0.5);
-                ctx.lineTo(this.x + this.size * 0.5, this.y - this.size);
-                ctx.lineTo(this.x + this.size * 0.3, this.y - this.size * 0.5);
-                ctx.fill();
-            } else if (this.type === 'broodmother') {
-                // Spider-like legs
-                ctx.strokeStyle = '#92400e';
-                ctx.lineWidth = 4;
-                for (let i = 0; i < 8; i++) {
-                    const angle = (i / 8) * Math.PI * 2;
-                    ctx.beginPath();
-                    ctx.moveTo(this.x, this.y);
-                    ctx.lineTo(this.x + Math.cos(angle) * this.size * 1.5, this.y + Math.sin(angle) * this.size * 1.5);
-                    ctx.stroke();
-                }
-            } else if (this.type === 'voidwalker') {
-                // Ethereal wispy tentacles
-                ctx.strokeStyle = 'rgba(139, 92, 246, 0.6)';
-                ctx.lineWidth = 3;
-                for (let i = 0; i < 6; i++) {
-                    const angle = (i / 6) * Math.PI * 2 + Date.now() * 0.001;
-                    const wave = Math.sin(Date.now() * 0.003 + i) * 20;
-                    ctx.beginPath();
-                    ctx.moveTo(this.x, this.y);
-                    ctx.quadraticCurveTo(
-                        this.x + Math.cos(angle) * this.size,
-                        this.y + Math.sin(angle) * this.size + wave,
-                        this.x + Math.cos(angle) * this.size * 1.3,
-                        this.y + Math.sin(angle) * this.size * 1.3
-                    );
-                    ctx.stroke();
-                }
-            } else if (this.type === 'necromancer') {
-                // Skeletal mage with staff and soul flames
-                // Skeletal body
-                ctx.strokeStyle = '#6b21a8';
-                ctx.lineWidth = 4;
-                
-                // Staff
-                ctx.beginPath();
-                ctx.moveTo(this.x - this.size * 0.3, this.y + this.size * 0.8);
-                ctx.lineTo(this.x - this.size * 0.3, this.y - this.size * 0.9);
-                ctx.stroke();
-                
-                // Skull orb on staff
-                ctx.fillStyle = '#8b5cf6';
-                ctx.beginPath();
-                ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.9, this.size * 0.25, 0, Math.PI * 2);
-                ctx.fill();
-                
-                // Soul flames
-                const soulPulse = Math.sin(Date.now() * 0.008) * 0.4 + 0.6;
-                ctx.fillStyle = `rgba(167, 139, 250, ${soulPulse})`;
-                for (let i = 0; i < 5; i++) {
-                    const angle = (i / 5) * Math.PI * 2 + Date.now() * 0.003;
-                    const dist = this.size * (1.1 + Math.sin(Date.now() * 0.005 + i) * 0.2);
-                    const flameHeight = Math.sin(Date.now() * 0.01 + i) * this.size * 0.3;
-                    ctx.beginPath();
-                    ctx.moveTo(this.x + Math.cos(angle) * dist, this.y + Math.sin(angle) * dist);
-                    ctx.lineTo(
-                        this.x + Math.cos(angle) * dist,
-                        this.y + Math.sin(angle) * dist - flameHeight
-                    );
-                    ctx.lineTo(
-                        this.x + Math.cos(angle) * (dist + this.size * 0.1),
-                        this.y + Math.sin(angle) * dist - flameHeight * 0.5
-                    );
-                    ctx.closePath();
-                    ctx.fill();
-                }
-                
-                // Resurrection visual effect
-                if (this.resurrectCooldown < 60) {
-                    const resurrectGlow = (60 - this.resurrectCooldown) / 60;
-                    ctx.strokeStyle = `rgba(167, 139, 250, ${resurrectGlow})`;
-                    ctx.lineWidth = 5;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size * (1 + resurrectGlow * 0.5), 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-            } else if (this.type === 'titan') {
-                // Colossal golem with bronze color and glowing runes
-                // Bronze armor segments
-                ctx.fillStyle = '#92400e';
-                for (let i = 0; i < 3; i++) {
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y - this.size * 0.3 + i * this.size * 0.3, this.size * 0.9, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                
-                // Glowing runes
-                const runePulse = Math.sin(Date.now() * 0.006) * 0.4 + 0.6;
-                ctx.fillStyle = `rgba(251, 191, 36, ${runePulse})`;
-                for (let i = 0; i < 8; i++) {
-                    const angle = (i / 8) * Math.PI * 2;
-                    const x = this.x + Math.cos(angle) * this.size * 0.6;
-                    const y = this.y + Math.sin(angle) * this.size * 0.6;
-                    
-                    // Rune symbols
-                    ctx.beginPath();
-                    ctx.arc(x, y, this.size * 0.1, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = `rgba(251, 191, 36, ${runePulse})`;
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(x - this.size * 0.08, y);
-                    ctx.lineTo(x + this.size * 0.08, y);
-                    ctx.moveTo(x, y - this.size * 0.08);
-                    ctx.lineTo(x, y + this.size * 0.08);
-                    ctx.stroke();
-                }
-                
-                // Earthquake charging effect
-                if (this.earthquakeCooldown < 60) {
-                    const quakePulse = (60 - this.earthquakeCooldown) / 60;
-                    ctx.strokeStyle = `rgba(251, 191, 36, ${quakePulse})`;
-                    ctx.lineWidth = 6;
-                    for (let i = 0; i < 3; i++) {
-                        ctx.beginPath();
-                        ctx.arc(this.x, this.y, this.size * (1.2 + i * 0.3 + quakePulse * 0.5), 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                }
-            }
-            
-            // Boss border
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-            ctx.stroke();
+            this.drawBoss(ctx);
         } else {
-            // Regular enemy designs - unique for each type
-            switch(this.type) {
-                case 'normal':
-                    // Classic alien blob with tentacles
-                    ctx.fillStyle = this.color;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Small tentacles
-                    ctx.fillStyle = '#9333ea';
-                    for (let i = 0; i < 4; i++) {
-                        const angle = (i / 4) * Math.PI * 2;
-                        ctx.beginPath();
-                        ctx.arc(
-                            this.x + Math.cos(angle) * this.size * 0.8,
-                            this.y + Math.sin(angle) * this.size * 0.8,
-                            this.size * 0.3,
-                            0,
-                            Math.PI * 2
-                        );
-                        ctx.fill();
-                    }
-                    break;
-                    
-                case 'fast':
-                    // Sleek predator design
-                    ctx.fillStyle = this.color;
-                    // Elongated oval body
-                    ctx.beginPath();
-                    ctx.ellipse(this.x, this.y, this.size * 1.2, this.size * 0.7, Math.PI / 4, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Spikes
-                    ctx.fillStyle = '#dc2626';
-                    for (let i = 0; i < 3; i++) {
-                        const angle = Math.PI / 4 + (i - 1) * 0.3;
-                        ctx.beginPath();
-                        ctx.moveTo(this.x + Math.cos(angle) * this.size * 0.5, this.y + Math.sin(angle) * this.size * 0.5);
-                        ctx.lineTo(this.x + Math.cos(angle) * this.size * 1.5, this.y + Math.sin(angle) * this.size * 1.5);
-                        ctx.lineTo(this.x + Math.cos(angle + 0.3) * this.size * 0.5, this.y + Math.sin(angle + 0.3) * this.size * 0.5);
-                        ctx.fill();
-                    }
-                    break;
-                    
-                case 'tank':
-                    // Armored beetle design
-                    ctx.fillStyle = this.color;
-                    // Shell segments
-                    for (let i = 0; i < 3; i++) {
-                        ctx.beginPath();
-                        ctx.arc(
-                            this.x,
-                            this.y - this.size * 0.4 + i * this.size * 0.4,
-                            this.size * 0.8,
-                            0,
-                            Math.PI * 2
-                        );
-                        ctx.fill();
-                    }
-                    // Armor plating
-                    ctx.strokeStyle = '#065f46';
-                    ctx.lineWidth = 2;
-                    for (let i = 0; i < 4; i++) {
-                        ctx.beginPath();
-                        ctx.arc(this.x, this.y, this.size * (0.9 - i * 0.2), 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                    break;
-                    
-                case 'swarm':
-                    // Small insect-like creature
-                    ctx.fillStyle = this.color;
-                    // Body
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Wings
-                    ctx.fillStyle = 'rgba(251, 191, 36, 0.5)';
-                    ctx.beginPath();
-                    ctx.ellipse(this.x - this.size * 0.5, this.y, this.size * 0.6, this.size * 0.3, -Math.PI / 6, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.ellipse(this.x + this.size * 0.5, this.y, this.size * 0.6, this.size * 0.3, Math.PI / 6, 0, Math.PI * 2);
-                    ctx.fill();
-                    break;
-                    
-                case 'teleporter':
-                    // Mystical orb with energy rings
-                    ctx.fillStyle = this.color;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Energy rings
-                    const pulse = Math.sin(Date.now() * 0.005) * 0.2 + 1;
-                    ctx.strokeStyle = 'rgba(139, 92, 246, 0.6)';
-                    ctx.lineWidth = 2;
-                    for (let i = 0; i < 3; i++) {
-                        ctx.beginPath();
-                        ctx.arc(this.x, this.y, this.size * (1.2 + i * 0.3) * pulse, 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                    break;
-                    
-                case 'shooter':
-                    // Ranged attacker with cannon
-                    ctx.fillStyle = this.color;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.fill();
-                    // Cannon barrels
-                    const angle = game.player ? Math.atan2(game.player.y - this.y, game.player.x - this.x) : 0;
-                    ctx.fillStyle = '#9f1239';
-                    for (let i = -1; i <= 1; i += 2) {
-                        ctx.save();
-                        ctx.translate(this.x, this.y);
-                        ctx.rotate(angle);
-                        ctx.fillRect(this.size * 0.5, this.size * 0.2 * i, this.size * 0.8, this.size * 0.15);
-                        ctx.restore();
-                    }
-                    break;
-                    
-                case 'healer':
-                    // Healer drone with healing aura and plus symbol
-                    ctx.fillStyle = this.color;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Plus symbol
-                    ctx.fillStyle = '#fff';
-                    const crossSize = this.size * 0.6;
-                    ctx.fillRect(this.x - crossSize / 2, this.y - crossSize * 0.15, crossSize, crossSize * 0.3);
-                    ctx.fillRect(this.x - crossSize * 0.15, this.y - crossSize / 2, crossSize * 0.3, crossSize);
-                    
-                    // Glowing aura to make it stand out as high priority
-                    const healGlow = Math.sin(Date.now() * 0.008) * 0.4 + 0.6;
-                    ctx.strokeStyle = `rgba(34, 211, 238, ${healGlow})`;
-                    ctx.lineWidth = 3;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size * 1.3, 0, Math.PI * 2);
-                    ctx.stroke();
-                    
-                    // Healing pulse rings
-                    if (this.healCooldown < 30) {
-                        const pulseRadius = this.size * (1.5 + (30 - this.healCooldown) / 30 * 3);
-                        ctx.strokeStyle = `rgba(0, 255, 136, ${0.5 - (30 - this.healCooldown) / 60})`;
-                        ctx.lineWidth = 2;
-                        ctx.beginPath();
-                        ctx.arc(this.x, this.y, pulseRadius, 0, Math.PI * 2);
-                        ctx.stroke();
-                    }
-                    break;
-                    
-                case 'splitter':
-                    // Gelatinous blob with internal cores visible
-                    ctx.fillStyle = this.color;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Wobble effect
-                    const wobble = Math.sin(Date.now() * 0.01) * 0.1 + 1;
-                    ctx.fillStyle = 'rgba(251, 146, 60, 0.6)';
-                    ctx.beginPath();
-                    ctx.ellipse(this.x, this.y, this.size * 0.9 * wobble, this.size * 0.9 / wobble, 0, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Internal cores
-                    ctx.fillStyle = '#ea580c';
-                    for (let i = 0; i < 3; i++) {
-                        const angle = (i / 3) * Math.PI * 2 + Date.now() * 0.001;
-                        const dist = this.size * 0.4;
-                        ctx.beginPath();
-                        ctx.arc(
-                            this.x + Math.cos(angle) * dist,
-                            this.y + Math.sin(angle) * dist,
-                            this.size * 0.15,
-                            0,
-                            Math.PI * 2
-                        );
-                        ctx.fill();
-                    }
-                    break;
-                    
-                case 'freezer':
-                    // Ice crystal entity with frost particles
-                    ctx.fillStyle = this.color;
-                    
-                    // Crystal shape
-                    ctx.beginPath();
-                    for (let i = 0; i < 6; i++) {
-                        const angle = (i / 6) * Math.PI * 2;
-                        const radius = i % 2 === 0 ? this.size * 1.1 : this.size * 0.7;
-                        const x = this.x + Math.cos(angle) * radius;
-                        const y = this.y + Math.sin(angle) * radius;
-                        if (i === 0) ctx.moveTo(x, y);
-                        else ctx.lineTo(x, y);
-                    }
-                    ctx.closePath();
-                    ctx.fill();
-                    
-                    // Inner glow
-                    ctx.fillStyle = 'rgba(125, 211, 252, 0.6)';
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size * 0.5, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Frost particles
-                    const frostPulse = Math.sin(Date.now() * 0.006) * 0.3 + 0.7;
-                    ctx.fillStyle = `rgba(186, 230, 253, ${frostPulse * 0.6})`;
-                    for (let i = 0; i < 6; i++) {
-                        const angle = (i / 6) * Math.PI * 2 + Date.now() * 0.003;
-                        const dist = this.size * (1.3 + Math.sin(Date.now() * 0.005 + i) * 0.2);
-                        ctx.beginPath();
-                        ctx.arc(
-                            this.x + Math.cos(angle) * dist,
-                            this.y + Math.sin(angle) * dist,
-                            this.size * 0.1,
-                            0,
-                            Math.PI * 2
-                        );
-                        ctx.fill();
-                    }
-                    break;
-                    
-                case 'berserker':
-                    // Rage demon with flame effects
-                    const berserkerColor = this.enraged ? '#ff0000' : this.color;
-                    ctx.fillStyle = berserkerColor;
-                    
-                    // Demon body with horns
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.fill();
-                    
-                    // Horns
-                    ctx.fillStyle = '#7f1d1d';
-                    ctx.beginPath();
-                    ctx.moveTo(this.x - this.size * 0.6, this.y - this.size * 0.3);
-                    ctx.lineTo(this.x - this.size * 0.4, this.y - this.size * 0.8);
-                    ctx.lineTo(this.x - this.size * 0.2, this.y - this.size * 0.3);
-                    ctx.fill();
-                    ctx.beginPath();
-                    ctx.moveTo(this.x + this.size * 0.6, this.y - this.size * 0.3);
-                    ctx.lineTo(this.x + this.size * 0.4, this.y - this.size * 0.8);
-                    ctx.lineTo(this.x + this.size * 0.2, this.y - this.size * 0.3);
-                    ctx.fill();
-                    
-                    // Enraged effects
-                    if (this.enraged) {
-                        // Pulsing red aura
-                        const ragePulse = Math.sin(Date.now() * 0.015) * 0.4 + 0.6;
-                        ctx.strokeStyle = `rgba(255, 0, 0, ${ragePulse})`;
-                        ctx.lineWidth = 4;
-                        ctx.beginPath();
-                        ctx.arc(this.x, this.y, this.size * 1.4, 0, Math.PI * 2);
-                        ctx.stroke();
-                        
-                        // Flame particles
-                        ctx.fillStyle = `rgba(251, 146, 60, ${ragePulse * 0.7})`;
-                        for (let i = 0; i < 8; i++) {
-                            const angle = (i / 8) * Math.PI * 2 + Date.now() * 0.01;
-                            const dist = this.size * (1.2 + Math.sin(Date.now() * 0.012 + i) * 0.3);
-                            ctx.beginPath();
-                            ctx.arc(
-                                this.x + Math.cos(angle) * dist,
-                                this.y + Math.sin(angle) * dist,
-                                this.size * 0.15,
-                                0,
-                                Math.PI * 2
-                            );
-                            ctx.fill();
-                        }
-                        
-                        // Angry eyes (red)
-                        ctx.fillStyle = '#ff0000';
-                        ctx.beginPath();
-                        ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.2, this.size * 0.15, 0, Math.PI * 2);
-                        ctx.arc(this.x + this.size * 0.3, this.y - this.size * 0.2, this.size * 0.15, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                    break;
-                    
-                default:
-                    // Fallback blob
-                    ctx.fillStyle = this.color;
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.fill();
-            }
+            // === LEGS ===
+            ctx.fillStyle = palette.limb;
+            ctx.save(); ctx.translate(cx - s * 0.1, cy + s * 0.25);
+            ctx.rotate(walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
+            ctx.save(); ctx.translate(cx + s * 0.1, cy + s * 0.25);
+            ctx.rotate(-walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
+            
+            // === TORSO ===
+            ctx.fillStyle = palette.body;
+            ctx.fillRect(cx - torsoW / 2, torsoTop, torsoW, torsoH);
+            
+            // Type-specific torso details
+            this.drawTorsoDetail(ctx, cx, cy, s, torsoW, torsoH, torsoTop, palette);
+            
+            // === ARMS ===
+            ctx.fillStyle = palette.limb;
+            // Left arm
+            ctx.save(); ctx.translate(cx - s * 0.22, cy - s * 0.15);
+            ctx.rotate(-0.3 + walkSwing * 0.5); ctx.fillRect(-armW / 2, 0, armW, armLen); ctx.restore();
+            // Right arm
+            ctx.save(); ctx.translate(cx + s * 0.22, cy - s * 0.15);
+            ctx.rotate(0.3 - walkSwing * 0.5); ctx.fillRect(-armW / 2, 0, armW, armLen);
+            // Type-specific hand item
+            this.drawHandItem(ctx, s, armLen, palette);
+            ctx.restore();
+            
+            // === HEAD ===
+            ctx.fillStyle = palette.head;
+            ctx.beginPath(); ctx.arc(cx, headY, headR, 0, Math.PI * 2); ctx.fill();
+            
+            // Type-specific head details
+            this.drawHeadDetail(ctx, cx, headY, headR, s, palette);
+            
+            // Eyes - alien style (glowing, single eye, multiple eyes, etc.)
+            this.drawEyes(ctx, cx, headY, headR, s, palette);
+            
+            // Type-specific aura/effects
+            this.drawAura(ctx, cx, cy, s, palette);
         }
-        
-        // Eyes for all enemies
-        ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.2, this.size * 0.2, 0, Math.PI * 2);
-        ctx.arc(this.x + this.size * 0.3, this.y - this.size * 0.2, this.size * 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.2, this.size * 0.1, 0, Math.PI * 2);
-        ctx.arc(this.x + this.size * 0.3, this.y - this.size * 0.2, this.size * 0.1, 0, Math.PI * 2);
-        ctx.fill();
         
         // Elite indicator
         if (this.isElite && !this.isBoss) {
@@ -2279,40 +2099,750 @@ class Enemy {
             ctx.lineWidth = 2;
             ctx.setLineDash([4, 4]);
             ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size + 5, 0, Math.PI * 2);
+            ctx.arc(cx, cy, s + 5, 0, Math.PI * 2);
             ctx.stroke();
             ctx.setLineDash([]);
             
-            // Elite name tag
             ctx.fillStyle = this.eliteModifier.color;
             ctx.font = 'bold 10px monospace';
             ctx.textAlign = 'center';
-            ctx.fillText(this.eliteModifier.name, this.x, this.y - this.size - 15);
+            ctx.fillText(this.eliteModifier.name, cx, cy - s - 15);
         }
         
-        // Health bar for all enemies
+        // Sentinel shield visual
+        if (this.canShield && this.shieldActive && this.shieldHealth > 0) {
+            const shieldAlpha = 0.3 + Math.sin(Date.now() * 0.005) * 0.1;
+            ctx.strokeStyle = `rgba(99, 102, 241, ${shieldAlpha})`;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(cx, cy, s * 1.3, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = `rgba(99, 102, 241, ${shieldAlpha * 0.3})`;
+            ctx.fill();
+        }
+        
+        // Health bar
         if (this.health < this.maxHealth) {
-            const barWidth = this.size * 2;
+            const barWidth = s * 2;
             const barHeight = 4;
-            const barY = this.y - this.size - 8;
+            const barY = cy - s - 8;
             
             ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(this.x - barWidth / 2, barY, barWidth, barHeight);
+            ctx.fillRect(cx - barWidth / 2, barY, barWidth, barHeight);
             
             const healthPercent = this.health / this.maxHealth;
             const healthColor = healthPercent > 0.5 ? '#00ff88' : healthPercent > 0.25 ? '#ffd93d' : '#ff6b6b';
             ctx.fillStyle = healthColor;
-            ctx.fillRect(this.x - barWidth / 2, barY, barWidth * healthPercent, barHeight);
+            ctx.fillRect(cx - barWidth / 2, barY, barWidth * healthPercent, barHeight);
+            
+            // Sentinel shield bar
+            if (this.canShield && this.shieldHealth > 0) {
+                ctx.fillStyle = '#818cf8';
+                ctx.fillRect(cx - barWidth / 2, barY - 3, barWidth * (this.shieldHealth / this.shieldMaxHealth), 2);
+            }
             
             // Elite shield bar
             if (this.isElite && this.eliteShield > 0 && this.eliteModifier?.hasShield) {
                 const shieldMax = this.maxHealth * 0.3;
                 ctx.fillStyle = '#60a5fa';
-                ctx.fillRect(this.x - barWidth / 2, barY - 3, barWidth * (this.eliteShield / shieldMax), 2);
+                ctx.fillRect(cx - barWidth / 2, barY - 3, barWidth * (this.eliteShield / shieldMax), 2);
             }
         }
         
         ctx.restore();
+    }
+    
+    drawTorsoDetail(ctx, cx, cy, s, torsoW, torsoH, torsoTop, palette) {
+        switch(this.type) {
+            case 'tank':
+                // Armor plates
+                ctx.fillStyle = palette.limb;
+                ctx.fillRect(cx - torsoW / 2 - 3, torsoTop + 2, 3, torsoH - 4);
+                ctx.fillRect(cx + torsoW / 2, torsoTop + 2, 3, torsoH - 4);
+                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1;
+                ctx.strokeRect(cx - torsoW / 2 + 2, torsoTop + 2, torsoW - 4, torsoH - 4);
+                break;
+            case 'healer':
+                // Cross symbol
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(cx - 2, torsoTop + 4, 4, torsoH - 8);
+                ctx.fillRect(cx - torsoW / 4, torsoTop + torsoH / 2 - 2, torsoW / 2, 4);
+                break;
+            case 'shooter':
+                // Bandolier
+                ctx.strokeStyle = palette.accent; ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.moveTo(cx - torsoW / 2, torsoTop + 3);
+                ctx.lineTo(cx + torsoW / 2, torsoTop + torsoH - 3); ctx.stroke();
+                break;
+            case 'berserker':
+                // Battle scars
+                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1;
+                for (let i = 0; i < 3; i++) {
+                    ctx.beginPath(); ctx.moveTo(cx - 4 + i * 4, torsoTop + 3);
+                    ctx.lineTo(cx - 2 + i * 4, torsoTop + torsoH - 3); ctx.stroke();
+                }
+                break;
+            case 'bomber':
+                // Explosive pack on chest
+                ctx.fillStyle = '#cc2900';
+                ctx.fillRect(cx - torsoW / 3, torsoTop + torsoH / 3, torsoW * 2 / 3, torsoH / 3);
+                ctx.fillStyle = '#ff6633';
+                ctx.beginPath(); ctx.arc(cx, torsoTop + torsoH / 2, s * 0.08, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'shielder':
+                // Shield emblem
+                ctx.fillStyle = palette.accent;
+                ctx.beginPath();
+                ctx.moveTo(cx, torsoTop + 3);
+                ctx.lineTo(cx + torsoW / 3, torsoTop + torsoH / 3);
+                ctx.lineTo(cx + torsoW / 3, torsoTop + torsoH * 0.6);
+                ctx.lineTo(cx, torsoTop + torsoH - 3);
+                ctx.lineTo(cx - torsoW / 3, torsoTop + torsoH * 0.6);
+                ctx.lineTo(cx - torsoW / 3, torsoTop + torsoH / 3);
+                ctx.closePath(); ctx.fill();
+                break;
+            case 'necro':
+                // Rib cage pattern
+                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1;
+                for (let i = 0; i < 4; i++) {
+                    const ry = torsoTop + 4 + i * (torsoH - 8) / 3;
+                    ctx.beginPath(); ctx.moveTo(cx - torsoW / 3, ry);
+                    ctx.quadraticCurveTo(cx, ry + 3, cx + torsoW / 3, ry); ctx.stroke();
+                }
+                break;
+            case 'parasite':
+                // Tendrils on torso
+                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
+                for (let i = 0; i < 3; i++) {
+                    const ax = cx + (i - 1) * torsoW / 3;
+                    ctx.beginPath(); ctx.moveTo(ax, torsoTop);
+                    ctx.quadraticCurveTo(ax + (Math.sin(Date.now() * 0.008 + i) * 4), torsoTop + torsoH / 2, ax, torsoTop + torsoH);
+                    ctx.stroke();
+                }
+                break;
+        }
+    }
+    
+    drawHandItem(ctx, s, armLen, palette) {
+        switch(this.type) {
+            case 'shooter':
+                // Gun
+                ctx.fillStyle = palette.accent;
+                ctx.fillRect(-2, armLen - 2, 4, 8);
+                break;
+            case 'healer':
+                // Staff
+                ctx.fillStyle = '#fff';
+                ctx.fillRect(-1, armLen - 4, 2, 10);
+                ctx.fillStyle = palette.accent;
+                ctx.beginPath(); ctx.arc(0, armLen + 6, 3, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'berserker':
+                // Blade
+                ctx.fillStyle = '#7f1d1d';
+                ctx.beginPath();
+                ctx.moveTo(-1, armLen); ctx.lineTo(0, armLen + 10); ctx.lineTo(1, armLen);
+                ctx.closePath(); ctx.fill();
+                break;
+            case 'freezer':
+                // Ice crystal
+                ctx.fillStyle = palette.accent;
+                ctx.beginPath();
+                ctx.moveTo(0, armLen - 2); ctx.lineTo(3, armLen + 4); ctx.lineTo(0, armLen + 10);
+                ctx.lineTo(-3, armLen + 4); ctx.closePath(); ctx.fill();
+                break;
+            case 'necro':
+                // Bone staff
+                ctx.fillStyle = '#e5e5e5';
+                ctx.fillRect(-1, armLen - 2, 2, 12);
+                ctx.beginPath(); ctx.arc(0, armLen - 2, 3, 0, Math.PI * 2); ctx.fill();
+                break;
+        }
+    }
+    
+    drawHeadDetail(ctx, cx, headY, headR, s, palette) {
+        switch(this.type) {
+            case 'normal':
+                // Antenna nubs
+                ctx.fillStyle = palette.accent;
+                ctx.beginPath(); ctx.arc(cx - headR * 0.4, headY - headR * 0.9, headR * 0.15, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + headR * 0.4, headY - headR * 0.9, headR * 0.15, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'fast':
+                // Sleek elongated head
+                ctx.fillStyle = palette.head;
+                ctx.beginPath();
+                ctx.moveTo(cx + headR, headY);
+                ctx.lineTo(cx + headR * 1.5, headY - headR * 0.3);
+                ctx.lineTo(cx + headR * 0.8, headY - headR * 0.5);
+                ctx.closePath(); ctx.fill();
+                break;
+            case 'tank':
+                // Helmet
+                ctx.strokeStyle = palette.limb; ctx.lineWidth = 2.5;
+                ctx.beginPath(); ctx.arc(cx, headY, headR * 1.05, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke();
+                ctx.fillStyle = palette.limb;
+                ctx.fillRect(cx - headR * 0.7, headY - headR * 0.1, headR * 1.4, headR * 0.25);
+                break;
+            case 'swarm':
+                // Mandibles
+                ctx.fillStyle = palette.limb;
+                ctx.beginPath();
+                ctx.moveTo(cx - headR * 0.5, headY + headR * 0.5);
+                ctx.lineTo(cx - headR * 0.8, headY + headR);
+                ctx.lineTo(cx - headR * 0.2, headY + headR * 0.6);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(cx + headR * 0.5, headY + headR * 0.5);
+                ctx.lineTo(cx + headR * 0.8, headY + headR);
+                ctx.lineTo(cx + headR * 0.2, headY + headR * 0.6);
+                ctx.fill();
+                break;
+            case 'teleporter':
+                // Floating rune crown
+                const runeGlow = Math.sin(Date.now() * 0.006) * 0.3 + 0.7;
+                ctx.strokeStyle = `rgba(139, 92, 246, ${runeGlow})`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.arc(cx, headY, headR * 1.3, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+                ctx.fillStyle = `rgba(167, 139, 250, ${runeGlow})`;
+                ctx.beginPath(); ctx.arc(cx, headY - headR * 1.2, 2, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'shooter':
+                // Targeting visor
+                ctx.fillStyle = palette.accent;
+                ctx.fillRect(cx - headR * 0.8, headY - headR * 0.15, headR * 1.6, headR * 0.3);
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY, headR * 0.15, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'healer':
+                // Halo
+                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.ellipse(cx, headY - headR * 1.1, headR * 0.8, headR * 0.2, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                break;
+            case 'splitter':
+                // Wobbling nucleus head
+                const wobble = Math.sin(Date.now() * 0.01) * 0.15;
+                ctx.fillStyle = palette.accent;
+                ctx.beginPath();
+                ctx.ellipse(cx, headY, headR * (1 + wobble), headR * (1 - wobble), 0, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+            case 'freezer':
+                // Ice crown crystals
+                ctx.fillStyle = palette.accent;
+                for (let i = 0; i < 5; i++) {
+                    const angle = Math.PI * 1.1 + (i / 4) * Math.PI * 0.8;
+                    const bx = cx + Math.cos(angle) * headR * 1.1;
+                    const by = headY + Math.sin(angle) * headR * 1.1;
+                    ctx.beginPath();
+                    ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(angle) * 4, by + Math.sin(angle) * 4 - 3);
+                    ctx.lineTo(bx + 2, by); ctx.closePath(); ctx.fill();
+                }
+                break;
+            case 'berserker':
+                // Horns
+                ctx.fillStyle = palette.limb;
+                ctx.beginPath();
+                ctx.moveTo(cx - headR * 0.6, headY - headR * 0.3);
+                ctx.lineTo(cx - headR * 0.3, headY - headR * 1.2);
+                ctx.lineTo(cx - headR * 0.1, headY - headR * 0.3);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.moveTo(cx + headR * 0.6, headY - headR * 0.3);
+                ctx.lineTo(cx + headR * 0.3, headY - headR * 1.2);
+                ctx.lineTo(cx + headR * 0.1, headY - headR * 0.3);
+                ctx.fill();
+                break;
+            case 'bomber':
+                // Fuse on head
+                ctx.strokeStyle = '#ff6633'; ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(cx, headY - headR);
+                ctx.quadraticCurveTo(cx + 4, headY - headR - 6, cx + 2, headY - headR - 10);
+                ctx.stroke();
+                // Spark at tip
+                const sparkPulse = Math.sin(Date.now() * 0.02) * 0.5 + 0.5;
+                ctx.fillStyle = `rgba(255, 200, 0, ${sparkPulse})`;
+                ctx.beginPath(); ctx.arc(cx + 2, headY - headR - 10, 2.5, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'parasite':
+                // Tendrils from head
+                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
+                for (let i = 0; i < 4; i++) {
+                    const angle = Math.PI * 0.8 + (i / 3) * Math.PI * 0.4;
+                    const wave = Math.sin(Date.now() * 0.008 + i) * 3;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + Math.cos(angle) * headR, headY + Math.sin(angle) * headR);
+                    ctx.quadraticCurveTo(
+                        cx + Math.cos(angle) * (headR + 8) + wave,
+                        headY + Math.sin(angle) * (headR + 8),
+                        cx + Math.cos(angle) * (headR + 5),
+                        headY + Math.sin(angle) * (headR + 12)
+                    );
+                    ctx.stroke();
+                }
+                break;
+            case 'shielder':
+                // Visor
+                ctx.fillStyle = palette.accent;
+                ctx.fillRect(cx - headR * 0.6, headY - headR * 0.2, headR * 1.2, headR * 0.35);
+                break;
+            case 'necro':
+                // Skull face overlay
+                ctx.fillStyle = palette.accent;
+                ctx.beginPath(); ctx.arc(cx, headY, headR * 0.85, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = palette.limb;
+                // Hollow eyes
+                ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
+                // Nose hole
+                ctx.beginPath();
+                ctx.moveTo(cx - 1, headY + headR * 0.15);
+                ctx.lineTo(cx + 1, headY + headR * 0.15);
+                ctx.lineTo(cx, headY + headR * 0.3);
+                ctx.closePath(); ctx.fill();
+                break;
+        }
+    }
+    
+    drawEyes(ctx, cx, headY, headR, s, palette) {
+        if (this.type === 'necro') return; // Necro has skull face, no separate eyes
+        
+        const eyeSize = headR * 0.2;
+        const pupilSize = headR * 0.1;
+        
+        switch(this.type) {
+            case 'swarm':
+                // Compound eyes (many small dots)
+                ctx.fillStyle = '#fff';
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const ex = cx + Math.cos(angle) * headR * 0.4;
+                    const ey = headY + Math.sin(angle) * headR * 0.4;
+                    ctx.beginPath(); ctx.arc(ex, ey, eyeSize * 0.5, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.fillStyle = palette.limb;
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i / 6) * Math.PI * 2;
+                    const ex = cx + Math.cos(angle) * headR * 0.4;
+                    const ey = headY + Math.sin(angle) * headR * 0.4;
+                    ctx.beginPath(); ctx.arc(ex, ey, pupilSize * 0.5, 0, Math.PI * 2); ctx.fill();
+                }
+                break;
+            case 'teleporter':
+                // Single large cyclopean eye
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(cx, headY, eyeSize * 1.3, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = palette.body;
+                ctx.beginPath(); ctx.arc(cx, headY, pupilSize * 1.3, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'berserker':
+                // Angry slanted eyes
+                if (this.enraged) {
+                    ctx.fillStyle = '#ff0000';
+                } else {
+                    ctx.fillStyle = '#fff';
+                }
+                ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
+                if (!this.enraged) {
+                    ctx.fillStyle = '#000';
+                    ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
+                }
+                // Angry brow
+                ctx.strokeStyle = palette.limb; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.moveTo(cx - headR * 0.5, headY - headR * 0.35);
+                ctx.lineTo(cx - headR * 0.1, headY - headR * 0.2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cx + headR * 0.5, headY - headR * 0.35);
+                ctx.lineTo(cx + headR * 0.1, headY - headR * 0.2); ctx.stroke();
+                break;
+            case 'parasite':
+                // Glowing green eyes
+                ctx.fillStyle = '#d9f99d';
+                ctx.beginPath(); ctx.arc(cx - headR * 0.25, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + headR * 0.25, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#4d7c0f';
+                ctx.beginPath(); ctx.arc(cx - headR * 0.25, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + headR * 0.25, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
+                break;
+            default:
+                // Standard alien eyes
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#000';
+                ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
+        }
+    }
+    
+    drawAura(ctx, cx, cy, s, palette) {
+        switch(this.type) {
+            case 'teleporter':
+                // Energy rings
+                const tpPulse = Math.sin(Date.now() * 0.005) * 0.2 + 0.8;
+                ctx.strokeStyle = `rgba(139, 92, 246, ${tpPulse * 0.4})`;
+                ctx.lineWidth = 1.5;
+                for (let i = 0; i < 2; i++) {
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, s * (1.1 + i * 0.25) * tpPulse, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                break;
+            case 'healer':
+                // Healing aura
+                const healGlow = Math.sin(Date.now() * 0.008) * 0.3 + 0.5;
+                ctx.strokeStyle = `rgba(34, 211, 238, ${healGlow})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(cx, cy, s * 1.2, 0, Math.PI * 2); ctx.stroke();
+                if (this.healCooldown < 30) {
+                    const pr = s * (1.3 + (30 - this.healCooldown) / 30 * 2);
+                    ctx.strokeStyle = `rgba(0, 255, 136, ${0.4 - (30 - this.healCooldown) / 75})`;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI * 2); ctx.stroke();
+                }
+                break;
+            case 'freezer':
+                // Frost aura
+                const frostPulse = Math.sin(Date.now() * 0.006) * 0.2 + 0.6;
+                ctx.fillStyle = `rgba(186, 230, 253, ${frostPulse * 0.3})`;
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i / 4) * Math.PI * 2 + Date.now() * 0.002;
+                    const dist = s * (1.1 + Math.sin(Date.now() * 0.005 + i) * 0.15);
+                    ctx.beginPath();
+                    ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, s * 0.08, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                break;
+            case 'berserker':
+                if (this.enraged) {
+                    const ragePulse = Math.sin(Date.now() * 0.015) * 0.3 + 0.7;
+                    ctx.strokeStyle = `rgba(255, 0, 0, ${ragePulse})`;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.arc(cx, cy, s * 1.3, 0, Math.PI * 2); ctx.stroke();
+                    // Flame particles
+                    ctx.fillStyle = `rgba(251, 146, 60, ${ragePulse * 0.5})`;
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i / 6) * Math.PI * 2 + Date.now() * 0.01;
+                        const dist = s * (1.1 + Math.sin(Date.now() * 0.012 + i) * 0.2);
+                        ctx.beginPath();
+                        ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, s * 0.1, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                break;
+            case 'bomber':
+                // Pulsing danger glow
+                const dangerPulse = Math.sin(Date.now() * 0.01) * 0.3 + 0.5;
+                ctx.strokeStyle = `rgba(255, 51, 0, ${dangerPulse})`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.arc(cx, cy, s * 1.15, 0, Math.PI * 2); ctx.stroke();
+                break;
+            case 'parasite':
+                // Toxic mist
+                const toxPulse = Math.sin(Date.now() * 0.007) * 0.15 + 0.2;
+                ctx.fillStyle = `rgba(132, 204, 22, ${toxPulse})`;
+                ctx.beginPath(); ctx.arc(cx, cy, s * 1.1, 0, Math.PI * 2); ctx.fill();
+                break;
+            case 'necro':
+                // Soul wisps
+                const soulPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.6;
+                ctx.fillStyle = `rgba(212, 212, 212, ${soulPulse * 0.5})`;
+                for (let i = 0; i < 3; i++) {
+                    const angle = (i / 3) * Math.PI * 2 + Date.now() * 0.003;
+                    const dist = s * (1.0 + Math.sin(Date.now() * 0.005 + i) * 0.2);
+                    const flameH = Math.sin(Date.now() * 0.01 + i) * s * 0.15;
+                    ctx.beginPath();
+                    ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist - flameH, s * 0.06, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                break;
+            case 'splitter':
+                // Internal cores visible through body
+                const wobble = Math.sin(Date.now() * 0.01) * 0.08;
+                ctx.fillStyle = `rgba(234, 88, 12, 0.4)`;
+                for (let i = 0; i < 3; i++) {
+                    const angle = (i / 3) * Math.PI * 2 + Date.now() * 0.001;
+                    const dist = s * (0.3 + wobble);
+                    ctx.beginPath();
+                    ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, s * 0.1, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                break;
+        }
+    }
+    
+    drawBoss(ctx) {
+        const s = this.size;
+        const cx = this.x;
+        const cy = this.y;
+        const bossType = BOSS_TYPES[this.type] || BOSS_TYPES.destroyer;
+        const palette = bossType.palette || { body: this.color, head: this.color, limb: this.color, accent: '#fff', glow: this.color };
+        const walkSwing = this.walkFrame === 0 ? 0.2 : -0.2;
+        
+        // Boss proportions (larger, more imposing)
+        const headR = s * 0.22;
+        const headY = cy - s * 0.4;
+        const torsoW = s * 0.5;
+        const torsoH = s * 0.5;
+        const torsoTop = cy - s * 0.15;
+        const armW = s * 0.1;
+        const armLen = s * 0.4;
+        const legW = s * 0.12;
+        const legLen = s * 0.35;
+        
+        // Glow aura
+        const glowPulse = Math.sin(Date.now() * 0.004) * 0.15 + 0.35;
+        ctx.fillStyle = `rgba(${this.hexToRgb(palette.glow)}, ${glowPulse})`;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 1.15, 0, Math.PI * 2); ctx.fill();
+        
+        // === LEGS ===
+        ctx.fillStyle = palette.limb;
+        ctx.save(); ctx.translate(cx - s * 0.12, cy + s * 0.35);
+        ctx.rotate(walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
+        ctx.save(); ctx.translate(cx + s * 0.12, cy + s * 0.35);
+        ctx.rotate(-walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
+        
+        // === TORSO ===
+        ctx.fillStyle = palette.body;
+        ctx.fillRect(cx - torsoW / 2, torsoTop, torsoW, torsoH);
+        
+        // Boss-specific torso details
+        if (this.type === 'destroyer') {
+            // Armor plate with skull
+            ctx.fillStyle = palette.limb;
+            ctx.fillRect(cx - torsoW / 2 - 4, torsoTop, 4, torsoH);
+            ctx.fillRect(cx + torsoW / 2, torsoTop, 4, torsoH);
+            ctx.fillStyle = palette.accent;
+            ctx.beginPath(); ctx.arc(cx, torsoTop + torsoH / 2, s * 0.08, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'broodmother') {
+            // Egg sac pattern
+            ctx.fillStyle = palette.accent;
+            for (let i = 0; i < 4; i++) {
+                ctx.beginPath(); ctx.arc(cx + (i - 1.5) * torsoW / 4, torsoTop + torsoH * 0.6, s * 0.05, 0, Math.PI * 2); ctx.fill();
+            }
+        } else if (this.type === 'necromancer') {
+            // Robe details
+            ctx.fillStyle = palette.accent;
+            ctx.beginPath();
+            ctx.moveTo(cx - torsoW / 2 - 6, torsoTop + torsoH);
+            ctx.lineTo(cx - torsoW / 2, torsoTop);
+            ctx.lineTo(cx + torsoW / 2, torsoTop);
+            ctx.lineTo(cx + torsoW / 2 + 6, torsoTop + torsoH);
+            ctx.closePath(); ctx.stroke();
+        } else if (this.type === 'titan') {
+            // Rune markings
+            const runePulse = Math.sin(Date.now() * 0.006) * 0.4 + 0.6;
+            ctx.fillStyle = `rgba(251, 191, 36, ${runePulse})`;
+            for (let i = 0; i < 6; i++) {
+                const rx = cx - torsoW / 3 + (i % 3) * torsoW / 3;
+                const ry = torsoTop + (Math.floor(i / 3)) * torsoH / 2 + torsoH / 4;
+                ctx.beginPath(); ctx.arc(rx, ry, s * 0.04, 0, Math.PI * 2); ctx.fill();
+            }
+        } else if (this.type === 'hivemind') {
+            // Brain pattern
+            ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
+            for (let i = 0; i < 3; i++) {
+                const ry = torsoTop + 5 + i * (torsoH - 10) / 2;
+                ctx.beginPath();
+                ctx.moveTo(cx - torsoW / 3, ry);
+                ctx.quadraticCurveTo(cx, ry + 5 * Math.sin(Date.now() * 0.003 + i), cx + torsoW / 3, ry);
+                ctx.stroke();
+            }
+        } else if (this.type === 'leviathan') {
+            // Scale pattern
+            ctx.fillStyle = palette.accent;
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 4; j++) {
+                    const sx = cx - torsoW / 3 + j * torsoW / 4;
+                    const sy = torsoTop + 4 + i * (torsoH - 8) / 2;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, s * 0.03, 0, Math.PI); ctx.fill();
+                }
+            }
+        }
+        
+        // === ARMS ===
+        ctx.fillStyle = palette.limb;
+        ctx.save(); ctx.translate(cx - s * 0.28, cy - s * 0.1);
+        ctx.rotate(-0.4 + walkSwing * 0.3); ctx.fillRect(-armW / 2, 0, armW, armLen); ctx.restore();
+        ctx.save(); ctx.translate(cx + s * 0.28, cy - s * 0.1);
+        ctx.rotate(0.4 - walkSwing * 0.3); ctx.fillRect(-armW / 2, 0, armW, armLen);
+        
+        // Boss weapon
+        if (this.type === 'destroyer' || this.type === 'titan') {
+            ctx.fillStyle = palette.accent;
+            ctx.fillRect(-3, armLen - 2, 6, 14);
+        } else if (this.type === 'necromancer') {
+            ctx.fillStyle = palette.accent;
+            ctx.fillRect(-1.5, armLen - 4, 3, 18);
+            ctx.beginPath(); ctx.arc(0, armLen + 14, 4, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+        
+        // === HEAD ===
+        ctx.fillStyle = palette.head;
+        ctx.beginPath(); ctx.arc(cx, headY, headR, 0, Math.PI * 2); ctx.fill();
+        
+        // Boss-specific head details
+        if (this.type === 'destroyer') {
+            // Horns
+            ctx.fillStyle = palette.limb;
+            ctx.beginPath();
+            ctx.moveTo(cx - headR * 0.7, headY - headR * 0.3);
+            ctx.lineTo(cx - headR * 0.4, headY - headR * 1.3);
+            ctx.lineTo(cx - headR * 0.1, headY - headR * 0.3);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(cx + headR * 0.7, headY - headR * 0.3);
+            ctx.lineTo(cx + headR * 0.4, headY - headR * 1.3);
+            ctx.lineTo(cx + headR * 0.1, headY - headR * 0.3);
+            ctx.fill();
+        } else if (this.type === 'broodmother') {
+            // Multiple eyes cluster
+            ctx.fillStyle = '#ff0000';
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.arc(cx + Math.cos(angle) * headR * 0.5, headY + Math.sin(angle) * headR * 0.5, headR * 0.12, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        } else if (this.type === 'voidwalker') {
+            // Hollow face
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.beginPath(); ctx.arc(cx, headY, headR * 0.7, 0, Math.PI * 2); ctx.fill();
+            // Ghost wisp eyes
+            const wispPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.7;
+            ctx.fillStyle = `rgba(167, 139, 250, ${wispPulse})`;
+            ctx.beginPath(); ctx.arc(cx - headR * 0.25, headY - headR * 0.1, headR * 0.15, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + headR * 0.25, headY - headR * 0.1, headR * 0.15, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'necromancer') {
+            // Skull with glowing eye sockets
+            ctx.fillStyle = palette.accent;
+            ctx.beginPath(); ctx.arc(cx, headY, headR * 0.85, 0, Math.PI * 2); ctx.fill();
+            const soulGlow = Math.sin(Date.now() * 0.008) * 0.3 + 0.7;
+            ctx.fillStyle = `rgba(167, 139, 250, ${soulGlow})`;
+            ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.18, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.18, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'titan') {
+            // Helmet visor
+            ctx.fillStyle = palette.accent;
+            ctx.fillRect(cx - headR * 0.8, headY - headR * 0.15, headR * 1.6, headR * 0.35);
+            const runePulse2 = Math.sin(Date.now() * 0.006) * 0.4 + 0.6;
+            ctx.fillStyle = `rgba(251, 191, 36, ${runePulse2})`;
+            ctx.beginPath(); ctx.arc(cx, headY, headR * 0.2, 0, Math.PI * 2); ctx.fill();
+        } else if (this.type === 'hivemind') {
+            // Exposed brain
+            ctx.fillStyle = palette.accent;
+            ctx.beginPath(); ctx.arc(cx, headY - headR * 0.3, headR * 0.8, Math.PI, 0); ctx.fill();
+            ctx.strokeStyle = palette.body; ctx.lineWidth = 1;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.arc(cx + (i - 1) * headR * 0.3, headY - headR * 0.4, headR * 0.25, Math.PI, 0);
+                ctx.stroke();
+            }
+        } else if (this.type === 'leviathan') {
+            // Dragon-like head with crest
+            ctx.fillStyle = palette.accent;
+            ctx.beginPath();
+            ctx.moveTo(cx - headR * 0.3, headY - headR);
+            ctx.lineTo(cx, headY - headR * 1.5);
+            ctx.lineTo(cx + headR * 0.3, headY - headR);
+            ctx.closePath(); ctx.fill();
+        }
+        
+        // Boss eyes (unless specific type has its own)
+        if (!['broodmother', 'voidwalker', 'necromancer'].includes(this.type)) {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.1, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.1, 0, Math.PI * 2); ctx.fill();
+        }
+        
+        // Boss border
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, s * 0.9, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Boss-specific aura effects
+        if (this.type === 'voidwalker') {
+            ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2 + Date.now() * 0.002;
+                const wave = Math.sin(Date.now() * 0.003 + i) * 15;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.quadraticCurveTo(
+                    cx + Math.cos(angle) * s * 0.8,
+                    cy + Math.sin(angle) * s * 0.8 + wave,
+                    cx + Math.cos(angle) * s,
+                    cy + Math.sin(angle) * s
+                );
+                ctx.stroke();
+            }
+        } else if (this.type === 'necromancer' && this.resurrectCooldown < 60) {
+            const resurrectGlow = (60 - this.resurrectCooldown) / 60;
+            ctx.strokeStyle = `rgba(167, 139, 250, ${resurrectGlow})`;
+            ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(cx, cy, s * (0.9 + resurrectGlow * 0.3), 0, Math.PI * 2); ctx.stroke();
+        } else if (this.type === 'titan' && this.earthquakeCooldown < 60) {
+            const quakePulse = (60 - this.earthquakeCooldown) / 60;
+            ctx.strokeStyle = `rgba(251, 191, 36, ${quakePulse})`;
+            ctx.lineWidth = 4;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath();
+                ctx.arc(cx, cy, s * (1 + i * 0.2 + quakePulse * 0.3), 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        } else if (this.type === 'hivemind') {
+            // Psionic waves
+            const psiPulse = Math.sin(Date.now() * 0.005) * 0.3 + 0.5;
+            ctx.strokeStyle = `rgba(192, 132, 252, ${psiPulse})`;
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < 3; i++) {
+                const r = s * (1 + i * 0.15 + Math.sin(Date.now() * 0.003 + i) * 0.1);
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+            }
+        } else if (this.type === 'leviathan' && this.isCharging) {
+            // Charge wind-up effect
+            ctx.strokeStyle = `rgba(45, 212, 191, 0.6)`;
+            ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(cx, cy, s * 1.2, 0, Math.PI * 2); ctx.stroke();
+        }
+        
+        // Health bar
+        if (this.health < this.maxHealth) {
+            const barWidth = s * 2;
+            const barHeight = 6;
+            const barY = cy - s - 12;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(cx - barWidth / 2, barY, barWidth, barHeight);
+            
+            const healthPercent = this.health / this.maxHealth;
+            const healthColor = healthPercent > 0.5 ? '#00ff88' : healthPercent > 0.25 ? '#ffd93d' : '#ff6b6b';
+            ctx.fillStyle = healthColor;
+            ctx.fillRect(cx - barWidth / 2, barY, barWidth * healthPercent, barHeight);
+            
+            // Boss name
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 12px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(this.name, cx, barY - 4);
+        }
+    }
+    
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255, 255, 255';
     }
 }
 
@@ -3092,6 +3622,10 @@ function spawnWave() {
                     if (t === 'splitter') return game.wave >= 15;
                     if (t === 'freezer') return game.wave >= 18;
                     if (t === 'berserker') return game.wave >= 20;
+                    if (t === 'bomber') return game.wave >= 8;
+                    if (t === 'parasite') return game.wave >= 14;
+                    if (t === 'shielder') return game.wave >= 16;
+                    if (t === 'necro') return game.wave >= 22;
                     return true;
                 });
                 const type = typeKeys[Math.floor(Math.random() * typeKeys.length)];
