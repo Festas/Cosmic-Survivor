@@ -202,18 +202,32 @@ class Enemy {
         this.health = this.maxHealth;
         this.damage = 5 + wave * 2;
         this.creditValue = 2 + wave;
-        this.color = `hsl(${Math.random() * 60 + 280}, 70%, 50%)`;
         this.attackCooldown = 0;
         this.type = Math.random() < 0.7 ? 'normal' : 'fast';
+        
+        // Walk animation
+        this.walkFrame = 0;
+        this.walkTimer = 0;
+        this.facingRight = true;
+        this.prevX = x;
+        
+        // Color palettes for each type
+        const palettes = {
+            normal: { body: '#a855f7', head: '#c084fc', limb: '#7c3aed', accent: '#e9d5ff' },
+            fast: { body: '#ff6b6b', head: '#fca5a5', limb: '#dc2626', accent: '#fef2f2' },
+        };
+        
+        this.palette = palettes[this.type] || palettes.normal;
+        this.color = this.palette.body;
         
         if (this.type === 'fast') {
             this.speed *= 1.5;
             this.health *= 0.7;
-            this.color = '#ff6b6b';
         }
     }
 
     update() {
+        this.prevX = this.x;
         const dx = game.player.x - this.x;
         const dy = game.player.y - this.y;
         const dist = Math.hypot(dx, dy);
@@ -221,6 +235,17 @@ class Enemy {
         if (dist > 0) {
             this.x += (dx / dist) * this.speed;
             this.y += (dy / dist) * this.speed;
+        }
+        
+        // Walk animation
+        const movedX = this.x - this.prevX;
+        if (Math.abs(movedX) > 0.1) {
+            this.facingRight = movedX > 0;
+            this.walkTimer++;
+            if (this.walkTimer >= 12) { this.walkTimer = 0; this.walkFrame = this.walkFrame === 0 ? 1 : 0; }
+        } else {
+            this.walkTimer = 0;
+            this.walkFrame = 0;
         }
 
         // Attack player if close
@@ -256,41 +281,84 @@ class Enemy {
     }
 
     draw(ctx) {
-        // Draw alien creature
         ctx.save();
         
-        // Body
-        ctx.fillStyle = this.color;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
+        const s = this.size;
+        const cx = this.x;
+        const cy = this.y;
+        const cc = this.palette;
+        const walkSwing = this.walkFrame === 0 ? 0.25 : -0.25;
+        
+        // Humanoid proportions
+        const headR = s * 0.28;
+        const headY = cy - s * 0.5;
+        const torsoW = s * 0.4;
+        const torsoH = s * 0.45;
+        const torsoTop = cy - s * 0.2;
+        const armW = s * 0.08;
+        const armLen = s * 0.35;
+        const legW = s * 0.09;
+        const legLen = s * 0.3;
+        
+        // === LEGS ===
+        ctx.fillStyle = cc.limb;
+        ctx.save(); ctx.translate(cx - s * 0.1, cy + s * 0.25);
+        ctx.rotate(walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
+        ctx.save(); ctx.translate(cx + s * 0.1, cy + s * 0.25);
+        ctx.rotate(-walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
+        
+        // === TORSO ===
+        ctx.fillStyle = cc.body;
+        ctx.fillRect(cx - torsoW / 2, torsoTop, torsoW, torsoH);
+        
+        // === ARMS ===
+        ctx.fillStyle = cc.limb;
+        ctx.save(); ctx.translate(cx - s * 0.22, cy - s * 0.15);
+        ctx.rotate(-0.3 + walkSwing * 0.5); ctx.fillRect(-armW / 2, 0, armW, armLen); ctx.restore();
+        ctx.save(); ctx.translate(cx + s * 0.22, cy - s * 0.15);
+        ctx.rotate(0.3 - walkSwing * 0.5); ctx.fillRect(-armW / 2, 0, armW, armLen); ctx.restore();
+        
+        // === HEAD ===
+        ctx.fillStyle = cc.head;
+        ctx.beginPath(); ctx.arc(cx, headY, headR, 0, Math.PI * 2); ctx.fill();
+        
+        // Type-specific head detail
+        if (this.type === 'fast') {
+            // Sleek crest
+            ctx.fillStyle = cc.head;
+            ctx.beginPath();
+            ctx.moveTo(cx + headR, headY);
+            ctx.lineTo(cx + headR * 1.5, headY - headR * 0.3);
+            ctx.lineTo(cx + headR * 0.8, headY - headR * 0.5);
+            ctx.closePath(); ctx.fill();
+        } else {
+            // Antenna nubs
+            ctx.fillStyle = cc.accent;
+            ctx.beginPath(); ctx.arc(cx - headR * 0.4, headY - headR * 0.9, headR * 0.15, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + headR * 0.4, headY - headR * 0.9, headR * 0.15, 0, Math.PI * 2); ctx.fill();
+        }
         
         // Eyes
         ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.2, this.size * 0.2, 0, Math.PI * 2);
-        ctx.arc(this.x + this.size * 0.3, this.y - this.size * 0.2, this.size * 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Pupils
+        ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#000';
-        ctx.beginPath();
-        ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.2, this.size * 0.1, 0, Math.PI * 2);
-        ctx.arc(this.x + this.size * 0.3, this.y - this.size * 0.2, this.size * 0.1, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.1, 0, Math.PI * 2); ctx.fill();
         
         // Health bar
         if (this.health < this.maxHealth) {
-            const barWidth = this.size * 1.5;
+            const barWidth = s * 2;
             const barHeight = 4;
-            const barX = this.x - barWidth / 2;
-            const barY = this.y - this.size - 10;
+            const barY = cy - s - 8;
             
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-            ctx.fillRect(barX, barY, barWidth, barHeight);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(cx - barWidth / 2, barY, barWidth, barHeight);
             
-            ctx.fillStyle = '#ff6b6b';
-            ctx.fillRect(barX, barY, barWidth * (this.health / this.maxHealth), barHeight);
+            const healthPercent = this.health / this.maxHealth;
+            const healthColor = healthPercent > 0.5 ? '#00ff88' : healthPercent > 0.25 ? '#ffd93d' : '#ff6b6b';
+            ctx.fillStyle = healthColor;
+            ctx.fillRect(cx - barWidth / 2, barY, barWidth * healthPercent, barHeight);
         }
         
         ctx.restore();
