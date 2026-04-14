@@ -24,6 +24,7 @@ const game = {
     pickups: [],
     particles: [],
     keys: {},
+    joystick: { x: 0, y: 0, active: false, startX: 0, startY: 0 },
     stats: {
         enemiesKilled: 0,
         damageDealt: 0,
@@ -62,6 +63,12 @@ class Player {
         if (game.keys['s'] || game.keys['ArrowDown']) dy += 1;
         if (game.keys['a'] || game.keys['ArrowLeft']) dx -= 1;
         if (game.keys['d'] || game.keys['ArrowRight']) dx += 1;
+
+        // Touch joystick
+        if (game.joystick && game.joystick.active) {
+            dx += game.joystick.x;
+            dy += game.joystick.y;
+        }
 
         // Normalize diagonal movement
         if (dx !== 0 && dy !== 0) {
@@ -843,6 +850,9 @@ function gameLoop(timestamp) {
         game.player.draw(game.ctx);
         game.particles.forEach(particle => particle.draw(game.ctx));
         
+        // Draw joystick on mobile
+        drawJoystick(game.ctx);
+        
         updateUI();
     }
     
@@ -858,11 +868,182 @@ window.addEventListener('keyup', (e) => {
     game.keys[e.key] = false;
 });
 
+// Canvas scaling
+let canvasScale = 1;
+
+function resizeCanvas() {
+    const canvas = game.canvas;
+    const container = document.getElementById('game-container');
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+    const aspect = containerWidth / containerHeight;
+    const isMobile = containerWidth <= 1024 || 'ontouchstart' in window;
+    
+    if (isMobile) {
+        const maxDim = 1200;
+        let canvasW, canvasH;
+        if (aspect >= 1) {
+            canvasW = maxDim;
+            canvasH = Math.round(maxDim / aspect);
+        } else {
+            canvasH = maxDim;
+            canvasW = Math.round(maxDim * aspect);
+        }
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        CONFIG.CANVAS_WIDTH = canvasW;
+        CONFIG.CANVAS_HEIGHT = canvasH;
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.marginLeft = '0';
+        canvas.style.marginTop = '0';
+        canvasScale = containerWidth / canvasW;
+    } else {
+        canvas.width = 1200;
+        canvas.height = 800;
+        CONFIG.CANVAS_WIDTH = 1200;
+        CONFIG.CANVAS_HEIGHT = 800;
+        const scaleX = containerWidth / 1200;
+        const scaleY = containerHeight / 800;
+        canvasScale = Math.min(scaleX, scaleY);
+        const scaledWidth = 1200 * canvasScale;
+        const scaledHeight = 800 * canvasScale;
+        canvas.style.width = scaledWidth + 'px';
+        canvas.style.height = scaledHeight + 'px';
+        canvas.style.marginLeft = ((containerWidth - scaledWidth) / 2) + 'px';
+        canvas.style.marginTop = ((containerHeight - scaledHeight) / 2) + 'px';
+    }
+}
+
+function getTouchPos(touch) {
+    const rect = game.canvas.getBoundingClientRect();
+    return {
+        x: (touch.clientX - rect.left) / canvasScale,
+        y: (touch.clientY - rect.top) / canvasScale
+    };
+}
+
+function setupTouchControls() {
+    const canvas = game.canvas;
+    let joystickTouchId = null;
+    
+    canvas.addEventListener('touchstart', e => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            const pos = getTouchPos(touch);
+            if (!game.joystick.active && pos.y > CONFIG.CANVAS_HEIGHT * 0.3) {
+                joystickTouchId = touch.identifier;
+                game.joystick.active = true;
+                game.joystick.startX = pos.x;
+                game.joystick.startY = pos.y;
+            }
+        }
+    }, { passive: false });
+    
+    canvas.addEventListener('touchmove', e => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier !== joystickTouchId || !game.joystick.active) continue;
+            const pos = getTouchPos(touch);
+            const dx = pos.x - game.joystick.startX;
+            const dy = pos.y - game.joystick.startY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = 60;
+            if (dist > 0) {
+                const clamp = Math.min(dist, maxDist);
+                game.joystick.x = (dx / dist) * (clamp / maxDist);
+                game.joystick.y = (dy / dist) * (clamp / maxDist);
+            }
+        }
+    }, { passive: false });
+    
+    canvas.addEventListener('touchend', e => {
+        e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            if (e.changedTouches[i].identifier === joystickTouchId) {
+                game.joystick.active = false;
+                game.joystick.x = 0;
+                game.joystick.y = 0;
+                joystickTouchId = null;
+            }
+        }
+    }, { passive: false });
+    
+    canvas.addEventListener('touchcancel', () => {
+        game.joystick.active = false;
+        game.joystick.x = 0;
+        game.joystick.y = 0;
+        joystickTouchId = null;
+    }, { passive: false });
+}
+
+function drawJoystick(ctx) {
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    if (isMobile && !game.joystick.active && game.state === 'playing') {
+        ctx.save();
+        const hintX = 100;
+        const hintY = CONFIG.CANVAS_HEIGHT - 120;
+        const pulse = Math.sin(Date.now() * 0.003) * 0.08 + 0.15;
+        ctx.globalAlpha = pulse;
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(hintX, hintY, 50, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('TOUCH TO MOVE', hintX, hintY + 70);
+        ctx.restore();
+        return;
+    }
+    
+    if (!game.joystick.active) return;
+    
+    const startX = game.joystick.startX;
+    const startY = game.joystick.startY;
+    const currentX = startX + game.joystick.x * 60;
+    const currentY = startY + game.joystick.y * 60;
+    
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = '#4ecdc4';
+    ctx.beginPath();
+    ctx.arc(startX, startY, 60, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.6;
+    ctx.strokeStyle = '#00ff88';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(startX, startY, 60, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#00ff88';
+    ctx.beginPath();
+    ctx.arc(currentX, currentY, 28, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+}
+
 // Initialize
 function init() {
     game.canvas = document.getElementById('gameCanvas');
     game.ctx = game.canvas.getContext('2d');
+    
+    // Setup responsive canvas
+    resizeCanvas();
+    window.addEventListener('resize', () => resizeCanvas());
+    
     game.player = new Player(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+    
+    // Setup touch controls
+    setupTouchControls();
     
     // Event listeners
     document.getElementById('start-btn').addEventListener('click', () => {
