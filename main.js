@@ -365,6 +365,9 @@ const game = {
     playerDPS: { damage: 0, timer: 0, history: [] },
     eliteKills: 0,
     activeWeaponSlot: 0,
+    waveModifier: null,
+    fogOfWar: false,
+    creditMultiplier: 1,
     obstacles: [],
     hazards: [],
     blackHoles: [],
@@ -2011,6 +2014,11 @@ class Enemy {
             this.walkFrame = 0;
         }
 
+        // Wave modifier: regenerating enemies
+        if (this.regens && !this.isBoss && game.frameCount % 60 === 0) {
+            this.health = Math.min(this.maxHealth, this.health + this.maxHealth * 0.02);
+        }
+
         // Attack player
         if (dist < this.size + game.player.size && this.attackCooldown <= 0) {
             game.player.takeDamage(this.damage);
@@ -2367,7 +2375,8 @@ class Enemy {
             spawnPowerup(this.x, this.y);
         }
         
-        game.pickups.push(new Pickup(this.x, this.y, this.creditValue));
+        const creditDrop = Math.floor(this.creditValue * (game.creditMultiplier || 1) * (1 + (game.player?.creditBonus || 0)));
+        game.pickups.push(new Pickup(this.x, this.y, creditDrop));
         // Vampire blood pools
         if (game.player && game.player.characterId === 'vampire') {
             if (!game.player.bloodPools) game.player.bloodPools = [];
@@ -4225,6 +4234,37 @@ function rerollShop() {
     renderShop();
 }
 
+// Wave modifiers - one random modifier per wave starting wave 3
+const WAVE_MODIFIERS = {
+    speed_surge: { name: '⚡ Speed Surge', desc: 'All enemies +30% speed', color: '#fbbf24',
+        apply: () => { game.enemies.forEach(e => { e.speed *= 1.3; }); },
+        onSpawn: e => { e.speed *= 1.3; } },
+    armored_horde: { name: '🛡️ Armored Horde', desc: 'All enemies +50% HP', color: '#60a5fa',
+        apply: () => { game.enemies.forEach(e => { e.maxHealth *= 1.5; e.health = e.maxHealth; }); },
+        onSpawn: e => { e.maxHealth *= 1.5; e.health = e.maxHealth; } },
+    bullet_hell: { name: '🎯 Bullet Hell', desc: 'Shooter enemies appear more', color: '#ec4899',
+        apply: () => {},
+        onSpawn: null,
+        spawnBias: 'shooter' },
+    the_swarm: { name: '🐝 The Swarm', desc: '3x enemies, 0.5x HP each', color: '#f59e0b',
+        apply: () => { game.enemies.forEach(e => { if (!e.isBoss) { e.maxHealth *= 0.5; e.health = e.maxHealth; } }); },
+        onSpawn: e => { if (!e.isBoss) { e.maxHealth *= 0.5; e.health = e.maxHealth; } },
+        enemyCountMult: 3 },
+    fog_of_war: { name: '🌫️ Fog of War', desc: 'Reduced vision radius', color: '#94a3b8',
+        apply: () => { game.fogOfWar = true; },
+        onSpawn: null },
+    jackpot: { name: '🎰 Jackpot', desc: '2x credit drops this wave', color: '#ffd93d',
+        apply: () => { game.creditMultiplier = 2; },
+        onSpawn: null },
+    regenerating: { name: '💚 Regenerating', desc: 'Enemies slowly heal', color: '#22c55e',
+        apply: () => {},
+        onSpawn: e => { e.regens = true; } },
+    giant: { name: '🗿 Giant', desc: 'Fewer but much larger enemies', color: '#a78bfa',
+        apply: () => { game.enemies.forEach(e => { if (!e.isBoss) { e.size *= 1.5; e.maxHealth *= 2; e.health = e.maxHealth; e.speed *= 0.7; } }); },
+        onSpawn: e => { if (!e.isBoss) { e.size *= 1.5; e.maxHealth *= 2; e.health = e.maxHealth; e.speed *= 0.7; } },
+        enemyCountMult: 0.5 },
+};
+
 // ==================== ARENA SYSTEM ====================
 const ARENA_THEMES = {
     asteroid: { name: 'Asteroid Field', bgColor: '#0a0a1a', gridColor: 'rgba(78,205,196,0.05)', obstacleColor: '#4a4a5a', waves: [1, 5] },
@@ -4330,8 +4370,35 @@ function drawArenaObstacles(ctx) {
 // ==================== WAVE SYSTEM ====================
 function spawnWave() {
     generateArenaObstacles();
-    showWaveAnnouncement();
+    
+    // Variable wave duration
+    let waveDuration;
+    if (game.wave <= 3) waveDuration = 35;
+    else if (game.wave <= 8) waveDuration = 45;
+    else if (game.wave <= 15) waveDuration = 55;
+    else if (game.wave <= 20) waveDuration = 70;
+    else waveDuration = 80;
+    
+    // Boss waves are always 90 seconds
     const isBoss = game.wave % CONFIG.BOSS_WAVE_INTERVAL === 0;
+    if (isBoss) waveDuration = 90;
+    
+    game.timeLeft = waveDuration;
+    
+    // Reset wave-specific state
+    game.fogOfWar = false;
+    game.creditMultiplier = 1;
+    game.waveModifier = null;
+    
+    // Apply wave modifier (starting wave 3, not on boss waves)
+    if (game.wave >= 3 && !isBoss) {
+        const modKeys = Object.keys(WAVE_MODIFIERS);
+        const modKey = modKeys[Math.floor(Math.random() * modKeys.length)];
+        game.waveModifier = { key: modKey, ...WAVE_MODIFIERS[modKey] };
+        showNotification(`${game.waveModifier.name}: ${game.waveModifier.desc}`, game.waveModifier.color, 3000);
+    }
+    
+    showWaveAnnouncement();
     
     if (isBoss) {
         Sound.play('boss');
@@ -4341,7 +4408,14 @@ function spawnWave() {
         game.enemies.push(boss);
         showNotification(`BOSS WAVE: ${boss.name}`);
     } else {
-        const enemyCount = 5 + game.wave * 3;
+        // Better enemy count scaling: starts at 8, exponential feel in later waves
+        let enemyCount = Math.floor(8 + game.wave * 2 + Math.pow(game.wave, 1.2));
+        
+        // Apply wave modifier to enemy count
+        if (game.waveModifier && game.waveModifier.enemyCountMult) {
+            enemyCount = Math.floor(enemyCount * game.waveModifier.enemyCountMult);
+        }
+        
         for (let i = 0; i < enemyCount; i++) {
             setTimeout(() => {
                 const side = Math.floor(Math.random() * 4);
@@ -4353,7 +4427,7 @@ function spawnWave() {
                     case 3: x = -50; y = Math.random() * CONFIG.CANVAS_HEIGHT; break;
                 }
                 
-                const typeKeys = Object.keys(ENEMY_TYPES).filter(t => {
+                let typeKeys = Object.keys(ENEMY_TYPES).filter(t => {
                     if (t === 'tank') return game.wave >= 3;
                     if (t === 'swarm') return game.wave >= 5;
                     if (t === 'teleporter') return game.wave >= 7;
@@ -4368,10 +4442,30 @@ function spawnWave() {
                     if (t === 'necro') return game.wave >= 22;
                     return true;
                 });
+                
+                // Wave modifier spawn bias
+                if (game.waveModifier && game.waveModifier.spawnBias && typeKeys.includes(game.waveModifier.spawnBias)) {
+                    if (Math.random() < 0.4) {
+                        typeKeys = [game.waveModifier.spawnBias];
+                    }
+                }
+                
                 const type = typeKeys[Math.floor(Math.random() * typeKeys.length)];
-                game.enemies.push(new Enemy(x, y, game.wave, type, false));
-            }, i * 200);
+                const enemy = new Enemy(x, y, game.wave, type, false);
+                
+                // Apply wave modifier to spawned enemy
+                if (game.waveModifier && game.waveModifier.onSpawn) {
+                    game.waveModifier.onSpawn(enemy);
+                }
+                
+                game.enemies.push(enemy);
+            }, i * 150); // Slightly faster spawn interval
         }
+    }
+    
+    // Apply wave modifier to existing enemies
+    if (game.waveModifier && game.waveModifier.apply) {
+        setTimeout(() => game.waveModifier.apply(), 500);
     }
     
     game.stats.waveStartDamage = game.stats.damageTaken;
@@ -4384,7 +4478,6 @@ function nextWave() {
         game.stats.maxWave = game.wave;
         savePersistentStats();
     }
-    game.timeLeft = CONFIG.WAVE_DURATION;
     game.state = 'playing';
     document.getElementById('shop-modal').classList.add('hidden');
     
@@ -4478,6 +4571,9 @@ function restartGame() {
     game.levelUpChoices = [];
     game.passivesChosen = [];
     game.playerDPS = { damage: 0, timer: 0, history: [] };
+    game.waveModifier = null;
+    game.fogOfWar = false;
+    game.creditMultiplier = 1;
     game.eliteKills = 0;
     game.xpOrbs = [];
     game.blackHoles = [];
@@ -4870,6 +4966,20 @@ function drawXPBar(ctx) {
     ctx.restore();
 }
 
+function drawWaveModifier(ctx) {
+    if (!game.waveModifier || game.state !== 'playing') return;
+    
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(10, 80, 200, 28);
+    ctx.fillStyle = game.waveModifier.color;
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(game.waveModifier.name, 15, 99);
+    ctx.restore();
+}
+
 function drawDashIndicator(ctx) {
     if (!game.player) return;
     const x = 20;
@@ -5196,6 +5306,21 @@ function gameLoop(timestamp) {
         
         updateUI();
         
+        // Fog of war overlay
+        if (game.fogOfWar && game.player) {
+            ctx.save();
+            const fogGradient = ctx.createRadialGradient(
+                game.player.x, game.player.y, 100,
+                game.player.x, game.player.y, 350
+            );
+            fogGradient.addColorStop(0, 'rgba(0,0,0,0)');
+            fogGradient.addColorStop(0.7, 'rgba(0,0,0,0.6)');
+            fogGradient.addColorStop(1, 'rgba(0,0,0,0.85)');
+            ctx.fillStyle = fogGradient;
+            ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+            ctx.restore();
+        }
+        
         // Draw weapon indicator (outside camera transform)
         ctx.restore();
         ctx.save();
@@ -5204,6 +5329,7 @@ function gameLoop(timestamp) {
         drawXPBar(game.ctx);
         drawDashIndicator(game.ctx);
         drawDPSMeter(game.ctx);
+        drawWaveModifier(game.ctx);
         updateDPS();
     } else if (game.paused) {
         // Still draw everything when paused
