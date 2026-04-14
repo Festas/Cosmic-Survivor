@@ -6,15 +6,59 @@ import {
 import {
     initDatabase, createUser, loginUser, createGuestUser,
     getUserProfile, updateUserStats, addAchievement, addHighScore,
-    getGlobalLeaderboard, closeDatabase
+    getGlobalLeaderboard, closeDatabase,
+    storeSession, getSession, deleteSession
 } from './database.js';
 import { v4 as uuidv4 } from 'uuid';
 
 // Connected clients: ws -> { userId, playerId, roomCode }
 const clients = new Map();
 
-// Session tokens: token -> userId
-const sessions = new Map();
+// ========== RATE LIMITING ==========
+const RATE_LIMIT_WINDOW = 1000; // 1 second window
+const RATE_LIMIT_MAX_MESSAGES = 30; // Max messages per window
+const AUTH_RATE_LIMIT_WINDOW = 60000; // 1 minute window for auth
+const AUTH_RATE_LIMIT_MAX = 5; // Max auth attempts per window
+const rateLimitState = new WeakMap(); // ws -> { messages: [], authAttempts: [] }
+
+function checkRateLimit(ws, isAuth = false) {
+    let state = rateLimitState.get(ws);
+    if (!state) {
+        state = { messages: [], authAttempts: [] };
+        rateLimitState.set(ws, state);
+    }
+
+    const now = Date.now();
+
+    // General message rate limit
+    state.messages = state.messages.filter(t => now - t < RATE_LIMIT_WINDOW);
+    if (state.messages.length >= RATE_LIMIT_MAX_MESSAGES) {
+        return false;
+    }
+    state.messages.push(now);
+
+    // Auth-specific rate limit
+    if (isAuth) {
+        state.authAttempts = state.authAttempts.filter(t => now - t < AUTH_RATE_LIMIT_WINDOW);
+        if (state.authAttempts.length >= AUTH_RATE_LIMIT_MAX) {
+            return false;
+        }
+        state.authAttempts.push(now);
+    }
+
+    return true;
+}
+
+// ========== TEXT SANITIZATION ==========
+function sanitizeText(text) {
+    if (typeof text !== 'string') return '';
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+}
 
 export function initMessageHandler() {
     initDatabase();
@@ -40,6 +84,13 @@ export function handleMessage(ws, rawMessage) {
 
     const client = clients.get(ws);
     if (!client) return;
+
+    // Rate limit check
+    const isAuthMessage = ['register', 'login', 'guest_login'].includes(message.type);
+    if (!checkRateLimit(ws, isAuthMessage)) {
+        send(ws, { type: 'error', message: 'Rate limit exceeded. Please slow down.' });
+        return;
+    }
 
     switch (message.type) {
         // ========== AUTH ==========
@@ -136,14 +187,15 @@ export function handleDisconnect(ws) {
 // ========== AUTH HANDLERS ==========
 
 function handleRegister(ws, client, msg) {
-    const result = createUser(msg.username, msg.password, msg.displayName);
+    const displayName = sanitizeText((msg.displayName || '').substring(0, 20));
+    const result = createUser(msg.username, msg.password, displayName);
     if (result.error) {
         send(ws, { type: 'auth_error', message: result.error });
         return;
     }
 
     const token = uuidv4();
-    sessions.set(token, result.userId);
+    storeSession(token, result.userId);
     client.userId = result.userId;
     client.playerId = result.userId;
 
@@ -163,7 +215,7 @@ function handleLogin(ws, client, msg) {
     }
 
     const token = uuidv4();
-    sessions.set(token, result.userId);
+    storeSession(token, result.userId);
     client.userId = result.userId;
     client.playerId = result.userId;
 
@@ -177,8 +229,13 @@ function handleLogin(ws, client, msg) {
 
 function handleGuestLogin(ws, client) {
     const result = createGuestUser();
+    if (result.error) {
+        send(ws, { type: 'auth_error', message: result.error });
+        return;
+    }
+
     const token = uuidv4();
-    sessions.set(token, result.userId);
+    storeSession(token, result.userId);
     client.userId = result.userId;
     client.playerId = result.userId;
 
@@ -198,7 +255,7 @@ function handleGuestLogin(ws, client) {
 }
 
 function handleRestoreSession(ws, client, msg) {
-    const userId = sessions.get(msg.token);
+    const userId = getSession(msg.token);
     if (!userId) {
         send(ws, { type: 'auth_error', message: 'Session expired' });
         return;
@@ -230,7 +287,7 @@ function handleCreateRoom(ws, client, msg) {
     }
 
     const profile = getUserProfile(client.userId);
-    const displayName = profile ? profile.displayName : 'Player';
+    const displayName = sanitizeText(profile ? profile.displayName : 'Player');
     const room = createRoom(client.userId, displayName, msg.settings || {});
     
     // Set the WebSocket for the host
@@ -258,7 +315,7 @@ function handleJoinRoom(ws, client, msg) {
     }
 
     const profile = getUserProfile(client.userId);
-    const displayName = profile ? profile.displayName : 'Player';
+    const displayName = sanitizeText(profile ? profile.displayName : 'Player');
     const result = joinRoom(msg.roomCode, client.userId, displayName, ws);
 
     if (result.error) {
@@ -444,11 +501,14 @@ function handleChatMessage(ws, client, msg) {
     const player = room.players.get(client.playerId);
     if (!player) return;
 
+    const sanitizedMessage = sanitizeText((msg.message || '').substring(0, 200));
+    if (!sanitizedMessage) return;
+
     room.broadcastAll({
         type: 'chat_message',
         playerId: client.playerId,
-        displayName: player.displayName,
-        message: (msg.message || '').substring(0, 200), // Limit message length
+        displayName: sanitizeText(player.displayName),
+        message: sanitizedMessage,
         timestamp: Date.now()
     });
 }

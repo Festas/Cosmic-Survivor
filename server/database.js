@@ -58,8 +58,15 @@ export function initDatabase() {
             timestamp INTEGER NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+
         CREATE INDEX IF NOT EXISTS idx_high_scores_user ON high_scores(user_id);
         CREATE INDEX IF NOT EXISTS idx_high_scores_score ON high_scores(score DESC);
+        CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
     `);
 
     return db;
@@ -112,18 +119,30 @@ export function loginUser(username, password) {
     };
 }
 
-// Guest account creation (no password required)
+// Guest account creation (no password required, with collision retry)
 export function createGuestUser() {
     const id = uuidv4();
-    const guestNum = randomInt(1000, 10000);
-    const username = `guest_${guestNum}`;
-    const displayName = `Guest ${guestNum}`;
-    const passwordHash = bcrypt.hashSync(id, SALT_ROUNDS); // Use id as password for guest
+    const maxAttempts = 10;
 
-    db.prepare('INSERT INTO users (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)').run(id, username, passwordHash, displayName);
-    db.prepare('INSERT INTO user_stats (user_id) VALUES (?)').run(id);
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const guestNum = randomInt(1000, 100000);
+        const username = `guest_${guestNum}`;
+        const displayName = `Guest ${guestNum}`;
+        const passwordHash = bcrypt.hashSync(id, SALT_ROUNDS);
 
-    return { success: true, userId: id, username, displayName, isGuest: true };
+        try {
+            db.prepare('INSERT INTO users (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)').run(id, username, passwordHash, displayName);
+            db.prepare('INSERT INTO user_stats (user_id) VALUES (?)').run(id);
+            return { success: true, userId: id, username, displayName, isGuest: true };
+        } catch (e) {
+            // UNIQUE constraint failure — try another number
+            if (e.code === 'SQLITE_CONSTRAINT_UNIQUE' || (e.message && e.message.includes('UNIQUE'))) {
+                continue;
+            }
+            throw e;
+        }
+    }
+    return { error: 'Failed to create guest account. Please try again.' };
 }
 
 // Get user stats
@@ -220,4 +239,27 @@ export function getUserProfile(userId) {
 
 export function closeDatabase() {
     if (db) db.close();
+}
+
+// ========== SESSION PERSISTENCE ==========
+
+export function storeSession(token, userId) {
+    // Remove old sessions for this user (limit to 5 active sessions)
+    const existing = db.prepare('SELECT token FROM sessions WHERE user_id = ? ORDER BY created_at DESC').all(userId);
+    if (existing.length >= 5) {
+        const toDelete = existing.slice(4).map(r => r.token);
+        if (toDelete.length > 0) {
+            db.prepare(`DELETE FROM sessions WHERE token IN (${toDelete.map(() => '?').join(',')})`).run(...toDelete);
+        }
+    }
+    db.prepare('INSERT OR REPLACE INTO sessions (token, user_id) VALUES (?, ?)').run(token, userId);
+}
+
+export function getSession(token) {
+    const row = db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token);
+    return row ? row.user_id : null;
+}
+
+export function deleteSession(token) {
+    db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
 }
