@@ -280,6 +280,7 @@ const game = {
     enemies: [],
     bullets: [],
     pickups: [],
+    xpOrbs: [],
     particles: [],
     stars: [],
     keys: {},
@@ -2097,19 +2098,29 @@ class Enemy {
         game.stats.enemiesKilled++;
         game.persistentStats.totalKills++;
         
-        // XP gain
+        // Spawn XP orbs instead of giving XP directly
         const baseXP = this.isBoss ? (BOSS_TYPES[this.type]?.xp || 50) : (ENEMY_TYPES[this.type]?.xp || 1);
         const xpMult = game.difficultySettings?.xpMult || 1;
-        const xpGain = Math.floor(baseXP * xpMult * (this.isElite ? 2 : 1));
-        game.stats.xp += xpGain;
-        game.stats.totalXpEarned += xpGain;
-        
-        // Check level up
-        while (game.stats.xp >= game.stats.xpToNext) {
-            game.stats.xp -= game.stats.xpToNext;
-            game.stats.level++;
-            game.stats.xpToNext = Math.floor(CONFIG.XP_BASE * Math.pow(CONFIG.XP_SCALING, game.stats.level - 1));
-            triggerLevelUp();
+        const totalXP = Math.floor(baseXP * xpMult * (this.isElite ? 2 : 1));
+
+        // Split large XP into multiple orbs
+        if (totalXP >= 25) {
+            const largeOrbs = Math.floor(totalXP / 25);
+            const remainder = totalXP % 25;
+            for (let i = 0; i < largeOrbs; i++) {
+                const angle = (i / largeOrbs) * Math.PI * 2;
+                const spread = 15 + Math.random() * 10;
+                game.xpOrbs.push(new XPOrb(this.x + Math.cos(angle) * spread, this.y + Math.sin(angle) * spread, 25));
+            }
+            if (remainder >= 5) {
+                game.xpOrbs.push(new XPOrb(this.x + (Math.random() - 0.5) * 20, this.y + (Math.random() - 0.5) * 20, remainder));
+            } else if (remainder > 0) {
+                game.xpOrbs.push(new XPOrb(this.x, this.y, remainder));
+            }
+        } else if (totalXP >= 5) {
+            game.xpOrbs.push(new XPOrb(this.x, this.y, totalXP));
+        } else {
+            game.xpOrbs.push(new XPOrb(this.x + (Math.random() - 0.5) * 10, this.y + (Math.random() - 0.5) * 10, Math.max(1, totalXP)));
         }
         
         // Elite kill tracking
@@ -3458,6 +3469,91 @@ class Pickup {
     }
 }
 
+class XPOrb {
+    constructor(x, y, value) {
+        this.x = x;
+        this.y = y;
+        this.value = value;
+        this.size = value >= 25 ? 8 : value >= 5 ? 6 : 4;
+        this.color = value >= 25 ? '#a855f7' : value >= 5 ? '#7c3aed' : '#6366f1';
+        this.glowColor = value >= 25 ? '#c084fc' : value >= 5 ? '#a78bfa' : '#818cf8';
+        this.bobOffset = Math.random() * Math.PI * 2;
+        this.magnetSpeed = 0;
+        this.life = 1800; // 30 seconds before despawn
+    }
+    
+    update() {
+        this.life--;
+        // Magnet effect - accelerate toward player when in range
+        if (game.player) {
+            const dist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+            const magnetRange = game.player.pickupRange * 2.5;
+            
+            if (dist < magnetRange) {
+                this.magnetSpeed = Math.min(this.magnetSpeed + 0.5, 8);
+                const angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
+                this.x += Math.cos(angle) * this.magnetSpeed;
+                this.y += Math.sin(angle) * this.magnetSpeed;
+            } else {
+                this.magnetSpeed = Math.max(0, this.magnetSpeed - 0.3);
+            }
+            
+            // Collect when close
+            if (dist < game.player.pickupRange) {
+                game.stats.xp += this.value;
+                game.stats.totalXpEarned += this.value;
+                
+                // Check level up
+                while (game.stats.xp >= game.stats.xpToNext) {
+                    game.stats.xp -= game.stats.xpToNext;
+                    game.stats.level++;
+                    game.stats.xpToNext = Math.floor(CONFIG.XP_BASE * Math.pow(CONFIG.XP_SCALING, game.stats.level - 1));
+                    triggerLevelUp();
+                }
+                
+                createParticles(this.x, this.y, this.color, 3);
+                return false; // Remove this orb
+            }
+        }
+        
+        return this.life > 0;
+    }
+    
+    draw(ctx) {
+        const bob = Math.sin(Date.now() * 0.004 + this.bobOffset) * 3;
+        const pulse = Math.sin(Date.now() * 0.006 + this.bobOffset) * 0.3 + 0.7;
+        
+        ctx.save();
+        // Fade out when about to despawn
+        if (this.life < 120) {
+            ctx.globalAlpha = this.life / 120;
+        }
+        
+        // Glow
+        ctx.fillStyle = this.glowColor;
+        ctx.globalAlpha *= 0.3 * pulse;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.size * 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Core
+        ctx.globalAlpha = this.life < 120 ? this.life / 120 : 1;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.size * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bright center
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha *= 0.6;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.size * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+}
+
 // ==================== VISUAL EFFECTS ====================
 // Enhanced particle system
 function createParticles(x, y, color, count) {
@@ -4214,6 +4310,7 @@ function restartGame() {
     game.passivesChosen = [];
     game.playerDPS = { damage: 0, timer: 0, history: [] };
     game.eliteKills = 0;
+    game.xpOrbs = [];
     
     game.state = 'characterSelect';
     showDifficultySelect();
@@ -4862,8 +4959,11 @@ function gameLoop(timestamp) {
         updateNotifications();
         updatePowerups();
         collectPowerups();
+        // Update XP orbs
+        game.xpOrbs = game.xpOrbs.filter(orb => orb.update());
         
         game.pickups.forEach(p => p.draw(ctx));
+        game.xpOrbs.forEach(orb => orb.draw(ctx));
         game.powerups.forEach(p => p.draw(ctx));
         game.enemies.forEach(e => e.draw(ctx));
         game.bullets.forEach(b => b.draw(ctx));
@@ -4888,6 +4988,7 @@ function gameLoop(timestamp) {
     } else if (game.paused) {
         // Still draw everything when paused
         game.pickups.forEach(p => p.draw(ctx));
+        game.xpOrbs.forEach(orb => orb.draw(ctx));
         game.powerups.forEach(p => p.draw(ctx));
         game.enemies.forEach(e => e.draw(ctx));
         game.bullets.forEach(b => b.draw(ctx));
