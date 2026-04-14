@@ -5640,7 +5640,6 @@ function drawXPBar(ctx) {
     ctx.fillText(`Lv.${game.stats.level}`, x + barWidth / 2, y - 5);
     
     // Glow when close to level up
-    const xpPercent = game.stats.xp / game.stats.xpToNext;
     if (xpPercent > 0.8) {
         const glowPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.5;
         ctx.save();
@@ -5652,6 +5651,8 @@ function drawXPBar(ctx) {
 
     ctx.restore();
 }
+
+function drawWaveModifier(ctx) {
     if (!game.waveModifier || game.state !== 'playing') return;
     
     ctx.save();
