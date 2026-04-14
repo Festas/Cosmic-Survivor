@@ -23,6 +23,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "concurrently": "^9.1.2",
     "copyfiles": "^2.4.1",
     "vite": "^5.0.0"
   }

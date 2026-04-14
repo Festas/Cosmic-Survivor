@@ -43,7 +43,13 @@ export default defineConfig({
   plugins: [injectServiceWorkerVersion()],
   server: {
     port: 3000,
-    open: '/index-enhanced.html'
+    open: '/index-enhanced.html',
+    proxy: {
+      '/ws': {
+        target: 'ws://localhost:3001',
+        ws: true,
+      },
+    },
   },
   preview: {
     port: 4173,

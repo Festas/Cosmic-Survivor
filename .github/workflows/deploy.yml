@@ -78,6 +78,11 @@ jobs:
                 restart: unless-stopped
                 ports:
                   - "127.0.0.1:8200:80"
+                volumes:
+                  - cosmic-data:/data
+            
+            volumes:
+              cosmic-data:
             EOF
             
             # Pull latest image and restart container

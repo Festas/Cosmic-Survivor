@@ -100,8 +100,8 @@ const MultiplayerClient = {
 
     _getDefaultServerUrl() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const host = window.location.hostname;
-        return `${protocol}//${host}:3001`;
+        const host = window.location.host; // includes port if non-standard
+        return `${protocol}//${host}/ws`;
     },
 
     send(data) {
