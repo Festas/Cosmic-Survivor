@@ -36,6 +36,8 @@ const MultiplayerClient = {
     // State sync throttling
     _lastStateSend: 0,
     _stateSendInterval: 50, // Send state every 50ms (20 Hz)
+    // Delay before attempting room rejoin after reconnect (allows session restore to complete)
+    _sessionRestoreDelay: 500,
 
     connect(serverUrl) {
         if (this.ws && this.ws.readyState <= 1) {
@@ -65,13 +67,12 @@ const MultiplayerClient = {
 
             // Attempt to rejoin the last room after reconnect
             if (this._lastRoomCode && this.sessionToken) {
-                // Wait briefly for session restore to complete before rejoining
                 setTimeout(() => {
                     if (this.authenticated && this._lastRoomCode && !this.room) {
                         console.log('[MP] Attempting to rejoin room:', this._lastRoomCode);
                         this.joinRoom(this._lastRoomCode);
                     }
-                }, 500);
+                }, this._sessionRestoreDelay);
             }
         };
 

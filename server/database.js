@@ -244,14 +244,12 @@ export function closeDatabase() {
 // ========== SESSION PERSISTENCE ==========
 
 export function storeSession(token, userId) {
-    // Remove old sessions for this user (limit to 5 active sessions)
-    const existing = db.prepare('SELECT token FROM sessions WHERE user_id = ? ORDER BY created_at DESC').all(userId);
-    if (existing.length >= 5) {
-        const toDelete = existing.slice(4).map(r => r.token);
-        if (toDelete.length > 0) {
-            db.prepare(`DELETE FROM sessions WHERE token IN (${toDelete.map(() => '?').join(',')})`).run(...toDelete);
-        }
-    }
+    // Remove old sessions for this user (keep only the 4 most recent, make room for the new one)
+    db.prepare(`
+        DELETE FROM sessions WHERE user_id = ? AND token NOT IN (
+            SELECT token FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 4
+        )
+    `).run(userId, userId);
     db.prepare('INSERT OR REPLACE INTO sessions (token, user_id) VALUES (?, ?)').run(token, userId);
 }
 

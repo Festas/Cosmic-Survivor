@@ -6384,7 +6384,7 @@ function initMultiplayerCallbacks() {
             openShop();
         } else if (event === 'wave_start') {
             // Host started next wave — sync wave number and spawn
-            if (data && data.wave) {
+            if (data && typeof data.wave === 'number' && data.wave > 0) {
                 game.wave = data.wave;
             }
             game.state = 'playing';
@@ -7449,14 +7449,14 @@ function showAccountModal() {
         const origOnAuth = mp.onAuthSuccess;
         mp.onAuthSuccess = (profile) => {
             modal.classList.add('hidden');
-            // Restore the original callback so future auth flows work correctly
-            mp.onAuthSuccess = origOnAuth;
             if (origOnAuth) {
                 origOnAuth(profile);
             } else {
                 showNotification(`Welcome, ${profile.displayName}!`, '#00ff88', 2000);
                 updateAccountUI(profile);
             }
+            // Restore the original callback after use so future auth flows work correctly
+            mp.onAuthSuccess = origOnAuth;
         };
     }
     
