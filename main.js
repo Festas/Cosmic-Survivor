@@ -136,51 +136,65 @@ const WEAPON_TYPES = {
 // Enemy types with behaviors
 const ENEMY_TYPES = {
     normal: { name: '👾 Grunt', color: '#a855f7', speed: 1, health: 1, damage: 1, credits: 1, xp: 1,
-        palette: { body: '#a855f7', head: '#c084fc', limb: '#7c3aed', accent: '#e9d5ff' } },
-    fast: { name: '💨 Stalker', color: '#ff6b6b', speed: 1.4, health: 0.6, damage: 0.7, credits: 1.2, xp: 1.1,
-        palette: { body: '#ff6b6b', head: '#fca5a5', limb: '#dc2626', accent: '#fef2f2' } },
-    tank: { name: '🪨 Golem', color: '#10b981', speed: 0.55, health: 2.2, damage: 1.3, credits: 2, xp: 1.5,
-        palette: { body: '#10b981', head: '#34d399', limb: '#065f46', accent: '#6ee7b7' } },
-    swarm: { name: '🦟 Drone', color: '#f59e0b', speed: 1.15, health: 0.35, damage: 0.4, credits: 0.5, xp: 0.4, size: 0.6,
-        palette: { body: '#f59e0b', head: '#fbbf24', limb: '#b45309', accent: '#fef3c7' } },
-    teleporter: { name: '🌀 Warper', color: '#8b5cf6', speed: 0.75, health: 0.9, damage: 1.1, credits: 1.5, xp: 1.3, canTeleport: true,
-        palette: { body: '#8b5cf6', head: '#a78bfa', limb: '#6d28d9', accent: '#c4b5fd' } },
-    shooter: { name: '🔫 Marksman', color: '#ec4899', speed: 0.45, health: 0.75, damage: 0.9, credits: 1.8, xp: 1.4, ranged: true,
-        palette: { body: '#ec4899', head: '#f472b6', limb: '#be185d', accent: '#fce7f3' } },
-    healer: { name: '💚 Medic', color: '#22d3ee', speed: 0.65, health: 1.1, damage: 0.5, credits: 2.5, xp: 2, heals: true,
-        palette: { body: '#22d3ee', head: '#67e8f9', limb: '#0891b2', accent: '#cffafe' } },
+        movementPattern: 'wander',
+        palette: { body: '#a855f7', core: '#e9d5ff', glow: '#c084fc', accent: '#7c3aed' } },
+    fast: { name: '⚡ Stalker', color: '#ff6b6b', speed: 1.5, health: 0.5, damage: 0.8, credits: 1.2, xp: 1.1,
+        movementPattern: 'zigzag',
+        palette: { body: '#ff6b6b', core: '#fef2f2', glow: '#f87171', accent: '#dc2626' } },
+    tank: { name: '💎 Golem', color: '#10b981', speed: 0.5, health: 2.5, damage: 1.4, credits: 2, xp: 1.5,
+        movementPattern: 'chase',
+        palette: { body: '#10b981', core: '#6ee7b7', glow: '#34d399', accent: '#065f46' } },
+    swarm: { name: '🦟 Drone', color: '#f59e0b', speed: 1.2, health: 0.3, damage: 0.4, credits: 0.5, xp: 0.4, size: 0.55,
+        movementPattern: 'orbit',
+        palette: { body: '#f59e0b', core: '#fef3c7', glow: '#fbbf24', accent: '#b45309' } },
+    teleporter: { name: '🌀 Warper', color: '#8b5cf6', speed: 0.7, health: 0.9, damage: 1.1, credits: 1.5, xp: 1.3, canTeleport: true,
+        movementPattern: 'phase',
+        palette: { body: '#8b5cf6', core: '#c4b5fd', glow: '#a78bfa', accent: '#6d28d9' } },
+    shooter: { name: '🎯 Marksman', color: '#ec4899', speed: 0.4, health: 0.75, damage: 1.0, credits: 1.8, xp: 1.4, ranged: true,
+        movementPattern: 'strafe',
+        palette: { body: '#ec4899', core: '#fce7f3', glow: '#f472b6', accent: '#be185d' } },
+    healer: { name: '✨ Oracle', color: '#22d3ee', speed: 0.6, health: 1.1, damage: 0.5, credits: 2.5, xp: 2, heals: true,
+        movementPattern: 'flee',
+        palette: { body: '#22d3ee', core: '#cffafe', glow: '#67e8f9', accent: '#0891b2' } },
     splitter: { name: '🧬 Mitotic', color: '#fb923c', speed: 0.85, health: 1.2, damage: 1.0, credits: 2.2, xp: 1.8, splits: 3,
-        palette: { body: '#fb923c', head: '#fdba74', limb: '#c2410c', accent: '#fed7aa' } },
-    freezer: { name: '❄️ Cryo', color: '#38bdf8', speed: 0.75, health: 1.0, damage: 0.8, credits: 2, xp: 1.5, freezes: true,
-        palette: { body: '#38bdf8', head: '#7dd3fc', limb: '#0284c7', accent: '#bae6fd' } },
-    berserker: { name: '🔥 Ravager', color: '#dc2626', speed: 0.95, health: 1.4, damage: 1.5, credits: 2.3, xp: 2, enrages: true,
-        palette: { body: '#dc2626', head: '#f87171', limb: '#991b1b', accent: '#fecaca' } },
-    bomber: { name: '💣 Detonator', color: '#ff3300', speed: 0.7, health: 0.9, damage: 1.0, credits: 2.5, xp: 2.2, explodes: true,
-        palette: { body: '#ff3300', head: '#ff6633', limb: '#cc2900', accent: '#ff9966' } },
-    parasite: { name: '🦠 Parasite', color: '#84cc16', speed: 1.1, health: 0.5, damage: 0.6, credits: 1.8, xp: 1.6, drains: true,
-        palette: { body: '#84cc16', head: '#a3e635', limb: '#4d7c0f', accent: '#d9f99d' } },
-    shielder: { name: '🛡️ Sentinel', color: '#6366f1', speed: 0.6, health: 1.5, damage: 0.8, credits: 2.8, xp: 2.5, shields: true,
-        palette: { body: '#6366f1', head: '#818cf8', limb: '#4338ca', accent: '#c7d2fe' } },
-    necro: { name: '💀 Revenant', color: '#a3a3a3', speed: 0.7, health: 1.3, damage: 1.2, credits: 3.0, xp: 2.8, revives: true,
-        palette: { body: '#a3a3a3', head: '#d4d4d4', limb: '#525252', accent: '#e5e5e5' } },
+        movementPattern: 'wander',
+        palette: { body: '#fb923c', core: '#fed7aa', glow: '#fdba74', accent: '#c2410c' } },
+    freezer: { name: '❄️ Cryo', color: '#38bdf8', speed: 0.7, health: 1.0, damage: 0.8, credits: 2, xp: 1.5, freezes: true,
+        movementPattern: 'chase',
+        palette: { body: '#38bdf8', core: '#e0f2fe', glow: '#7dd3fc', accent: '#0284c7' } },
+    berserker: { name: '👹 Ravager', color: '#dc2626', speed: 1.0, health: 1.5, damage: 1.6, credits: 2.3, xp: 2, enrages: true,
+        movementPattern: 'lunge',
+        palette: { body: '#dc2626', core: '#fecaca', glow: '#f87171', accent: '#991b1b' } },
+    bomber: { name: '💣 Detonator', color: '#ff3300', speed: 0.75, health: 0.8, damage: 1.0, credits: 2.5, xp: 2.2, explodes: true,
+        movementPattern: 'dash',
+        palette: { body: '#ff3300', core: '#ff9966', glow: '#ff6633', accent: '#cc2900' } },
+    parasite: { name: '🦠 Leech', color: '#84cc16', speed: 1.15, health: 0.5, damage: 0.6, credits: 1.8, xp: 1.6, drains: true,
+        movementPattern: 'orbit',
+        palette: { body: '#84cc16', core: '#d9f99d', glow: '#a3e635', accent: '#4d7c0f' } },
+    shielder: { name: '🛡️ Sentinel', color: '#6366f1', speed: 0.55, health: 1.6, damage: 0.8, credits: 2.8, xp: 2.5, shields: true,
+        movementPattern: 'chase',
+        palette: { body: '#6366f1', core: '#c7d2fe', glow: '#818cf8', accent: '#4338ca' } },
+    necro: { name: '💀 Wraith', color: '#78716c', speed: 0.65, health: 1.3, damage: 1.2, credits: 3.0, xp: 2.8, revives: true,
+        movementPattern: 'flee',
+        palette: { body: '#78716c', core: '#d6d3d1', glow: '#a8a29e', accent: '#44403c' } },
 };
 
 // Boss types
 const BOSS_TYPES = {
     destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 12, damage: 2.5, credits: 100, xp: 50,
-        palette: { body: '#dc2626', head: '#f87171', limb: '#991b1b', accent: '#fecaca', glow: '#ff0000' } },
+        palette: { body: '#dc2626', core: '#fecaca', glow: '#ff0000', accent: '#991b1b', wing: '#7f1d1d' } },
     broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 10, damage: 1.8, credits: 120, xp: 60, summons: true,
-        palette: { body: '#7c2d12', head: '#a16207', limb: '#451a03', accent: '#d97706', glow: '#f59e0b' } },
+        palette: { body: '#7c2d12', core: '#d97706', glow: '#f59e0b', accent: '#451a03', wing: '#a16207' } },
     voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 8, damage: 2.2, credits: 150, xp: 70, teleports: true,
-        palette: { body: '#581c87', head: '#7c3aed', limb: '#3b0764', accent: '#a78bfa', glow: '#8b5cf6' } },
+        palette: { body: '#581c87', core: '#a78bfa', glow: '#8b5cf6', accent: '#3b0764', wing: '#7c3aed' } },
     necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 11, damage: 2.0, credits: 180, xp: 80, resurrects: true,
-        palette: { body: '#4c1d95', head: '#6d28d9', limb: '#2e1065', accent: '#a78bfa', glow: '#8b5cf6' } },
+        palette: { body: '#4c1d95', core: '#a78bfa', glow: '#8b5cf6', accent: '#2e1065', wing: '#6d28d9' } },
     titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 16, damage: 3.5, credits: 200, xp: 100, earthquake: true,
-        palette: { body: '#b91c1c', head: '#92400e', limb: '#7f1d1d', accent: '#fbbf24', glow: '#f59e0b' } },
+        palette: { body: '#b91c1c', core: '#fbbf24', glow: '#f59e0b', accent: '#7f1d1d', wing: '#92400e' } },
     hivemind: { name: '🧠 Hivemind', color: '#7e22ce', size: 2.5, health: 14, damage: 1.5, credits: 220, xp: 90, commands: true,
-        palette: { body: '#7e22ce', head: '#a855f7', limb: '#581c87', accent: '#d8b4fe', glow: '#c084fc' } },
+        palette: { body: '#7e22ce', core: '#d8b4fe', glow: '#c084fc', accent: '#581c87', wing: '#a855f7' } },
     leviathan: { name: '🐉 Leviathan', color: '#0f766e', size: 3.5, health: 20, damage: 3.0, credits: 280, xp: 120, charges: true,
-        palette: { body: '#0f766e', head: '#14b8a6', limb: '#134e4a', accent: '#5eead4', glow: '#2dd4bf' } },
+        palette: { body: '#0f766e', core: '#5eead4', glow: '#2dd4bf', accent: '#134e4a', wing: '#14b8a6' } },
 };
 
 // Elite enemy modifiers - rare empowered enemies
@@ -1516,6 +1530,18 @@ class Enemy {
             this.shieldHealth = 0;
             this.splitGeneration = 0; // Track split depth to prevent infinite splitting
             
+            // Movement pattern properties
+            this.movementPattern = enemyType.movementPattern || 'chase';
+            this.orbitAngle = Math.random() * Math.PI * 2;
+            this.zigzagPhase = Math.random() * Math.PI * 2;
+            this.lungeCooldown = 0;
+            this.lungeFrames = 0;
+            this.isLunging = false;
+            this.dashCooldown = 0;
+            this.dashFrames = 0;
+            this.isDashing = false;
+            this.prevY = y;
+            
             // Elite enemy modification
             this.isElite = false;
             if (!isBoss && game.wave >= 5 && Math.random() < CONFIG.ELITE_CHANCE) {
@@ -1558,6 +1584,7 @@ class Enemy {
     update() {
         // Track movement for walk animation
         this.prevX = this.x;
+        this.prevY = this.y;
         
         let targetX = game.player.x, targetY = game.player.y;
         if (game.player.decoy && game.player.decoy.health > 0 && !this.isBoss) {
@@ -1668,13 +1695,140 @@ class Enemy {
             }
         }
 
-        // Move toward player
-        if (dist > (this.isRanged ? 200 : 0)) {
-            let moveSpeed = this.speed;
-            if (game.player && game.player.timeDilation > 0 && dist < 200) moveSpeed *= (1 - game.player.timeDilation);
-            this.x += (dx / dist) * moveSpeed;
-            this.y += (dy / dist) * moveSpeed;
+        // Movement patterns
+        let moveSpeed = this.speed;
+        if (game.player && game.player.timeDilation > 0 && dist < 200) moveSpeed *= (1 - game.player.timeDilation);
+        
+        if (this.isBoss) {
+            // Bosses always chase directly
+            if (dist > 10) {
+                this.x += (dx / dist) * moveSpeed;
+                this.y += (dy / dist) * moveSpeed;
+            }
+        } else {
+            const pattern = this.movementPattern || 'chase';
+            switch(pattern) {
+                case 'wander': {
+                    if (dist > 20) {
+                        const wanderOffset = Math.sin(Date.now() * 0.003 + this.zigzagPhase) * 0.4;
+                        const angle = Math.atan2(dy, dx) + wanderOffset;
+                        this.x += Math.cos(angle) * moveSpeed;
+                        this.y += Math.sin(angle) * moveSpeed;
+                    }
+                    break;
+                }
+                case 'zigzag': {
+                    if (dist > 20) {
+                        const baseAngle = Math.atan2(dy, dx);
+                        const zigzag = Math.sin(Date.now() * 0.012 + this.zigzagPhase) * 0.8;
+                        this.x += Math.cos(baseAngle + zigzag) * moveSpeed;
+                        this.y += Math.sin(baseAngle + zigzag) * moveSpeed;
+                    }
+                    break;
+                }
+                case 'strafe': {
+                    if (dist > 280) {
+                        this.x += (dx / dist) * moveSpeed;
+                        this.y += (dy / dist) * moveSpeed;
+                    } else if (dist > 180) {
+                        const strafeAngle = Math.atan2(dy, dx) + Math.PI / 2;
+                        this.x += Math.cos(strafeAngle) * moveSpeed * 0.8;
+                        this.y += Math.sin(strafeAngle) * moveSpeed * 0.8;
+                    } else {
+                        const retreatAngle = Math.atan2(dy, dx) + Math.PI * 0.7;
+                        this.x += Math.cos(retreatAngle) * moveSpeed;
+                        this.y += Math.sin(retreatAngle) * moveSpeed;
+                    }
+                    break;
+                }
+                case 'orbit': {
+                    this.orbitAngle += 0.02 * (this.speed / 1.2);
+                    if (dist > 120) {
+                        this.x += (dx / dist) * moveSpeed * 0.7;
+                        this.y += (dy / dist) * moveSpeed * 0.7;
+                    } else {
+                        const orbitDist = 80;
+                        const orbTargetX = targetX + Math.cos(this.orbitAngle) * orbitDist;
+                        const orbTargetY = targetY + Math.sin(this.orbitAngle) * orbitDist;
+                        const ox = orbTargetX - this.x;
+                        const oy = orbTargetY - this.y;
+                        const od = Math.hypot(ox, oy);
+                        if (od > 5) {
+                            this.x += (ox / od) * moveSpeed;
+                            this.y += (oy / od) * moveSpeed;
+                        }
+                    }
+                    break;
+                }
+                case 'flee': {
+                    if (dist < 180) {
+                        this.x -= (dx / dist) * moveSpeed * 1.2;
+                        this.y -= (dy / dist) * moveSpeed * 1.2;
+                    } else if (dist > 350) {
+                        this.x += (dx / dist) * moveSpeed * 0.5;
+                        this.y += (dy / dist) * moveSpeed * 0.5;
+                    }
+                    break;
+                }
+                case 'lunge': {
+                    if (this.isLunging) {
+                        this.lungeFrames++;
+                        if (dist > 5) {
+                            this.x += (dx / dist) * moveSpeed * 4;
+                            this.y += (dy / dist) * moveSpeed * 4;
+                        }
+                        if (this.lungeFrames > 10) this.isLunging = false;
+                    } else if (dist > 30) {
+                        this.x += (dx / dist) * moveSpeed;
+                        this.y += (dy / dist) * moveSpeed;
+                    }
+                    if (!this.isLunging && this.lungeCooldown <= 0 && dist < 150 && dist > 40) {
+                        this.isLunging = true;
+                        this.lungeFrames = 0;
+                        this.lungeCooldown = 90;
+                        createParticles(this.x, this.y, this.color, 8);
+                    }
+                    if (this.lungeCooldown > 0) this.lungeCooldown--;
+                    break;
+                }
+                case 'dash': {
+                    if (this.isDashing) {
+                        this.dashFrames++;
+                        if (dist > 5) {
+                            this.x += (dx / dist) * moveSpeed * 3;
+                            this.y += (dy / dist) * moveSpeed * 3;
+                        }
+                        if (this.dashFrames > 15) {
+                            this.isDashing = false;
+                            this.dashCooldown = 45;
+                        }
+                    } else if (this.dashCooldown <= 0) {
+                        this.isDashing = true;
+                        this.dashFrames = 0;
+                    }
+                    if (this.dashCooldown > 0) this.dashCooldown--;
+                    break;
+                }
+                case 'phase': {
+                    if (dist > 30) {
+                        this.x += (dx / dist) * moveSpeed;
+                        this.y += (dy / dist) * moveSpeed;
+                    }
+                    break;
+                }
+                default: {
+                    if (dist > (this.isRanged ? 200 : 0)) {
+                        this.x += (dx / dist) * moveSpeed;
+                        this.y += (dy / dist) * moveSpeed;
+                    }
+                    break;
+                }
+            }
         }
+        
+        // Keep enemy in bounds
+        this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
+        this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
         
         // Update walk animation
         const movedX = this.x - this.prevX;
@@ -2045,79 +2199,58 @@ class Enemy {
 
     draw(ctx) {
         ctx.save();
-        
         const s = this.size;
         const cx = this.x;
         const cy = this.y;
-        const walkSwing = this.walkFrame === 0 ? 0.25 : -0.25;
-        const typeData = ENEMY_TYPES[this.type] || ENEMY_TYPES.normal;
-        const palette = typeData.palette || { body: this.color, head: this.color, limb: this.color, accent: '#fff' };
-        
-        // Humanoid proportions
-        const headR = s * 0.28;
-        const headY = cy - s * 0.5;
-        const torsoW = s * 0.4;
-        const torsoH = s * 0.45;
-        const torsoTop = cy - s * 0.2;
-        const armW = s * 0.08;
-        const armLen = s * 0.35;
-        const legW = s * 0.09;
-        const legLen = s * 0.3;
+        const t = Date.now();
         
         if (this.isBoss) {
             this.drawBoss(ctx);
         } else {
-            // === LEGS ===
-            ctx.fillStyle = palette.limb;
-            ctx.save(); ctx.translate(cx - s * 0.1, cy + s * 0.25);
-            ctx.rotate(walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
-            ctx.save(); ctx.translate(cx + s * 0.1, cy + s * 0.25);
-            ctx.rotate(-walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
+            const typeData = ENEMY_TYPES[this.type] || ENEMY_TYPES.normal;
+            const p = typeData.palette || { body: this.color, core: '#fff', glow: this.color, accent: this.color };
+            const pa = game.player ? Math.atan2(game.player.y - cy, game.player.x - cx) : 0;
             
-            // === TORSO ===
-            ctx.fillStyle = palette.body;
-            ctx.fillRect(cx - torsoW / 2, torsoTop, torsoW, torsoH);
-            
-            // Type-specific torso details
-            this.drawTorsoDetail(ctx, cx, cy, s, torsoW, torsoH, torsoTop, palette);
-            
-            // === ARMS ===
-            ctx.fillStyle = palette.limb;
-            // Left arm
-            ctx.save(); ctx.translate(cx - s * 0.22, cy - s * 0.15);
-            ctx.rotate(-0.3 + walkSwing * 0.5); ctx.fillRect(-armW / 2, 0, armW, armLen); ctx.restore();
-            // Right arm
-            ctx.save(); ctx.translate(cx + s * 0.22, cy - s * 0.15);
-            ctx.rotate(0.3 - walkSwing * 0.5); ctx.fillRect(-armW / 2, 0, armW, armLen);
-            // Type-specific hand item
-            this.drawHandItem(ctx, s, armLen, palette);
-            ctx.restore();
-            
-            // === HEAD ===
-            ctx.fillStyle = palette.head;
-            ctx.beginPath(); ctx.arc(cx, headY, headR, 0, Math.PI * 2); ctx.fill();
-            
-            // Type-specific head details
-            this.drawHeadDetail(ctx, cx, headY, headR, s, palette);
-            
-            // Eyes - alien style (glowing, single eye, multiple eyes, etc.)
-            this.drawEyes(ctx, cx, headY, headR, s, palette);
-            
-            // Type-specific aura/effects
-            this.drawAura(ctx, cx, cy, s, palette);
+            switch(this.type) {
+                case 'normal': this._drawGrunt(ctx, cx, cy, s, t, p, pa); break;
+                case 'fast': this._drawStalker(ctx, cx, cy, s, t, p, pa); break;
+                case 'tank': this._drawGolem(ctx, cx, cy, s, t, p); break;
+                case 'swarm': this._drawDrone(ctx, cx, cy, s, t, p); break;
+                case 'teleporter': this._drawWarper(ctx, cx, cy, s, t, p); break;
+                case 'shooter': this._drawMarksman(ctx, cx, cy, s, t, p, pa); break;
+                case 'healer': this._drawOracle(ctx, cx, cy, s, t, p); break;
+                case 'splitter': this._drawMitotic(ctx, cx, cy, s, t, p); break;
+                case 'freezer': this._drawCryo(ctx, cx, cy, s, t, p); break;
+                case 'berserker': this._drawRavager(ctx, cx, cy, s, t, p); break;
+                case 'bomber': this._drawDetonator(ctx, cx, cy, s, t, p); break;
+                case 'parasite': this._drawLeech(ctx, cx, cy, s, t, p, pa); break;
+                case 'shielder': this._drawSentinel(ctx, cx, cy, s, t, p); break;
+                case 'necro': this._drawWraith(ctx, cx, cy, s, t, p); break;
+                default: this._drawGrunt(ctx, cx, cy, s, t, p, pa); break;
+            }
         }
         
         // Elite indicator
         if (this.isElite && !this.isBoss) {
-            ctx.strokeStyle = this.eliteModifier.color;
+            const eColor = this.eliteModifier.color;
+            const ePulse = Math.sin(t * 0.008) * 0.3 + 0.7;
+            ctx.strokeStyle = eColor;
             ctx.lineWidth = 2;
             ctx.setLineDash([4, 4]);
             ctx.beginPath();
             ctx.arc(cx, cy, s + 5, 0, Math.PI * 2);
             ctx.stroke();
             ctx.setLineDash([]);
-            
-            ctx.fillStyle = this.eliteModifier.color;
+            // Rotating elite runes
+            ctx.fillStyle = eColor;
+            ctx.globalAlpha = ePulse;
+            for (let i = 0; i < 4; i++) {
+                const a = (i / 4) * Math.PI * 2 + t * 0.003;
+                const rx = cx + Math.cos(a) * (s + 8);
+                const ry = cy + Math.sin(a) * (s + 8);
+                ctx.beginPath(); ctx.arc(rx, ry, 2, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
             ctx.font = 'bold 10px monospace';
             ctx.textAlign = 'center';
             ctx.fillText(this.eliteModifier.name, cx, cy - s - 15);
@@ -2125,7 +2258,7 @@ class Enemy {
         
         // Sentinel shield visual
         if (this.canShield && this.shieldActive && this.shieldHealth > 0) {
-            const shieldAlpha = 0.3 + Math.sin(Date.now() * 0.005) * 0.1;
+            const shieldAlpha = 0.3 + Math.sin(t * 0.005) * 0.1;
             ctx.strokeStyle = `rgba(99, 102, 241, ${shieldAlpha})`;
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -2133,6 +2266,14 @@ class Enemy {
             ctx.stroke();
             ctx.fillStyle = `rgba(99, 102, 241, ${shieldAlpha * 0.3})`;
             ctx.fill();
+            // Hex pattern on shield
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2 + t * 0.001;
+                ctx.fillStyle = `rgba(129, 140, 248, ${shieldAlpha * 0.5})`;
+                ctx.beginPath();
+                ctx.arc(cx + Math.cos(a) * s * 1.1, cy + Math.sin(a) * s * 1.1, s * 0.08, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
         
         // Health bar
@@ -2166,691 +2307,1010 @@ class Enemy {
         ctx.restore();
     }
     
-    drawTorsoDetail(ctx, cx, cy, s, torsoW, torsoH, torsoTop, palette) {
-        switch(this.type) {
-            case 'tank':
-                // Armor plates
-                ctx.fillStyle = palette.limb;
-                ctx.fillRect(cx - torsoW / 2 - 3, torsoTop + 2, 3, torsoH - 4);
-                ctx.fillRect(cx + torsoW / 2, torsoTop + 2, 3, torsoH - 4);
-                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1;
-                ctx.strokeRect(cx - torsoW / 2 + 2, torsoTop + 2, torsoW - 4, torsoH - 4);
-                break;
-            case 'healer':
-                // Cross symbol
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(cx - 2, torsoTop + 4, 4, torsoH - 8);
-                ctx.fillRect(cx - torsoW / 4, torsoTop + torsoH / 2 - 2, torsoW / 2, 4);
-                break;
-            case 'shooter':
-                // Bandolier
-                ctx.strokeStyle = palette.accent; ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.moveTo(cx - torsoW / 2, torsoTop + 3);
-                ctx.lineTo(cx + torsoW / 2, torsoTop + torsoH - 3); ctx.stroke();
-                break;
-            case 'berserker':
-                // Battle scars
-                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1;
-                for (let i = 0; i < 3; i++) {
-                    ctx.beginPath(); ctx.moveTo(cx - 4 + i * 4, torsoTop + 3);
-                    ctx.lineTo(cx - 2 + i * 4, torsoTop + torsoH - 3); ctx.stroke();
-                }
-                break;
-            case 'bomber':
-                // Explosive pack on chest
-                ctx.fillStyle = '#cc2900';
-                ctx.fillRect(cx - torsoW / 3, torsoTop + torsoH / 3, torsoW * 2 / 3, torsoH / 3);
-                ctx.fillStyle = '#ff6633';
-                ctx.beginPath(); ctx.arc(cx, torsoTop + torsoH / 2, s * 0.08, 0, Math.PI * 2); ctx.fill();
-                break;
-            case 'shielder':
-                // Shield emblem
-                ctx.fillStyle = palette.accent;
+    // === GRUNT: Floating alien eye-orb with organic tentacles ===
+    _drawGrunt(ctx, cx, cy, s, t, p, angle) {
+        const pulse = Math.sin(t * 0.004) * 0.15 + 0.3;
+        ctx.fillStyle = `rgba(${this.hexToRgb(p.glow)}, ${pulse})`;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 1.05, 0, Math.PI * 2); ctx.fill();
+        // Tentacles
+        ctx.strokeStyle = p.accent; ctx.lineWidth = s * 0.07; ctx.lineCap = 'round';
+        for (let i = 0; i < 4; i++) {
+            const tx = cx + (i - 1.5) * s * 0.22;
+            const wave = Math.sin(t * 0.006 + i * 1.5) * s * 0.15;
+            ctx.beginPath(); ctx.moveTo(tx, cy + s * 0.3);
+            ctx.quadraticCurveTo(tx + wave, cy + s * 0.6, tx + wave * 0.5, cy + s * 0.85);
+            ctx.stroke();
+        }
+        // Body orb
+        ctx.fillStyle = p.body;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.5, 0, Math.PI * 2); ctx.fill();
+        // Inner glow
+        const grad = ctx.createRadialGradient(cx, cy, s * 0.1, cx, cy, s * 0.5);
+        grad.addColorStop(0, p.core); grad.addColorStop(1, p.body);
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.48, 0, Math.PI * 2); ctx.fill();
+        // Eye
+        const eyeX = cx + Math.cos(angle) * s * 0.1;
+        const eyeY = cy + Math.sin(angle) * s * 0.1;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#1a1a2e';
+        ctx.beginPath(); ctx.arc(eyeX, eyeY, s * 0.11, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = p.glow;
+        ctx.beginPath(); ctx.arc(eyeX + s * 0.03, eyeY - s * 0.03, s * 0.035, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    // === STALKER: Dart-shaped predator with motion trail ===
+    _drawStalker(ctx, cx, cy, s, t, p, angle) {
+        const moveAngle = Math.atan2((this.y - (this.prevY ?? this.y)), (this.x - (this.prevX ?? this.x)) || 0.01);
+        // Motion trail
+        ctx.globalAlpha = 0.15;
+        ctx.fillStyle = p.glow;
+        for (let i = 1; i <= 3; i++) {
+            const trailX = cx - Math.cos(moveAngle) * s * 0.3 * i;
+            const trailY = cy - Math.sin(moveAngle) * s * 0.3 * i;
+            ctx.beginPath(); ctx.arc(trailX, trailY, s * (0.3 - i * 0.06), 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        // Body - arrow/dart shape
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(moveAngle);
+        ctx.fillStyle = p.body;
+        ctx.beginPath();
+        ctx.moveTo(s * 0.6, 0);
+        ctx.lineTo(-s * 0.3, -s * 0.35);
+        ctx.lineTo(-s * 0.15, 0);
+        ctx.lineTo(-s * 0.3, s * 0.35);
+        ctx.closePath(); ctx.fill();
+        // Core streak
+        ctx.fillStyle = p.core;
+        ctx.beginPath();
+        ctx.moveTo(s * 0.4, 0);
+        ctx.lineTo(-s * 0.1, -s * 0.12);
+        ctx.lineTo(-s * 0.1, s * 0.12);
+        ctx.closePath(); ctx.fill();
+        // Fins
+        ctx.fillStyle = p.accent;
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.2, -s * 0.25);
+        ctx.lineTo(-s * 0.5, -s * 0.45);
+        ctx.lineTo(-s * 0.35, -s * 0.15);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.2, s * 0.25);
+        ctx.lineTo(-s * 0.5, s * 0.45);
+        ctx.lineTo(-s * 0.35, s * 0.15);
+        ctx.closePath(); ctx.fill();
+        // Eye
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(s * 0.15, 0, s * 0.08, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = p.accent;
+        ctx.beginPath(); ctx.arc(s * 0.18, 0, s * 0.04, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+    
+    // === GOLEM: Floating crystal cluster ===
+    _drawGolem(ctx, cx, cy, s, t, p) {
+        const pulse = Math.sin(t * 0.003) * 0.1;
+        // Orbiting crystal shards
+        ctx.fillStyle = p.core;
+        for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI * 2 + t * 0.002;
+            const d = s * (0.75 + pulse);
+            const sx = cx + Math.cos(a) * d;
+            const sy = cy + Math.sin(a) * d;
+            ctx.save(); ctx.translate(sx, sy); ctx.rotate(a + t * 0.004);
+            ctx.beginPath();
+            ctx.moveTo(0, -s * 0.12); ctx.lineTo(s * 0.07, 0);
+            ctx.lineTo(0, s * 0.12); ctx.lineTo(-s * 0.07, 0);
+            ctx.closePath(); ctx.fill(); ctx.restore();
+        }
+        // Main crystal body (hexagonal)
+        ctx.fillStyle = p.body;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 - Math.PI / 6;
+            const r = s * 0.55;
+            const px = cx + Math.cos(a) * r;
+            const py = cy + Math.sin(a) * r;
+            if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath(); ctx.fill();
+        // Crystal facets
+        ctx.strokeStyle = p.glow; ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - s * 0.55); ctx.lineTo(cx, cy + s * 0.55);
+        ctx.moveTo(cx - s * 0.47, cy - s * 0.27); ctx.lineTo(cx + s * 0.47, cy + s * 0.27);
+        ctx.moveTo(cx - s * 0.47, cy + s * 0.27); ctx.lineTo(cx + s * 0.47, cy - s * 0.27);
+        ctx.stroke();
+        // Inner glow core
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, s * 0.35);
+        grad.addColorStop(0, p.core); grad.addColorStop(1, 'transparent');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.35, 0, Math.PI * 2); ctx.fill();
+        // Eyes (two crystal eyes)
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx - s * 0.15, cy - s * 0.1, s * 0.08, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.15, cy - s * 0.1, s * 0.08, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = p.accent;
+        ctx.beginPath(); ctx.arc(cx - s * 0.15, cy - s * 0.1, s * 0.04, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.15, cy - s * 0.1, s * 0.04, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    // === DRONE: Tiny buzzing insect with fluttering wings ===
+    _drawDrone(ctx, cx, cy, s, t, p) {
+        const wingFlutter = Math.sin(t * 0.04) * 0.4;
+        // Wings (translucent, fluttering)
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = p.core;
+        ctx.save(); ctx.translate(cx, cy);
+        // Left wing
+        ctx.save(); ctx.rotate(-0.6 + wingFlutter);
+        ctx.beginPath(); ctx.ellipse(-s * 0.1, -s * 0.1, s * 0.45, s * 0.15, -0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        // Right wing
+        ctx.save(); ctx.rotate(0.6 - wingFlutter);
+        ctx.beginPath(); ctx.ellipse(s * 0.1, -s * 0.1, s * 0.45, s * 0.15, 0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+        // Body (diamond shape)
+        ctx.fillStyle = p.body;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - s * 0.35); ctx.lineTo(cx + s * 0.2, cy);
+        ctx.lineTo(cx, cy + s * 0.35); ctx.lineTo(cx - s * 0.2, cy);
+        ctx.closePath(); ctx.fill();
+        // Eye dots
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx - s * 0.06, cy - s * 0.08, s * 0.06, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.06, cy - s * 0.08, s * 0.06, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    // === WARPER: Cosmic jellyfish with trailing energy ribbons ===
+    _drawWarper(ctx, cx, cy, s, t, p) {
+        const pulse = Math.sin(t * 0.005) * 0.15 + 0.85;
+        const phaseAlpha = this.teleportCooldown > 150 ? 0.5 : 1;
+        ctx.globalAlpha = phaseAlpha;
+        // Energy ribbons (trailing tentacles)
+        ctx.strokeStyle = p.glow; ctx.lineWidth = s * 0.04; ctx.lineCap = 'round';
+        for (let i = 0; i < 6; i++) {
+            const tx = cx + (i - 2.5) * s * 0.16;
+            const len = s * (0.5 + Math.sin(t * 0.004 + i) * 0.15);
+            const wave1 = Math.sin(t * 0.007 + i * 0.8) * s * 0.12;
+            const wave2 = Math.sin(t * 0.005 + i * 1.2) * s * 0.08;
+            ctx.globalAlpha = phaseAlpha * (0.3 + i * 0.1);
+            ctx.beginPath(); ctx.moveTo(tx, cy + s * 0.2);
+            ctx.quadraticCurveTo(tx + wave1, cy + s * 0.2 + len * 0.5, tx + wave2, cy + s * 0.2 + len);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = phaseAlpha;
+        // Bell/dome body
+        ctx.fillStyle = p.body;
+        ctx.beginPath();
+        ctx.arc(cx, cy - s * 0.1, s * 0.45, Math.PI, 0);
+        ctx.quadraticCurveTo(cx + s * 0.45, cy + s * 0.2, cx, cy + s * 0.25);
+        ctx.quadraticCurveTo(cx - s * 0.45, cy + s * 0.2, cx - s * 0.45, cy - s * 0.1);
+        ctx.fill();
+        // Inner glow
+        const grad = ctx.createRadialGradient(cx, cy - s * 0.1, 0, cx, cy - s * 0.1, s * 0.4);
+        grad.addColorStop(0, p.core); grad.addColorStop(0.6, p.body); grad.addColorStop(1, p.accent);
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy - s * 0.1, s * 0.35 * pulse, Math.PI, 0); ctx.fill();
+        // Nucleus orb
+        ctx.fillStyle = p.core;
+        ctx.beginPath(); ctx.arc(cx, cy - s * 0.05, s * 0.12, 0, Math.PI * 2); ctx.fill();
+        // Phase rings
+        ctx.strokeStyle = `rgba(${this.hexToRgb(p.glow)}, ${0.3 * pulse})`;
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 2; i++) {
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, s * (0.6 + i * 0.15) * pulse, s * 0.15, 0, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+    }
+    
+    // === MARKSMAN: Floating turret eye with stabilizers ===
+    _drawMarksman(ctx, cx, cy, s, t, p, angle) {
+        // Targeting laser toward player
+        ctx.strokeStyle = `rgba(${this.hexToRgb(p.glow)}, 0.15)`;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 8]);
+        ctx.beginPath(); ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + Math.cos(angle) * s * 4, cy + Math.sin(angle) * s * 4);
+        ctx.stroke(); ctx.setLineDash([]);
+        // Rotating ring
+        ctx.strokeStyle = p.accent; ctx.lineWidth = 2;
+        const ringAngle = t * 0.003;
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(ringAngle);
+        ctx.beginPath(); ctx.arc(0, 0, s * 0.55, 0, Math.PI * 1.2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, 0, s * 0.55, Math.PI * 1.4, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+        // Stabilizer fins (3 rotating)
+        ctx.fillStyle = p.accent;
+        for (let i = 0; i < 3; i++) {
+            const a = (i / 3) * Math.PI * 2 + t * 0.002;
+            ctx.save(); ctx.translate(cx + Math.cos(a) * s * 0.45, cy + Math.sin(a) * s * 0.45);
+            ctx.rotate(a + Math.PI / 2);
+            ctx.fillRect(-s * 0.03, -s * 0.12, s * 0.06, s * 0.24);
+            ctx.restore();
+        }
+        // Main body orb
+        ctx.fillStyle = p.body;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.38, 0, Math.PI * 2); ctx.fill();
+        // Eye (large targeting eye)
+        const eyeX = cx + Math.cos(angle) * s * 0.08;
+        const eyeY = cy + Math.sin(angle) * s * 0.08;
+        ctx.fillStyle = p.core;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.25, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#1a1a2e';
+        ctx.beginPath(); ctx.arc(eyeX, eyeY, s * 0.15, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#ff0040';
+        ctx.beginPath(); ctx.arc(eyeX + s * 0.02, eyeY, s * 0.06, 0, Math.PI * 2); ctx.fill();
+        // Crosshair on eye
+        ctx.strokeStyle = '#ff0040'; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(eyeX - s * 0.1, eyeY); ctx.lineTo(eyeX + s * 0.1, eyeY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(eyeX, eyeY - s * 0.1); ctx.lineTo(eyeX, eyeY + s * 0.1); ctx.stroke();
+    }
+    
+    // === ORACLE: Angelic moth with luminous wings ===
+    _drawOracle(ctx, cx, cy, s, t, p) {
+        const wingBeat = Math.sin(t * 0.008) * 0.15;
+        const healGlow = this.healCooldown < 30 ? (30 - this.healCooldown) / 30 : 0;
+        // Healing aura pulse
+        if (healGlow > 0) {
+            ctx.fillStyle = `rgba(0, 255, 136, ${healGlow * 0.2})`;
+            ctx.beginPath(); ctx.arc(cx, cy, s * (1.2 + healGlow * 0.8), 0, Math.PI * 2); ctx.fill();
+        }
+        // Wings (spread moth wings)
+        ctx.fillStyle = p.body;
+        ctx.globalAlpha = 0.6;
+        // Left wing
+        ctx.save(); ctx.translate(cx, cy);
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.1, -s * 0.1);
+        ctx.quadraticCurveTo(-s * 0.7, -s * (0.6 + wingBeat), -s * 0.5, s * 0.1);
+        ctx.quadraticCurveTo(-s * 0.3, s * 0.3, -s * 0.1, s * 0.15);
+        ctx.closePath(); ctx.fill();
+        // Right wing
+        ctx.beginPath();
+        ctx.moveTo(s * 0.1, -s * 0.1);
+        ctx.quadraticCurveTo(s * 0.7, -s * (0.6 + wingBeat), s * 0.5, s * 0.1);
+        ctx.quadraticCurveTo(s * 0.3, s * 0.3, s * 0.1, s * 0.15);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+        // Wing veins
+        ctx.strokeStyle = p.glow; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(cx - s * 0.1, cy); ctx.lineTo(cx - s * 0.5, cy - s * 0.3); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + s * 0.1, cy); ctx.lineTo(cx + s * 0.5, cy - s * 0.3); ctx.stroke();
+        // Body
+        ctx.fillStyle = p.core;
+        ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.15, s * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+        // Halo
+        const haloPulse = Math.sin(t * 0.006) * 0.2 + 0.8;
+        ctx.strokeStyle = `rgba(${this.hexToRgb(p.glow)}, ${haloPulse * 0.6})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(cx, cy - s * 0.35, s * 0.25, s * 0.06, 0, 0, Math.PI * 2); ctx.stroke();
+        // Eyes
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx - s * 0.06, cy - s * 0.08, s * 0.05, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.06, cy - s * 0.08, s * 0.05, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    // === MITOTIC: Amoeba blob with visible nuclei ===
+    _drawMitotic(ctx, cx, cy, s, t, p) {
+        const wobble1 = Math.sin(t * 0.005) * 0.12;
+        const wobble2 = Math.sin(t * 0.007 + 1) * 0.1;
+        const wobble3 = Math.sin(t * 0.006 + 2) * 0.08;
+        // Outer membrane (blobby)
+        ctx.fillStyle = p.body;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(cx + s * (0.5 + wobble1), cy);
+        ctx.quadraticCurveTo(cx + s * (0.45 + wobble2), cy - s * (0.5 + wobble3), cx, cy - s * (0.48 + wobble1));
+        ctx.quadraticCurveTo(cx - s * (0.5 + wobble3), cy - s * (0.45 + wobble2), cx - s * (0.5 + wobble2), cy);
+        ctx.quadraticCurveTo(cx - s * (0.45 + wobble1), cy + s * (0.5 + wobble2), cx, cy + s * (0.5 + wobble3));
+        ctx.quadraticCurveTo(cx + s * (0.5 + wobble3), cy + s * (0.45 + wobble1), cx + s * (0.5 + wobble1), cy);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        // Inner nuclei (3 visible cores)
+        ctx.fillStyle = p.core;
+        for (let i = 0; i < 3; i++) {
+            const a = (i / 3) * Math.PI * 2 + t * 0.002;
+            const d = s * 0.2;
+            const nx = cx + Math.cos(a) * d;
+            const ny = cy + Math.sin(a) * d;
+            ctx.beginPath(); ctx.arc(nx, ny, s * 0.1, 0, Math.PI * 2); ctx.fill();
+            // Nucleus detail
+            ctx.fillStyle = p.accent;
+            ctx.beginPath(); ctx.arc(nx, ny, s * 0.04, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = p.core;
+        }
+        // Membrane outline
+        ctx.strokeStyle = p.glow; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx + s * (0.5 + wobble1), cy);
+        ctx.quadraticCurveTo(cx + s * (0.45 + wobble2), cy - s * (0.5 + wobble3), cx, cy - s * (0.48 + wobble1));
+        ctx.quadraticCurveTo(cx - s * (0.5 + wobble3), cy - s * (0.45 + wobble2), cx - s * (0.5 + wobble2), cy);
+        ctx.quadraticCurveTo(cx - s * (0.45 + wobble1), cy + s * (0.5 + wobble2), cx, cy + s * (0.5 + wobble3));
+        ctx.quadraticCurveTo(cx + s * (0.5 + wobble3), cy + s * (0.45 + wobble1), cx + s * (0.5 + wobble1), cy);
+        ctx.stroke();
+    }
+    
+    // === CRYO: Crystalline ice entity with frost aura ===
+    _drawCryo(ctx, cx, cy, s, t, p) {
+        // Frost particle orbit
+        ctx.fillStyle = p.core;
+        ctx.globalAlpha = 0.5;
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 + t * 0.003;
+            const d = s * (0.7 + Math.sin(t * 0.005 + i) * 0.1);
+            ctx.beginPath();
+            ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, s * 0.04, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+        // Main crystal body (diamond/star shape)
+        ctx.fillStyle = p.body;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - s * 0.6); ctx.lineTo(cx + s * 0.25, cy - s * 0.15);
+        ctx.lineTo(cx + s * 0.55, cy); ctx.lineTo(cx + s * 0.25, cy + s * 0.15);
+        ctx.lineTo(cx, cy + s * 0.6); ctx.lineTo(cx - s * 0.25, cy + s * 0.15);
+        ctx.lineTo(cx - s * 0.55, cy); ctx.lineTo(cx - s * 0.25, cy - s * 0.15);
+        ctx.closePath(); ctx.fill();
+        // Crystal facet lines
+        ctx.strokeStyle = p.glow; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(cx, cy - s * 0.6); ctx.lineTo(cx, cy + s * 0.6); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx - s * 0.55, cy); ctx.lineTo(cx + s * 0.55, cy); ctx.stroke();
+        // Inner glow
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, s * 0.3);
+        grad.addColorStop(0, '#fff'); grad.addColorStop(1, p.body);
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.2, 0, Math.PI * 2); ctx.fill();
+        // Cold aura ring
+        const frostPulse = Math.sin(t * 0.006) * 0.2 + 0.6;
+        ctx.strokeStyle = `rgba(${this.hexToRgb(p.glow)}, ${frostPulse * 0.4})`;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.8, 0, Math.PI * 2); ctx.stroke();
+    }
+    
+    // === RAVAGER: Low aggressive beast with claws ===
+    _drawRavager(ctx, cx, cy, s, t, p) {
+        const isEnraged = this.enraged;
+        const ragePulse = isEnraged ? Math.sin(t * 0.015) * 0.3 + 0.7 : 0;
+        // Rage aura
+        if (isEnraged) {
+            ctx.fillStyle = `rgba(255, 0, 0, ${ragePulse * 0.25})`;
+            ctx.beginPath(); ctx.arc(cx, cy, s * 1.3, 0, Math.PI * 2); ctx.fill();
+            // Flame particles
+            ctx.fillStyle = `rgba(251, 146, 60, ${ragePulse * 0.5})`;
+            for (let i = 0; i < 6; i++) {
+                const a = (i / 6) * Math.PI * 2 + t * 0.01;
+                const d = s * (1.0 + Math.sin(t * 0.012 + i) * 0.2);
+                ctx.beginPath(); ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, s * 0.08, 0, Math.PI * 2); ctx.fill();
+            }
+        }
+        const walkOff = this.walkFrame === 0 ? 0.15 : -0.15;
+        // Legs (4 beast legs)
+        ctx.fillStyle = p.accent;
+        const legPositions = [[-0.35, 0.15], [0.35, 0.15], [-0.25, 0.25], [0.25, 0.25]];
+        legPositions.forEach((pos, i) => {
+            const lx = cx + pos[0] * s;
+            const ly = cy + pos[1] * s;
+            ctx.save(); ctx.translate(lx, ly);
+            ctx.rotate((i < 2 ? 1 : -1) * walkOff);
+            ctx.fillRect(-s * 0.04, 0, s * 0.08, s * 0.3);
+            ctx.restore();
+        });
+        // Body (wide horizontal beast shape)
+        ctx.fillStyle = isEnraged ? '#ef4444' : p.body;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, s * 0.55, s * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // Spikes along back
+        ctx.fillStyle = p.accent;
+        for (let i = 0; i < 5; i++) {
+            const sx = cx - s * 0.3 + i * s * 0.15;
+            ctx.beginPath();
+            ctx.moveTo(sx - s * 0.04, cy - s * 0.25);
+            ctx.lineTo(sx, cy - s * (0.4 + Math.sin(t * 0.01 + i) * 0.05));
+            ctx.lineTo(sx + s * 0.04, cy - s * 0.25);
+            ctx.closePath(); ctx.fill();
+        }
+        // Head
+        ctx.fillStyle = isEnraged ? '#ef4444' : p.body;
+        ctx.beginPath(); ctx.arc(cx + s * 0.4, cy - s * 0.05, s * 0.22, 0, Math.PI * 2); ctx.fill();
+        // Eyes
+        ctx.fillStyle = isEnraged ? '#ff0000' : '#fff';
+        ctx.beginPath(); ctx.arc(cx + s * 0.45, cy - s * 0.12, s * 0.07, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.5, cy - s * 0.06, s * 0.06, 0, Math.PI * 2); ctx.fill();
+        if (!isEnraged) {
+            ctx.fillStyle = '#000';
+            ctx.beginPath(); ctx.arc(cx + s * 0.46, cy - s * 0.12, s * 0.03, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(cx + s * 0.51, cy - s * 0.06, s * 0.03, 0, Math.PI * 2); ctx.fill();
+        }
+        // Jaw/teeth
+        ctx.fillStyle = p.core;
+        ctx.beginPath();
+        ctx.moveTo(cx + s * 0.55, cy + s * 0.05);
+        ctx.lineTo(cx + s * 0.65, cy);
+        ctx.lineTo(cx + s * 0.55, cy - s * 0.05);
+        ctx.closePath(); ctx.fill();
+    }
+    
+    // === DETONATOR: Living bomb/mine with pulsing core ===
+    _drawDetonator(ctx, cx, cy, s, t, p) {
+        const playerDist = game.player ? Math.hypot(game.player.x - cx, game.player.y - cy) : CONFIG.CANVAS_WIDTH;
+        const urgency = Math.max(0.3, 1 - playerDist / 400);
+        const pulse = Math.sin(t * (0.008 + urgency * 0.02)) * 0.3 + 0.7;
+        // Danger glow
+        ctx.fillStyle = `rgba(${this.hexToRgb(p.glow)}, ${pulse * 0.3})`;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 1.1, 0, Math.PI * 2); ctx.fill();
+        // Outer shell segments
+        ctx.fillStyle = p.accent;
+        for (let i = 0; i < 8; i++) {
+            const a = (i / 8) * Math.PI * 2;
+            const a2 = ((i + 1) / 8) * Math.PI * 2;
+            if (i % 2 === 0) {
                 ctx.beginPath();
-                ctx.moveTo(cx, torsoTop + 3);
-                ctx.lineTo(cx + torsoW / 3, torsoTop + torsoH / 3);
-                ctx.lineTo(cx + torsoW / 3, torsoTop + torsoH * 0.6);
-                ctx.lineTo(cx, torsoTop + torsoH - 3);
-                ctx.lineTo(cx - torsoW / 3, torsoTop + torsoH * 0.6);
-                ctx.lineTo(cx - torsoW / 3, torsoTop + torsoH / 3);
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, s * 0.5, a, a2);
                 ctx.closePath(); ctx.fill();
-                break;
-            case 'necro':
-                // Rib cage pattern
-                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1;
-                for (let i = 0; i < 4; i++) {
-                    const ry = torsoTop + 4 + i * (torsoH - 8) / 3;
-                    ctx.beginPath(); ctx.moveTo(cx - torsoW / 3, ry);
-                    ctx.quadraticCurveTo(cx, ry + 3, cx + torsoW / 3, ry); ctx.stroke();
-                }
-                break;
-            case 'parasite':
-                // Tendrils on torso
-                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
-                for (let i = 0; i < 3; i++) {
-                    const ax = cx + (i - 1) * torsoW / 3;
-                    ctx.beginPath(); ctx.moveTo(ax, torsoTop);
-                    ctx.quadraticCurveTo(ax + (Math.sin(Date.now() * 0.008 + i) * 4), torsoTop + torsoH / 2, ax, torsoTop + torsoH);
-                    ctx.stroke();
-                }
-                break;
+            }
         }
+        // Body sphere
+        ctx.fillStyle = p.body;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.45, 0, Math.PI * 2); ctx.fill();
+        // Pulsing core
+        const coreSize = s * (0.2 + pulse * 0.1);
+        const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreSize);
+        coreGrad.addColorStop(0, '#ffcc00'); coreGrad.addColorStop(0.5, p.glow); coreGrad.addColorStop(1, p.body);
+        ctx.fillStyle = coreGrad;
+        ctx.beginPath(); ctx.arc(cx, cy, coreSize, 0, Math.PI * 2); ctx.fill();
+        // Warning spikes
+        ctx.fillStyle = p.core;
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2 + t * 0.002;
+            ctx.save(); ctx.translate(cx + Math.cos(a) * s * 0.45, cy + Math.sin(a) * s * 0.45);
+            ctx.rotate(a);
+            ctx.beginPath();
+            ctx.moveTo(0, -s * 0.04); ctx.lineTo(s * 0.12, 0); ctx.lineTo(0, s * 0.04);
+            ctx.closePath(); ctx.fill(); ctx.restore();
+        }
+        // Fuse on top
+        ctx.strokeStyle = p.core; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx, cy - s * 0.45);
+        ctx.quadraticCurveTo(cx + 3, cy - s * 0.6, cx + 1, cy - s * 0.7);
+        ctx.stroke();
+        ctx.fillStyle = `rgba(255, 200, 0, ${pulse})`;
+        ctx.beginPath(); ctx.arc(cx + 1, cy - s * 0.7, 3, 0, Math.PI * 2); ctx.fill();
     }
     
-    drawHandItem(ctx, s, armLen, palette) {
-        switch(this.type) {
-            case 'shooter':
-                // Gun
-                ctx.fillStyle = palette.accent;
-                ctx.fillRect(-2, armLen - 2, 4, 8);
-                break;
-            case 'healer':
-                // Staff
-                ctx.fillStyle = '#fff';
-                ctx.fillRect(-1, armLen - 4, 2, 10);
-                ctx.fillStyle = palette.accent;
-                ctx.beginPath(); ctx.arc(0, armLen + 6, 3, 0, Math.PI * 2); ctx.fill();
-                break;
-            case 'berserker':
-                // Blade
-                ctx.fillStyle = '#7f1d1d';
-                ctx.beginPath();
-                ctx.moveTo(-1, armLen); ctx.lineTo(0, armLen + 10); ctx.lineTo(1, armLen);
-                ctx.closePath(); ctx.fill();
-                break;
-            case 'freezer':
-                // Ice crystal
-                ctx.fillStyle = palette.accent;
-                ctx.beginPath();
-                ctx.moveTo(0, armLen - 2); ctx.lineTo(3, armLen + 4); ctx.lineTo(0, armLen + 10);
-                ctx.lineTo(-3, armLen + 4); ctx.closePath(); ctx.fill();
-                break;
-            case 'necro':
-                // Bone staff
-                ctx.fillStyle = '#e5e5e5';
-                ctx.fillRect(-1, armLen - 2, 2, 12);
-                ctx.beginPath(); ctx.arc(0, armLen - 2, 3, 0, Math.PI * 2); ctx.fill();
-                break;
+    // === LEECH: Segmented cosmic worm ===
+    _drawLeech(ctx, cx, cy, s, t, p, angle) {
+        const moveAngle = Math.atan2((this.y - (this.prevY ?? this.y)), (this.x - (this.prevX ?? this.x)) || 0.01);
+        const segCount = 5;
+        // Body segments (tail to head)
+        for (let i = segCount - 1; i >= 0; i--) {
+            const segPhase = Math.sin(t * 0.008 + i * 0.8) * s * 0.08;
+            const segX = cx - Math.cos(moveAngle) * i * s * 0.18 + Math.sin(t * 0.006 + i) * segPhase;
+            const segY = cy - Math.sin(moveAngle) * i * s * 0.18 + Math.cos(t * 0.006 + i) * segPhase;
+            const segSize = s * (0.28 - i * 0.03);
+            // Toxic trail from segments
+            if (i > 2) {
+                ctx.fillStyle = `rgba(${this.hexToRgb(p.glow)}, 0.15)`;
+                ctx.beginPath(); ctx.arc(segX, segY, segSize * 1.2, 0, Math.PI * 2); ctx.fill();
+            }
+            ctx.fillStyle = i === 0 ? p.body : p.accent;
+            ctx.beginPath(); ctx.arc(segX, segY, segSize, 0, Math.PI * 2); ctx.fill();
+            // Segment ring detail
+            ctx.strokeStyle = p.glow; ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(segX, segY, segSize * 0.7, 0, Math.PI * 2); ctx.stroke();
         }
+        // Head (first segment - larger with mandibles)
+        const headX = cx;
+        const headY = cy;
+        // Mandibles
+        ctx.fillStyle = p.core;
+        const mandAngle1 = angle + Math.sin(t * 0.01) * 0.3 - 0.4;
+        const mandAngle2 = angle - Math.sin(t * 0.01) * 0.3 + 0.4;
+        ctx.beginPath();
+        ctx.moveTo(headX + Math.cos(mandAngle1) * s * 0.15, headY + Math.sin(mandAngle1) * s * 0.15);
+        ctx.lineTo(headX + Math.cos(angle) * s * 0.45, headY + Math.sin(angle) * s * 0.45);
+        ctx.lineTo(headX + Math.cos(mandAngle1 + 0.3) * s * 0.2, headY + Math.sin(mandAngle1 + 0.3) * s * 0.2);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(headX + Math.cos(mandAngle2) * s * 0.15, headY + Math.sin(mandAngle2) * s * 0.15);
+        ctx.lineTo(headX + Math.cos(angle) * s * 0.45, headY + Math.sin(angle) * s * 0.45);
+        ctx.lineTo(headX + Math.cos(mandAngle2 - 0.3) * s * 0.2, headY + Math.sin(mandAngle2 - 0.3) * s * 0.2);
+        ctx.closePath(); ctx.fill();
+        // Eyes
+        ctx.fillStyle = '#d9f99d';
+        ctx.beginPath(); ctx.arc(cx + Math.cos(angle - 0.4) * s * 0.15, cy + Math.sin(angle - 0.4) * s * 0.15, s * 0.06, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + Math.cos(angle + 0.4) * s * 0.15, cy + Math.sin(angle + 0.4) * s * 0.15, s * 0.06, 0, Math.PI * 2); ctx.fill();
     }
     
-    drawHeadDetail(ctx, cx, headY, headR, s, palette) {
-        switch(this.type) {
-            case 'normal':
-                // Antenna nubs
-                ctx.fillStyle = palette.accent;
-                ctx.beginPath(); ctx.arc(cx - headR * 0.4, headY - headR * 0.9, headR * 0.15, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(cx + headR * 0.4, headY - headR * 0.9, headR * 0.15, 0, Math.PI * 2); ctx.fill();
-                break;
-            case 'fast':
-                // Sleek elongated head
-                ctx.fillStyle = palette.head;
-                ctx.beginPath();
-                ctx.moveTo(cx + headR, headY);
-                ctx.lineTo(cx + headR * 1.5, headY - headR * 0.3);
-                ctx.lineTo(cx + headR * 0.8, headY - headR * 0.5);
-                ctx.closePath(); ctx.fill();
-                break;
-            case 'tank':
-                // Helmet
-                ctx.strokeStyle = palette.limb; ctx.lineWidth = 2.5;
-                ctx.beginPath(); ctx.arc(cx, headY, headR * 1.05, Math.PI * 1.2, Math.PI * 1.8); ctx.stroke();
-                ctx.fillStyle = palette.limb;
-                ctx.fillRect(cx - headR * 0.7, headY - headR * 0.1, headR * 1.4, headR * 0.25);
-                break;
-            case 'swarm':
-                // Mandibles
-                ctx.fillStyle = palette.limb;
-                ctx.beginPath();
-                ctx.moveTo(cx - headR * 0.5, headY + headR * 0.5);
-                ctx.lineTo(cx - headR * 0.8, headY + headR);
-                ctx.lineTo(cx - headR * 0.2, headY + headR * 0.6);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(cx + headR * 0.5, headY + headR * 0.5);
-                ctx.lineTo(cx + headR * 0.8, headY + headR);
-                ctx.lineTo(cx + headR * 0.2, headY + headR * 0.6);
-                ctx.fill();
-                break;
-            case 'teleporter':
-                // Floating rune crown
-                const runeGlow = Math.sin(Date.now() * 0.006) * 0.3 + 0.7;
-                ctx.strokeStyle = `rgba(139, 92, 246, ${runeGlow})`;
-                ctx.lineWidth = 1.5;
-                ctx.beginPath(); ctx.arc(cx, headY, headR * 1.3, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
-                ctx.fillStyle = `rgba(167, 139, 250, ${runeGlow})`;
-                ctx.beginPath(); ctx.arc(cx, headY - headR * 1.2, 2, 0, Math.PI * 2); ctx.fill();
-                break;
-            case 'shooter':
-                // Targeting visor
-                ctx.fillStyle = palette.accent;
-                ctx.fillRect(cx - headR * 0.8, headY - headR * 0.15, headR * 1.6, headR * 0.3);
-                ctx.fillStyle = '#fff';
-                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY, headR * 0.15, 0, Math.PI * 2); ctx.fill();
-                break;
-            case 'healer':
-                // Halo
-                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                ctx.ellipse(cx, headY - headR * 1.1, headR * 0.8, headR * 0.2, 0, 0, Math.PI * 2);
-                ctx.stroke();
-                break;
-            case 'splitter':
-                // Wobbling nucleus head
-                const wobble = Math.sin(Date.now() * 0.01) * 0.15;
-                ctx.fillStyle = palette.accent;
-                ctx.beginPath();
-                ctx.ellipse(cx, headY, headR * (1 + wobble), headR * (1 - wobble), 0, 0, Math.PI * 2);
-                ctx.fill();
-                break;
-            case 'freezer':
-                // Ice crown crystals
-                ctx.fillStyle = palette.accent;
-                for (let i = 0; i < 5; i++) {
-                    const angle = Math.PI * 1.1 + (i / 4) * Math.PI * 0.8;
-                    const bx = cx + Math.cos(angle) * headR * 1.1;
-                    const by = headY + Math.sin(angle) * headR * 1.1;
-                    ctx.beginPath();
-                    ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(angle) * 4, by + Math.sin(angle) * 4 - 3);
-                    ctx.lineTo(bx + 2, by); ctx.closePath(); ctx.fill();
-                }
-                break;
-            case 'berserker':
-                // Horns
-                ctx.fillStyle = palette.limb;
-                ctx.beginPath();
-                ctx.moveTo(cx - headR * 0.6, headY - headR * 0.3);
-                ctx.lineTo(cx - headR * 0.3, headY - headR * 1.2);
-                ctx.lineTo(cx - headR * 0.1, headY - headR * 0.3);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.moveTo(cx + headR * 0.6, headY - headR * 0.3);
-                ctx.lineTo(cx + headR * 0.3, headY - headR * 1.2);
-                ctx.lineTo(cx + headR * 0.1, headY - headR * 0.3);
-                ctx.fill();
-                break;
-            case 'bomber':
-                // Fuse on head
-                ctx.strokeStyle = '#ff6633'; ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(cx, headY - headR);
-                ctx.quadraticCurveTo(cx + 4, headY - headR - 6, cx + 2, headY - headR - 10);
-                ctx.stroke();
-                // Spark at tip
-                const sparkPulse = Math.sin(Date.now() * 0.02) * 0.5 + 0.5;
-                ctx.fillStyle = `rgba(255, 200, 0, ${sparkPulse})`;
-                ctx.beginPath(); ctx.arc(cx + 2, headY - headR - 10, 2.5, 0, Math.PI * 2); ctx.fill();
-                break;
-            case 'parasite':
-                // Tendrils from head
-                ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
-                for (let i = 0; i < 4; i++) {
-                    const angle = Math.PI * 0.8 + (i / 3) * Math.PI * 0.4;
-                    const wave = Math.sin(Date.now() * 0.008 + i) * 3;
-                    ctx.beginPath();
-                    ctx.moveTo(cx + Math.cos(angle) * headR, headY + Math.sin(angle) * headR);
-                    ctx.quadraticCurveTo(
-                        cx + Math.cos(angle) * (headR + 8) + wave,
-                        headY + Math.sin(angle) * (headR + 8),
-                        cx + Math.cos(angle) * (headR + 5),
-                        headY + Math.sin(angle) * (headR + 12)
-                    );
-                    ctx.stroke();
-                }
-                break;
-            case 'shielder':
-                // Visor
-                ctx.fillStyle = palette.accent;
-                ctx.fillRect(cx - headR * 0.6, headY - headR * 0.2, headR * 1.2, headR * 0.35);
-                break;
-            case 'necro':
-                // Skull face overlay
-                ctx.fillStyle = palette.accent;
-                ctx.beginPath(); ctx.arc(cx, headY, headR * 0.85, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = palette.limb;
-                // Hollow eyes
-                ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
-                // Nose hole
-                ctx.beginPath();
-                ctx.moveTo(cx - 1, headY + headR * 0.15);
-                ctx.lineTo(cx + 1, headY + headR * 0.15);
-                ctx.lineTo(cx, headY + headR * 0.3);
-                ctx.closePath(); ctx.fill();
-                break;
+    // === SENTINEL: Floating geometric obelisk with shield projectors ===
+    _drawSentinel(ctx, cx, cy, s, t, p) {
+        const hover = Math.sin(t * 0.004) * s * 0.05;
+        const cy2 = cy + hover;
+        // Shield aura for nearby allies
+        if (this.shieldActive) {
+            const shieldPulse = Math.sin(t * 0.005) * 0.1 + 0.2;
+            ctx.strokeStyle = `rgba(${this.hexToRgb(p.glow)}, ${shieldPulse})`;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.arc(cx, cy2, s * 2, 0, Math.PI * 2); ctx.stroke();
         }
+        // Energy projectors (4 floating nodes)
+        ctx.fillStyle = p.glow;
+        for (let i = 0; i < 4; i++) {
+            const a = (i / 4) * Math.PI * 2 + t * 0.003;
+            const d = s * 0.65;
+            const nx = cx + Math.cos(a) * d;
+            const ny = cy2 + Math.sin(a) * d;
+            ctx.beginPath(); ctx.arc(nx, ny, s * 0.06, 0, Math.PI * 2); ctx.fill();
+            // Connection beam to body
+            ctx.strokeStyle = `rgba(${this.hexToRgb(p.glow)}, 0.4)`;
+            ctx.lineWidth = 1;
+            ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(cx, cy2); ctx.stroke();
+        }
+        // Main body (tall hexagonal obelisk)
+        ctx.fillStyle = p.body;
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.2, cy2 - s * 0.55);
+        ctx.lineTo(cx + s * 0.2, cy2 - s * 0.55);
+        ctx.lineTo(cx + s * 0.3, cy2 - s * 0.15);
+        ctx.lineTo(cx + s * 0.25, cy2 + s * 0.45);
+        ctx.lineTo(cx - s * 0.25, cy2 + s * 0.45);
+        ctx.lineTo(cx - s * 0.3, cy2 - s * 0.15);
+        ctx.closePath(); ctx.fill();
+        // Energy lines
+        ctx.strokeStyle = p.glow; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(cx, cy2 - s * 0.55); ctx.lineTo(cx, cy2 + s * 0.45); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx - s * 0.28, cy2); ctx.lineTo(cx + s * 0.28, cy2); ctx.stroke();
+        // Core eye
+        ctx.fillStyle = p.core;
+        ctx.beginPath(); ctx.arc(cx, cy2 - s * 0.1, s * 0.12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx, cy2 - s * 0.1, s * 0.07, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = p.accent;
+        ctx.beginPath(); ctx.arc(cx, cy2 - s * 0.1, s * 0.04, 0, Math.PI * 2); ctx.fill();
     }
     
-    drawEyes(ctx, cx, headY, headR, s, palette) {
-        if (this.type === 'necro') return; // Necro has skull face, no separate eyes
-        
-        const eyeSize = headR * 0.2;
-        const pupilSize = headR * 0.1;
-        
-        switch(this.type) {
-            case 'swarm':
-                // Compound eyes (many small dots)
-                ctx.fillStyle = '#fff';
-                for (let i = 0; i < 6; i++) {
-                    const angle = (i / 6) * Math.PI * 2;
-                    const ex = cx + Math.cos(angle) * headR * 0.4;
-                    const ey = headY + Math.sin(angle) * headR * 0.4;
-                    ctx.beginPath(); ctx.arc(ex, ey, eyeSize * 0.5, 0, Math.PI * 2); ctx.fill();
-                }
-                ctx.fillStyle = palette.limb;
-                for (let i = 0; i < 6; i++) {
-                    const angle = (i / 6) * Math.PI * 2;
-                    const ex = cx + Math.cos(angle) * headR * 0.4;
-                    const ey = headY + Math.sin(angle) * headR * 0.4;
-                    ctx.beginPath(); ctx.arc(ex, ey, pupilSize * 0.5, 0, Math.PI * 2); ctx.fill();
-                }
-                break;
-            case 'teleporter':
-                // Single large cyclopean eye
-                ctx.fillStyle = '#fff';
-                ctx.beginPath(); ctx.arc(cx, headY, eyeSize * 1.3, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = palette.body;
-                ctx.beginPath(); ctx.arc(cx, headY, pupilSize * 1.3, 0, Math.PI * 2); ctx.fill();
-                break;
-            case 'berserker':
-                // Angry slanted eyes
-                if (this.enraged) {
-                    ctx.fillStyle = '#ff0000';
-                } else {
-                    ctx.fillStyle = '#fff';
-                }
-                ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
-                if (!this.enraged) {
-                    ctx.fillStyle = '#000';
-                    ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
-                    ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
-                }
-                // Angry brow
-                ctx.strokeStyle = palette.limb; ctx.lineWidth = 1.5;
-                ctx.beginPath(); ctx.moveTo(cx - headR * 0.5, headY - headR * 0.35);
-                ctx.lineTo(cx - headR * 0.1, headY - headR * 0.2); ctx.stroke();
-                ctx.beginPath(); ctx.moveTo(cx + headR * 0.5, headY - headR * 0.35);
-                ctx.lineTo(cx + headR * 0.1, headY - headR * 0.2); ctx.stroke();
-                break;
-            case 'parasite':
-                // Glowing green eyes
-                ctx.fillStyle = '#d9f99d';
-                ctx.beginPath(); ctx.arc(cx - headR * 0.25, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(cx + headR * 0.25, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = '#4d7c0f';
-                ctx.beginPath(); ctx.arc(cx - headR * 0.25, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(cx + headR * 0.25, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
-                break;
-            default:
-                // Standard alien eyes
-                ctx.fillStyle = '#fff';
-                ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, eyeSize, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = '#000';
-                ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
-                ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, pupilSize, 0, Math.PI * 2); ctx.fill();
+    // === WRAITH: Spectral entity with fading body ===
+    _drawWraith(ctx, cx, cy, s, t, p) {
+        const soulPulse = Math.sin(t * 0.005) * 0.2 + 0.7;
+        // Soul wisps orbiting
+        for (let i = 0; i < 3; i++) {
+            const a = (i / 3) * Math.PI * 2 + t * 0.003;
+            const d = s * (0.8 + Math.sin(t * 0.004 + i) * 0.15);
+            const wx = cx + Math.cos(a) * d;
+            const wy = cy + Math.sin(a) * d;
+            ctx.fillStyle = `rgba(${this.hexToRgb(p.glow)}, ${soulPulse * 0.4})`;
+            ctx.beginPath(); ctx.arc(wx, wy, s * 0.06, 0, Math.PI * 2); ctx.fill();
+        }
+        // Spectral body (fading bottom)
+        const bodyGrad = ctx.createLinearGradient(cx, cy - s * 0.5, cx, cy + s * 0.7);
+        bodyGrad.addColorStop(0, p.body); bodyGrad.addColorStop(0.6, p.body);
+        bodyGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = bodyGrad;
+        // Flowing robe shape
+        const wave1 = Math.sin(t * 0.004) * s * 0.08;
+        const wave2 = Math.sin(t * 0.005 + 1) * s * 0.06;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - s * 0.55);
+        ctx.lineTo(cx + s * 0.3, cy - s * 0.3);
+        ctx.lineTo(cx + s * 0.35, cy + s * 0.1);
+        ctx.quadraticCurveTo(cx + s * 0.4 + wave1, cy + s * 0.5, cx + s * 0.2 + wave2, cy + s * 0.7);
+        ctx.lineTo(cx - s * 0.2 - wave2, cy + s * 0.7);
+        ctx.quadraticCurveTo(cx - s * 0.4 - wave1, cy + s * 0.5, cx - s * 0.35, cy + s * 0.1);
+        ctx.lineTo(cx - s * 0.3, cy - s * 0.3);
+        ctx.closePath(); ctx.fill();
+        // Hood
+        ctx.fillStyle = p.accent;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - s * 0.6);
+        ctx.quadraticCurveTo(cx + s * 0.35, cy - s * 0.45, cx + s * 0.3, cy - s * 0.15);
+        ctx.lineTo(cx + s * 0.15, cy - s * 0.1);
+        ctx.lineTo(cx - s * 0.15, cy - s * 0.1);
+        ctx.lineTo(cx - s * 0.3, cy - s * 0.15);
+        ctx.quadraticCurveTo(cx - s * 0.35, cy - s * 0.45, cx, cy - s * 0.6);
+        ctx.fill();
+        // Glowing eyes in hood
+        ctx.fillStyle = `rgba(167, 139, 250, ${soulPulse})`;
+        ctx.beginPath(); ctx.arc(cx - s * 0.1, cy - s * 0.25, s * 0.06, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.1, cy - s * 0.25, s * 0.06, 0, Math.PI * 2); ctx.fill();
+        // Skeletal hands
+        ctx.strokeStyle = p.core; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+        // Left hand
+        ctx.beginPath(); ctx.moveTo(cx - s * 0.3, cy); ctx.lineTo(cx - s * 0.45, cy + s * 0.05); ctx.stroke();
+        for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(cx - s * 0.45, cy + s * 0.05);
+            ctx.lineTo(cx - s * 0.52, cy + s * (0.02 + i * 0.04));
+            ctx.stroke();
+        }
+        // Right hand
+        ctx.beginPath(); ctx.moveTo(cx + s * 0.3, cy); ctx.lineTo(cx + s * 0.45, cy + s * 0.05); ctx.stroke();
+        for (let i = 0; i < 3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(cx + s * 0.45, cy + s * 0.05);
+            ctx.lineTo(cx + s * 0.52, cy + s * (0.02 + i * 0.04));
+            ctx.stroke();
         }
     }
-    
-    drawAura(ctx, cx, cy, s, palette) {
-        switch(this.type) {
-            case 'teleporter':
-                // Energy rings
-                const tpPulse = Math.sin(Date.now() * 0.005) * 0.2 + 0.8;
-                ctx.strokeStyle = `rgba(139, 92, 246, ${tpPulse * 0.4})`;
-                ctx.lineWidth = 1.5;
-                for (let i = 0; i < 2; i++) {
-                    ctx.beginPath();
-                    ctx.arc(cx, cy, s * (1.1 + i * 0.25) * tpPulse, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-                break;
-            case 'healer':
-                // Healing aura
-                const healGlow = Math.sin(Date.now() * 0.008) * 0.3 + 0.5;
-                ctx.strokeStyle = `rgba(34, 211, 238, ${healGlow})`;
-                ctx.lineWidth = 2;
-                ctx.beginPath(); ctx.arc(cx, cy, s * 1.2, 0, Math.PI * 2); ctx.stroke();
-                if (this.healCooldown < 30) {
-                    const pr = s * (1.3 + (30 - this.healCooldown) / 30 * 2);
-                    ctx.strokeStyle = `rgba(0, 255, 136, ${0.4 - (30 - this.healCooldown) / 75})`;
-                    ctx.lineWidth = 1.5;
-                    ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI * 2); ctx.stroke();
-                }
-                break;
-            case 'freezer':
-                // Frost aura
-                const frostPulse = Math.sin(Date.now() * 0.006) * 0.2 + 0.6;
-                ctx.fillStyle = `rgba(186, 230, 253, ${frostPulse * 0.3})`;
-                for (let i = 0; i < 4; i++) {
-                    const angle = (i / 4) * Math.PI * 2 + Date.now() * 0.002;
-                    const dist = s * (1.1 + Math.sin(Date.now() * 0.005 + i) * 0.15);
-                    ctx.beginPath();
-                    ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, s * 0.08, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-            case 'berserker':
-                if (this.enraged) {
-                    const ragePulse = Math.sin(Date.now() * 0.015) * 0.3 + 0.7;
-                    ctx.strokeStyle = `rgba(255, 0, 0, ${ragePulse})`;
-                    ctx.lineWidth = 3;
-                    ctx.beginPath(); ctx.arc(cx, cy, s * 1.3, 0, Math.PI * 2); ctx.stroke();
-                    // Flame particles
-                    ctx.fillStyle = `rgba(251, 146, 60, ${ragePulse * 0.5})`;
-                    for (let i = 0; i < 6; i++) {
-                        const angle = (i / 6) * Math.PI * 2 + Date.now() * 0.01;
-                        const dist = s * (1.1 + Math.sin(Date.now() * 0.012 + i) * 0.2);
-                        ctx.beginPath();
-                        ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, s * 0.1, 0, Math.PI * 2);
-                        ctx.fill();
-                    }
-                }
-                break;
-            case 'bomber':
-                // Pulsing danger glow
-                const dangerPulse = Math.sin(Date.now() * 0.01) * 0.3 + 0.5;
-                ctx.strokeStyle = `rgba(255, 51, 0, ${dangerPulse})`;
-                ctx.lineWidth = 1.5;
-                ctx.beginPath(); ctx.arc(cx, cy, s * 1.15, 0, Math.PI * 2); ctx.stroke();
-                break;
-            case 'parasite':
-                // Toxic mist
-                const toxPulse = Math.sin(Date.now() * 0.007) * 0.15 + 0.2;
-                ctx.fillStyle = `rgba(132, 204, 22, ${toxPulse})`;
-                ctx.beginPath(); ctx.arc(cx, cy, s * 1.1, 0, Math.PI * 2); ctx.fill();
-                break;
-            case 'necro':
-                // Soul wisps
-                const soulPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.6;
-                ctx.fillStyle = `rgba(212, 212, 212, ${soulPulse * 0.5})`;
-                for (let i = 0; i < 3; i++) {
-                    const angle = (i / 3) * Math.PI * 2 + Date.now() * 0.003;
-                    const dist = s * (1.0 + Math.sin(Date.now() * 0.005 + i) * 0.2);
-                    const flameH = Math.sin(Date.now() * 0.01 + i) * s * 0.15;
-                    ctx.beginPath();
-                    ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist - flameH, s * 0.06, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-            case 'splitter':
-                // Internal cores visible through body
-                const wobble = Math.sin(Date.now() * 0.01) * 0.08;
-                ctx.fillStyle = `rgba(234, 88, 12, 0.4)`;
-                for (let i = 0; i < 3; i++) {
-                    const angle = (i / 3) * Math.PI * 2 + Date.now() * 0.001;
-                    const dist = s * (0.3 + wobble);
-                    ctx.beginPath();
-                    ctx.arc(cx + Math.cos(angle) * dist, cy + Math.sin(angle) * dist, s * 0.1, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                break;
-        }
-    }
-    
     drawBoss(ctx) {
         const s = this.size;
         const cx = this.x;
         const cy = this.y;
+        const t = Date.now();
         const bossType = BOSS_TYPES[this.type] || BOSS_TYPES.destroyer;
-        const palette = bossType.palette || { body: this.color, head: this.color, limb: this.color, accent: '#fff', glow: this.color };
-        const walkSwing = this.walkFrame === 0 ? 0.2 : -0.2;
+        const p = bossType.palette || { body: this.color, core: '#fff', glow: this.color, accent: this.color, wing: this.color };
         
-        // Boss proportions (larger, more imposing)
-        const headR = s * 0.22;
-        const headY = cy - s * 0.4;
-        const torsoW = s * 0.5;
-        const torsoH = s * 0.5;
-        const torsoTop = cy - s * 0.15;
-        const armW = s * 0.1;
-        const armLen = s * 0.4;
-        const legW = s * 0.12;
-        const legLen = s * 0.35;
-        
-        // Glow aura
-        const glowPulse = Math.sin(Date.now() * 0.004) * 0.15 + 0.35;
-        ctx.fillStyle = `rgba(${this.hexToRgb(palette.glow)}, ${glowPulse})`;
+        // Boss glow aura (pulsing)
+        const glowPulse = Math.sin(t * 0.004) * 0.15 + 0.35;
+        ctx.fillStyle = `rgba(${this.hexToRgb(p.glow)}, ${glowPulse})`;
         ctx.beginPath(); ctx.arc(cx, cy, s * 1.15, 0, Math.PI * 2); ctx.fill();
         
-        // === LEGS ===
-        ctx.fillStyle = palette.limb;
-        ctx.save(); ctx.translate(cx - s * 0.12, cy + s * 0.35);
-        ctx.rotate(walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
-        ctx.save(); ctx.translate(cx + s * 0.12, cy + s * 0.35);
-        ctx.rotate(-walkSwing); ctx.fillRect(-legW / 2, 0, legW, legLen); ctx.restore();
-        
-        // === TORSO ===
-        ctx.fillStyle = palette.body;
-        ctx.fillRect(cx - torsoW / 2, torsoTop, torsoW, torsoH);
-        
-        // Boss-specific torso details
-        if (this.type === 'destroyer') {
-            // Armor plate with skull
-            ctx.fillStyle = palette.limb;
-            ctx.fillRect(cx - torsoW / 2 - 4, torsoTop, 4, torsoH);
-            ctx.fillRect(cx + torsoW / 2, torsoTop, 4, torsoH);
-            ctx.fillStyle = palette.accent;
-            ctx.beginPath(); ctx.arc(cx, torsoTop + torsoH / 2, s * 0.08, 0, Math.PI * 2); ctx.fill();
-        } else if (this.type === 'broodmother') {
-            // Egg sac pattern
-            ctx.fillStyle = palette.accent;
-            for (let i = 0; i < 4; i++) {
-                ctx.beginPath(); ctx.arc(cx + (i - 1.5) * torsoW / 4, torsoTop + torsoH * 0.6, s * 0.05, 0, Math.PI * 2); ctx.fill();
-            }
-        } else if (this.type === 'necromancer') {
-            // Robe details
-            ctx.fillStyle = palette.accent;
-            ctx.beginPath();
-            ctx.moveTo(cx - torsoW / 2 - 6, torsoTop + torsoH);
-            ctx.lineTo(cx - torsoW / 2, torsoTop);
-            ctx.lineTo(cx + torsoW / 2, torsoTop);
-            ctx.lineTo(cx + torsoW / 2 + 6, torsoTop + torsoH);
-            ctx.closePath(); ctx.stroke();
-        } else if (this.type === 'titan') {
-            // Rune markings
-            const runePulse = Math.sin(Date.now() * 0.006) * 0.4 + 0.6;
-            ctx.fillStyle = `rgba(251, 191, 36, ${runePulse})`;
-            for (let i = 0; i < 6; i++) {
-                const rx = cx - torsoW / 3 + (i % 3) * torsoW / 3;
-                const ry = torsoTop + (Math.floor(i / 3)) * torsoH / 2 + torsoH / 4;
-                ctx.beginPath(); ctx.arc(rx, ry, s * 0.04, 0, Math.PI * 2); ctx.fill();
-            }
-        } else if (this.type === 'hivemind') {
-            // Brain pattern
-            ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
-            for (let i = 0; i < 3; i++) {
-                const ry = torsoTop + 5 + i * (torsoH - 10) / 2;
-                ctx.beginPath();
-                ctx.moveTo(cx - torsoW / 3, ry);
-                ctx.quadraticCurveTo(cx, ry + 5 * Math.sin(Date.now() * 0.003 + i), cx + torsoW / 3, ry);
-                ctx.stroke();
-            }
-        } else if (this.type === 'leviathan') {
-            // Scale pattern
-            ctx.fillStyle = palette.accent;
-            for (let i = 0; i < 3; i++) {
-                for (let j = 0; j < 4; j++) {
-                    const sx = cx - torsoW / 3 + j * torsoW / 4;
-                    const sy = torsoTop + 4 + i * (torsoH - 8) / 2;
-                    ctx.beginPath();
-                    ctx.arc(sx, sy, s * 0.03, 0, Math.PI); ctx.fill();
-                }
-            }
+        switch(this.type) {
+            case 'destroyer': this._drawBossDestroyer(ctx, cx, cy, s, t, p); break;
+            case 'broodmother': this._drawBossBroodmother(ctx, cx, cy, s, t, p); break;
+            case 'voidwalker': this._drawBossVoidwalker(ctx, cx, cy, s, t, p); break;
+            case 'necromancer': this._drawBossNecromancer(ctx, cx, cy, s, t, p); break;
+            case 'titan': this._drawBossTitan(ctx, cx, cy, s, t, p); break;
+            case 'hivemind': this._drawBossHivemind(ctx, cx, cy, s, t, p); break;
+            case 'leviathan': this._drawBossLeviathan(ctx, cx, cy, s, t, p); break;
+            default: this._drawBossDestroyer(ctx, cx, cy, s, t, p); break;
         }
         
-        // === ARMS ===
-        ctx.fillStyle = palette.limb;
-        ctx.save(); ctx.translate(cx - s * 0.28, cy - s * 0.1);
-        ctx.rotate(-0.4 + walkSwing * 0.3); ctx.fillRect(-armW / 2, 0, armW, armLen); ctx.restore();
-        ctx.save(); ctx.translate(cx + s * 0.28, cy - s * 0.1);
-        ctx.rotate(0.4 - walkSwing * 0.3); ctx.fillRect(-armW / 2, 0, armW, armLen);
-        
-        // Boss weapon
-        if (this.type === 'destroyer' || this.type === 'titan') {
-            ctx.fillStyle = palette.accent;
-            ctx.fillRect(-3, armLen - 2, 6, 14);
-        } else if (this.type === 'necromancer') {
-            ctx.fillStyle = palette.accent;
-            ctx.fillRect(-1.5, armLen - 4, 3, 18);
-            ctx.beginPath(); ctx.arc(0, armLen + 14, 4, 0, Math.PI * 2); ctx.fill();
-        }
-        ctx.restore();
-        
-        // === HEAD ===
-        ctx.fillStyle = palette.head;
-        ctx.beginPath(); ctx.arc(cx, headY, headR, 0, Math.PI * 2); ctx.fill();
-        
-        // Boss-specific head details
-        if (this.type === 'destroyer') {
-            // Horns
-            ctx.fillStyle = palette.limb;
-            ctx.beginPath();
-            ctx.moveTo(cx - headR * 0.7, headY - headR * 0.3);
-            ctx.lineTo(cx - headR * 0.4, headY - headR * 1.3);
-            ctx.lineTo(cx - headR * 0.1, headY - headR * 0.3);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(cx + headR * 0.7, headY - headR * 0.3);
-            ctx.lineTo(cx + headR * 0.4, headY - headR * 1.3);
-            ctx.lineTo(cx + headR * 0.1, headY - headR * 0.3);
-            ctx.fill();
-        } else if (this.type === 'broodmother') {
-            // Multiple eyes cluster
-            ctx.fillStyle = '#ff0000';
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                ctx.beginPath();
-                ctx.arc(cx + Math.cos(angle) * headR * 0.5, headY + Math.sin(angle) * headR * 0.5, headR * 0.12, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        } else if (this.type === 'voidwalker') {
-            // Hollow face
-            ctx.fillStyle = 'rgba(0,0,0,0.7)';
-            ctx.beginPath(); ctx.arc(cx, headY, headR * 0.7, 0, Math.PI * 2); ctx.fill();
-            // Ghost wisp eyes
-            const wispPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.7;
-            ctx.fillStyle = `rgba(167, 139, 250, ${wispPulse})`;
-            ctx.beginPath(); ctx.arc(cx - headR * 0.25, headY - headR * 0.1, headR * 0.15, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(cx + headR * 0.25, headY - headR * 0.1, headR * 0.15, 0, Math.PI * 2); ctx.fill();
-        } else if (this.type === 'necromancer') {
-            // Skull with glowing eye sockets
-            ctx.fillStyle = palette.accent;
-            ctx.beginPath(); ctx.arc(cx, headY, headR * 0.85, 0, Math.PI * 2); ctx.fill();
-            const soulGlow = Math.sin(Date.now() * 0.008) * 0.3 + 0.7;
-            ctx.fillStyle = `rgba(167, 139, 250, ${soulGlow})`;
-            ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.18, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.18, 0, Math.PI * 2); ctx.fill();
-        } else if (this.type === 'titan') {
-            // Helmet visor
-            ctx.fillStyle = palette.accent;
-            ctx.fillRect(cx - headR * 0.8, headY - headR * 0.15, headR * 1.6, headR * 0.35);
-            const runePulse2 = Math.sin(Date.now() * 0.006) * 0.4 + 0.6;
-            ctx.fillStyle = `rgba(251, 191, 36, ${runePulse2})`;
-            ctx.beginPath(); ctx.arc(cx, headY, headR * 0.2, 0, Math.PI * 2); ctx.fill();
-        } else if (this.type === 'hivemind') {
-            // Exposed brain
-            ctx.fillStyle = palette.accent;
-            ctx.beginPath(); ctx.arc(cx, headY - headR * 0.3, headR * 0.8, Math.PI, 0); ctx.fill();
-            ctx.strokeStyle = palette.body; ctx.lineWidth = 1;
-            for (let i = 0; i < 3; i++) {
-                ctx.beginPath();
-                ctx.arc(cx + (i - 1) * headR * 0.3, headY - headR * 0.4, headR * 0.25, Math.PI, 0);
-                ctx.stroke();
-            }
-        } else if (this.type === 'leviathan') {
-            // Dragon-like head with crest
-            ctx.fillStyle = palette.accent;
-            ctx.beginPath();
-            ctx.moveTo(cx - headR * 0.3, headY - headR);
-            ctx.lineTo(cx, headY - headR * 1.5);
-            ctx.lineTo(cx + headR * 0.3, headY - headR);
-            ctx.closePath(); ctx.fill();
-        }
-        
-        // Boss eyes (unless specific type has its own)
-        if (!['broodmother', 'voidwalker', 'necromancer'].includes(this.type)) {
-            ctx.fillStyle = '#fff';
-            ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.2, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = '#000';
-            ctx.beginPath(); ctx.arc(cx - headR * 0.3, headY - headR * 0.1, headR * 0.1, 0, Math.PI * 2); ctx.fill();
-            ctx.beginPath(); ctx.arc(cx + headR * 0.3, headY - headR * 0.1, headR * 0.1, 0, Math.PI * 2); ctx.fill();
-        }
-        
-        // Boss border
-        ctx.strokeStyle = '#fff';
+        // Boss border ring
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 + Math.sin(t * 0.003) * 0.2})`;
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, s * 0.9, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Boss-specific aura effects
-        if (this.type === 'voidwalker') {
-            ctx.strokeStyle = 'rgba(139, 92, 246, 0.4)';
-            ctx.lineWidth = 2;
-            for (let i = 0; i < 4; i++) {
-                const angle = (i / 4) * Math.PI * 2 + Date.now() * 0.002;
-                const wave = Math.sin(Date.now() * 0.003 + i) * 15;
-                ctx.beginPath();
-                ctx.moveTo(cx, cy);
-                ctx.quadraticCurveTo(
-                    cx + Math.cos(angle) * s * 0.8,
-                    cy + Math.sin(angle) * s * 0.8 + wave,
-                    cx + Math.cos(angle) * s,
-                    cy + Math.sin(angle) * s
-                );
-                ctx.stroke();
-            }
-        } else if (this.type === 'necromancer' && this.resurrectCooldown < 60) {
-            const resurrectGlow = (60 - this.resurrectCooldown) / 60;
-            ctx.strokeStyle = `rgba(167, 139, 250, ${resurrectGlow})`;
-            ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.arc(cx, cy, s * (0.9 + resurrectGlow * 0.3), 0, Math.PI * 2); ctx.stroke();
-        } else if (this.type === 'titan' && this.earthquakeCooldown < 60) {
-            const quakePulse = (60 - this.earthquakeCooldown) / 60;
-            ctx.strokeStyle = `rgba(251, 191, 36, ${quakePulse})`;
-            ctx.lineWidth = 4;
-            for (let i = 0; i < 3; i++) {
-                ctx.beginPath();
-                ctx.arc(cx, cy, s * (1 + i * 0.2 + quakePulse * 0.3), 0, Math.PI * 2);
-                ctx.stroke();
-            }
-        } else if (this.type === 'hivemind') {
-            // Psionic waves
-            const psiPulse = Math.sin(Date.now() * 0.005) * 0.3 + 0.5;
-            ctx.strokeStyle = `rgba(192, 132, 252, ${psiPulse})`;
-            ctx.lineWidth = 1.5;
-            for (let i = 0; i < 3; i++) {
-                const r = s * (1 + i * 0.15 + Math.sin(Date.now() * 0.003 + i) * 0.1);
-                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
-            }
-        } else if (this.type === 'leviathan' && this.isCharging) {
-            // Charge wind-up effect
-            ctx.strokeStyle = `rgba(45, 212, 191, 0.6)`;
-            ctx.lineWidth = 3;
-            ctx.beginPath(); ctx.arc(cx, cy, s * 1.2, 0, Math.PI * 2); ctx.stroke();
-        }
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.9, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
         
         // Health bar
         if (this.health < this.maxHealth) {
             const barWidth = s * 2;
             const barHeight = 6;
             const barY = cy - s - 12;
-            
             ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
             ctx.fillRect(cx - barWidth / 2, barY, barWidth, barHeight);
-            
             const healthPercent = this.health / this.maxHealth;
             const healthColor = healthPercent > 0.5 ? '#00ff88' : healthPercent > 0.25 ? '#ffd93d' : '#ff6b6b';
             ctx.fillStyle = healthColor;
             ctx.fillRect(cx - barWidth / 2, barY, barWidth * healthPercent, barHeight);
-            
-            // Boss name
             ctx.fillStyle = '#fff';
             ctx.font = 'bold 12px monospace';
             ctx.textAlign = 'center';
             ctx.fillText(this.name, cx, barY - 4);
+        }
+    }
+    
+    // === DESTROYER: Demonic war entity with burning wings ===
+    _drawBossDestroyer(ctx, cx, cy, s, t, p) {
+        const wingBeat = Math.sin(t * 0.006) * 0.1;
+        // Burning wings
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = p.wing;
+        // Left wing
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.15, cy - s * 0.2);
+        ctx.quadraticCurveTo(cx - s * 0.8, cy - s * (0.6 + wingBeat), cx - s * 0.6, cy + s * 0.1);
+        ctx.lineTo(cx - s * 0.15, cy + s * 0.05);
+        ctx.closePath(); ctx.fill();
+        // Right wing
+        ctx.beginPath();
+        ctx.moveTo(cx + s * 0.15, cy - s * 0.2);
+        ctx.quadraticCurveTo(cx + s * 0.8, cy - s * (0.6 + wingBeat), cx + s * 0.6, cy + s * 0.1);
+        ctx.lineTo(cx + s * 0.15, cy + s * 0.05);
+        ctx.closePath(); ctx.fill();
+        ctx.globalAlpha = 1;
+        // Body
+        ctx.fillStyle = p.body;
+        ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.35, s * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+        // Armor plates
+        ctx.strokeStyle = p.core; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx - s * 0.3, cy - s * 0.1); ctx.lineTo(cx + s * 0.3, cy - s * 0.1); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx - s * 0.25, cy + s * 0.15); ctx.lineTo(cx + s * 0.25, cy + s * 0.15); ctx.stroke();
+        // Skull head
+        ctx.fillStyle = p.core;
+        ctx.beginPath(); ctx.arc(cx, cy - s * 0.4, s * 0.2, 0, Math.PI * 2); ctx.fill();
+        // Horns
+        ctx.fillStyle = p.wing;
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.15, cy - s * 0.5); ctx.lineTo(cx - s * 0.1, cy - s * 0.75);
+        ctx.lineTo(cx - s * 0.05, cy - s * 0.45); ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(cx + s * 0.15, cy - s * 0.5); ctx.lineTo(cx + s * 0.1, cy - s * 0.75);
+        ctx.lineTo(cx + s * 0.05, cy - s * 0.45); ctx.closePath(); ctx.fill();
+        // Glowing eyes
+        const eyeGlow = Math.sin(t * 0.01) * 0.3 + 0.7;
+        ctx.fillStyle = `rgba(255, 0, 0, ${eyeGlow})`;
+        ctx.beginPath(); ctx.arc(cx - s * 0.08, cy - s * 0.42, s * 0.05, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.08, cy - s * 0.42, s * 0.05, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    // === BROOD MOTHER: Spider queen with legs ===
+    _drawBossBroodmother(ctx, cx, cy, s, t, p) {
+        // Spider legs (8)
+        ctx.strokeStyle = p.accent; ctx.lineWidth = s * 0.04; ctx.lineCap = 'round';
+        for (let i = 0; i < 8; i++) {
+            const side = i < 4 ? -1 : 1;
+            const idx = i % 4;
+            const baseAngle = side * (0.3 + idx * 0.35);
+            const legWave = Math.sin(t * 0.006 + i * 0.5) * 0.1;
+            const startX = cx + side * s * 0.3;
+            const startY = cy - s * 0.1 + idx * s * 0.15;
+            const midX = startX + side * s * 0.4;
+            const midY = startY - s * 0.2 + Math.sin(t * 0.008 + i) * s * 0.1;
+            const endX = midX + side * s * 0.2;
+            const endY = startY + s * 0.15;
+            ctx.beginPath(); ctx.moveTo(startX, startY);
+            ctx.quadraticCurveTo(midX, midY, endX, endY); ctx.stroke();
+        }
+        // Abdomen (large bulbous)
+        ctx.fillStyle = p.body;
+        ctx.beginPath(); ctx.ellipse(cx, cy + s * 0.15, s * 0.4, s * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+        // Egg sac pattern
+        ctx.fillStyle = p.core;
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.arc(cx + Math.cos(a) * s * 0.2, cy + s * 0.2 + Math.sin(a) * s * 0.2, s * 0.06, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Cephalothorax
+        ctx.fillStyle = p.accent;
+        ctx.beginPath(); ctx.ellipse(cx, cy - s * 0.25, s * 0.25, s * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+        // Eyes (cluster of 8 red)
+        ctx.fillStyle = '#ff0000';
+        const eyePositions = [[-0.1,-0.08],[0.1,-0.08],[-0.06,-0.03],[0.06,-0.03],[-0.12,0],[0.12,0],[-0.04,0.04],[0.04,0.04]];
+        eyePositions.forEach(pos => {
+            ctx.beginPath();
+            ctx.arc(cx + pos[0] * s, cy - s * 0.25 + pos[1] * s, s * 0.03, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        // Mandibles
+        ctx.strokeStyle = p.core; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(cx - s * 0.08, cy - s * 0.15); ctx.lineTo(cx - s * 0.15, cy - s * 0.08); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx + s * 0.08, cy - s * 0.15); ctx.lineTo(cx + s * 0.15, cy - s * 0.08); ctx.stroke();
+    }
+    
+    // === VOID WALKER: Spectral horror with void portals ===
+    _drawBossVoidwalker(ctx, cx, cy, s, t, p) {
+        const phase = Math.sin(t * 0.004) * 0.2 + 0.8;
+        // Void portals orbiting
+        ctx.strokeStyle = p.glow; ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+            const a = (i / 3) * Math.PI * 2 + t * 0.002;
+            const d = s * 0.7;
+            const px = cx + Math.cos(a) * d;
+            const py = cy + Math.sin(a) * d;
+            ctx.save(); ctx.translate(px, py); ctx.rotate(a + t * 0.005);
+            ctx.beginPath(); ctx.ellipse(0, 0, s * 0.12, s * 0.06, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = `rgba(0, 0, 0, 0.6)`;
+            ctx.fill();
+            ctx.restore();
+        }
+        // Ethereal body (fading)
+        ctx.globalAlpha = phase;
+        const bodyGrad = ctx.createLinearGradient(cx, cy - s * 0.5, cx, cy + s * 0.7);
+        bodyGrad.addColorStop(0, p.body); bodyGrad.addColorStop(0.7, p.body); bodyGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = bodyGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - s * 0.55);
+        ctx.quadraticCurveTo(cx + s * 0.4, cy - s * 0.3, cx + s * 0.35, cy + s * 0.2);
+        ctx.quadraticCurveTo(cx + s * 0.3, cy + s * 0.6, cx, cy + s * 0.7);
+        ctx.quadraticCurveTo(cx - s * 0.3, cy + s * 0.6, cx - s * 0.35, cy + s * 0.2);
+        ctx.quadraticCurveTo(cx - s * 0.4, cy - s * 0.3, cx, cy - s * 0.55);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        // Hollow face
+        ctx.fillStyle = 'rgba(0,0,0,0.8)';
+        ctx.beginPath(); ctx.arc(cx, cy - s * 0.3, s * 0.18, 0, Math.PI * 2); ctx.fill();
+        // Burning void eyes
+        const voidPulse = Math.sin(t * 0.008) * 0.3 + 0.7;
+        ctx.fillStyle = `rgba(167, 139, 250, ${voidPulse})`;
+        ctx.beginPath(); ctx.arc(cx - s * 0.07, cy - s * 0.32, s * 0.05, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.07, cy - s * 0.32, s * 0.05, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    // === NECROMANCER: Floating lich with soul energy ===
+    _drawBossNecromancer(ctx, cx, cy, s, t, p) {
+        const soulPulse = Math.sin(t * 0.005) * 0.2 + 0.7;
+        // Swirling soul energy
+        ctx.strokeStyle = `rgba(${this.hexToRgb(p.glow)}, ${soulPulse * 0.4})`;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 5; i++) {
+            const a = (i / 5) * Math.PI * 2 + t * 0.002;
+            const d = s * (0.6 + Math.sin(t * 0.003 + i) * 0.15);
+            ctx.beginPath();
+            ctx.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, s * 0.05, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        // Robed body
+        const robeGrad = ctx.createLinearGradient(cx, cy - s * 0.4, cx, cy + s * 0.65);
+        robeGrad.addColorStop(0, p.body); robeGrad.addColorStop(0.8, p.body); robeGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = robeGrad;
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.2, cy - s * 0.35);
+        ctx.lineTo(cx + s * 0.2, cy - s * 0.35);
+        ctx.lineTo(cx + s * 0.4, cy + s * 0.5);
+        ctx.lineTo(cx - s * 0.4, cy + s * 0.5);
+        ctx.closePath(); ctx.fill();
+        // Bone crown
+        ctx.fillStyle = p.core;
+        for (let i = 0; i < 5; i++) {
+            const a = Math.PI * 1.15 + (i / 4) * Math.PI * 0.7;
+            const bx = cx + Math.cos(a) * s * 0.22;
+            const by = cy - s * 0.4 + Math.sin(a) * s * 0.22;
+            ctx.beginPath();
+            ctx.moveTo(bx, by); ctx.lineTo(bx + Math.cos(a) * s * 0.1, by + Math.sin(a) * s * 0.1 - s * 0.05);
+            ctx.lineTo(bx + s * 0.02, by); ctx.closePath(); ctx.fill();
+        }
+        // Skull face
+        ctx.fillStyle = p.core;
+        ctx.beginPath(); ctx.arc(cx, cy - s * 0.35, s * 0.16, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(167, 139, 250, ${soulPulse})`;
+        ctx.beginPath(); ctx.arc(cx - s * 0.06, cy - s * 0.37, s * 0.04, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.06, cy - s * 0.37, s * 0.04, 0, Math.PI * 2); ctx.fill();
+        // Staff
+        ctx.strokeStyle = p.core; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(cx + s * 0.25, cy - s * 0.2); ctx.lineTo(cx + s * 0.3, cy + s * 0.45); ctx.stroke();
+        ctx.fillStyle = p.glow;
+        ctx.beginPath(); ctx.arc(cx + s * 0.25, cy - s * 0.2, s * 0.06, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    // === TITAN: Colossal armored war machine ===
+    _drawBossTitan(ctx, cx, cy, s, t, p) {
+        const runePulse = Math.sin(t * 0.006) * 0.4 + 0.6;
+        const quakeActive = this.earthquakeCooldown < 60;
+        // Earthquake warning
+        if (quakeActive) {
+            const quakePulse = (60 - this.earthquakeCooldown) / 60;
+            ctx.strokeStyle = `rgba(251, 191, 36, ${quakePulse})`;
+            ctx.lineWidth = 4;
+            for (let i = 0; i < 3; i++) {
+                ctx.beginPath(); ctx.arc(cx, cy, s * (1 + i * 0.2 + quakePulse * 0.3), 0, Math.PI * 2); ctx.stroke();
+            }
+        }
+        // Massive armored body
+        ctx.fillStyle = p.body;
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.35, cy - s * 0.4);
+        ctx.lineTo(cx + s * 0.35, cy - s * 0.4);
+        ctx.lineTo(cx + s * 0.45, cy + s * 0.05);
+        ctx.lineTo(cx + s * 0.35, cy + s * 0.45);
+        ctx.lineTo(cx - s * 0.35, cy + s * 0.45);
+        ctx.lineTo(cx - s * 0.45, cy + s * 0.05);
+        ctx.closePath(); ctx.fill();
+        // Rune markings
+        ctx.fillStyle = `rgba(251, 191, 36, ${runePulse})`;
+        for (let i = 0; i < 8; i++) {
+            const rx = cx - s * 0.25 + (i % 4) * s * 0.17;
+            const ry = cy - s * 0.2 + Math.floor(i / 4) * s * 0.3;
+            ctx.beginPath(); ctx.arc(rx, ry, s * 0.03, 0, Math.PI * 2); ctx.fill();
+        }
+        // Shoulder pauldrons
+        ctx.fillStyle = p.accent;
+        ctx.beginPath(); ctx.ellipse(cx - s * 0.4, cy - s * 0.25, s * 0.15, s * 0.1, -0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(cx + s * 0.4, cy - s * 0.25, s * 0.15, s * 0.1, 0.3, 0, Math.PI * 2); ctx.fill();
+        // Helmet head
+        ctx.fillStyle = p.wing;
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.2, cy - s * 0.35);
+        ctx.lineTo(cx, cy - s * 0.6);
+        ctx.lineTo(cx + s * 0.2, cy - s * 0.35);
+        ctx.lineTo(cx + s * 0.15, cy - s * 0.2);
+        ctx.lineTo(cx - s * 0.15, cy - s * 0.2);
+        ctx.closePath(); ctx.fill();
+        // Visor
+        ctx.fillStyle = `rgba(251, 191, 36, ${runePulse})`;
+        ctx.fillRect(cx - s * 0.12, cy - s * 0.35, s * 0.24, s * 0.06);
+        // Fists
+        ctx.fillStyle = p.accent;
+        ctx.beginPath(); ctx.arc(cx - s * 0.5, cy + s * 0.2, s * 0.1, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.5, cy + s * 0.2, s * 0.1, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    // === HIVEMIND: Massive brain entity with psychic tentacles ===
+    _drawBossHivemind(ctx, cx, cy, s, t, p) {
+        const psiPulse = Math.sin(t * 0.005) * 0.3 + 0.5;
+        // Psionic waves
+        ctx.strokeStyle = `rgba(${this.hexToRgb(p.glow)}, ${psiPulse * 0.3})`;
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 4; i++) {
+            const r = s * (0.8 + i * 0.15 + Math.sin(t * 0.003 + i) * 0.1);
+            ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+        }
+        // Tentacles
+        ctx.strokeStyle = p.accent; ctx.lineWidth = s * 0.04; ctx.lineCap = 'round';
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            const wave = Math.sin(t * 0.005 + i) * s * 0.15;
+            ctx.beginPath();
+            ctx.moveTo(cx + Math.cos(a) * s * 0.3, cy + Math.sin(a) * s * 0.3);
+            ctx.quadraticCurveTo(
+                cx + Math.cos(a) * s * 0.5 + wave,
+                cy + Math.sin(a) * s * 0.5,
+                cx + Math.cos(a) * s * 0.7,
+                cy + Math.sin(a) * s * 0.7
+            );
+            ctx.stroke();
+        }
+        // Brain body
+        ctx.fillStyle = p.body;
+        ctx.beginPath(); ctx.arc(cx, cy, s * 0.4, 0, Math.PI * 2); ctx.fill();
+        // Brain folds
+        ctx.fillStyle = p.core;
+        ctx.beginPath(); ctx.arc(cx, cy - s * 0.1, s * 0.35, Math.PI, 0); ctx.fill();
+        ctx.strokeStyle = p.accent; ctx.lineWidth = 1.5;
+        for (let i = 0; i < 4; i++) {
+            ctx.beginPath();
+            ctx.arc(cx + (i - 1.5) * s * 0.1, cy - s * 0.15, s * 0.1, Math.PI, 0);
+            ctx.stroke();
+        }
+        // Central eye
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx, cy + s * 0.1, s * 0.12, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = p.accent;
+        ctx.beginPath(); ctx.arc(cx, cy + s * 0.1, s * 0.06, 0, Math.PI * 2); ctx.fill();
+    }
+    
+    // === LEVIATHAN: Enormous serpent/dragon ===
+    _drawBossLeviathan(ctx, cx, cy, s, t, p) {
+        const chargeGlow = this.isCharging ? 0.8 : 0;
+        // Serpentine body segments
+        ctx.fillStyle = p.body;
+        for (let i = 5; i >= 0; i--) {
+            const segAngle = Math.sin(t * 0.004 + i * 0.7) * 0.3;
+            const segX = cx - Math.cos(segAngle) * i * s * 0.12;
+            const segY = cy + i * s * 0.1 + Math.sin(t * 0.005 + i) * s * 0.05;
+            const segSize = s * (0.35 - i * 0.03);
+            ctx.beginPath(); ctx.arc(segX, segY, segSize, 0, Math.PI * 2); ctx.fill();
+            // Scale detail
+            if (i > 0) {
+                ctx.fillStyle = p.core;
+                ctx.beginPath(); ctx.arc(segX, segY, segSize * 0.5, 0, Math.PI); ctx.fill();
+                ctx.fillStyle = p.body;
+            }
+        }
+        // Head (dragon-like)
+        ctx.fillStyle = p.wing;
+        ctx.beginPath(); ctx.arc(cx, cy - s * 0.05, s * 0.3, 0, Math.PI * 2); ctx.fill();
+        // Dragon crest
+        ctx.fillStyle = p.core;
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.15, cy - s * 0.25);
+        ctx.lineTo(cx, cy - s * 0.5);
+        ctx.lineTo(cx + s * 0.15, cy - s * 0.25);
+        ctx.closePath(); ctx.fill();
+        // Horns
+        ctx.fillStyle = p.accent;
+        ctx.beginPath();
+        ctx.moveTo(cx - s * 0.2, cy - s * 0.15);
+        ctx.lineTo(cx - s * 0.35, cy - s * 0.45);
+        ctx.lineTo(cx - s * 0.12, cy - s * 0.2);
+        ctx.closePath(); ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(cx + s * 0.2, cy - s * 0.15);
+        ctx.lineTo(cx + s * 0.35, cy - s * 0.45);
+        ctx.lineTo(cx + s * 0.12, cy - s * 0.2);
+        ctx.closePath(); ctx.fill();
+        // Eyes
+        ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(cx - s * 0.1, cy - s * 0.1, s * 0.07, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.1, cy - s * 0.1, s * 0.07, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = p.accent;
+        ctx.beginPath(); ctx.arc(cx - s * 0.1, cy - s * 0.1, s * 0.035, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx + s * 0.1, cy - s * 0.1, s * 0.035, 0, Math.PI * 2); ctx.fill();
+        // Charge effect
+        if (chargeGlow > 0) {
+            ctx.strokeStyle = `rgba(45, 212, 191, ${chargeGlow})`;
+            ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.arc(cx, cy, s * 0.9, 0, Math.PI * 2); ctx.stroke();
         }
     }
     
@@ -2859,6 +3319,7 @@ class Enemy {
         return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255, 255, 255';
     }
 }
+
 
 // ==================== BULLET CLASS ====================
 class Bullet {

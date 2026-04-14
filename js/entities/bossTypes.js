@@ -12,7 +12,7 @@ export const BOSS_TYPES = {
         creditValue: 100,
         behavior: 'boss_melee',
         abilities: ['charge', 'summon'],
-        palette: { body: '#dc2626', head: '#f87171', limb: '#991b1b', accent: '#fecaca', glow: '#ff0000' },
+        palette: { body: '#dc2626', core: '#fecaca', glow: '#ff0000', accent: '#991b1b', wing: '#7f1d1d' },
     },
     broodmother: {
         name: '🕷️ Brood Mother',
@@ -24,7 +24,7 @@ export const BOSS_TYPES = {
         creditValue: 120,
         behavior: 'boss_summoner',
         abilities: ['spawn_minions'],
-        palette: { body: '#7c2d12', head: '#a16207', limb: '#451a03', accent: '#d97706', glow: '#f59e0b' },
+        palette: { body: '#7c2d12', core: '#d97706', glow: '#f59e0b', accent: '#451a03', wing: '#a16207' },
     },
     voidwalker: {
         name: '👻 Void Walker',
@@ -36,7 +36,7 @@ export const BOSS_TYPES = {
         creditValue: 150,
         behavior: 'boss_teleporter',
         abilities: ['teleport_attack', 'void_beam'],
-        palette: { body: '#581c87', head: '#7c3aed', limb: '#3b0764', accent: '#a78bfa', glow: '#8b5cf6' },
+        palette: { body: '#581c87', core: '#a78bfa', glow: '#8b5cf6', accent: '#3b0764', wing: '#7c3aed' },
     },
     necromancer: {
         name: '💀 Necromancer',
@@ -48,7 +48,7 @@ export const BOSS_TYPES = {
         creditValue: 180,
         behavior: 'boss_necromancer',
         abilities: ['resurrect_enemies', 'death_curse'],
-        palette: { body: '#4c1d95', head: '#6d28d9', limb: '#2e1065', accent: '#a78bfa', glow: '#8b5cf6' },
+        palette: { body: '#4c1d95', core: '#a78bfa', glow: '#8b5cf6', accent: '#2e1065', wing: '#6d28d9' },
     },
     titan: {
         name: '⚡ Titan',
@@ -60,7 +60,7 @@ export const BOSS_TYPES = {
         creditValue: 200,
         behavior: 'boss_melee',
         abilities: ['earthquake', 'ground_slam'],
-        palette: { body: '#b91c1c', head: '#92400e', limb: '#7f1d1d', accent: '#fbbf24', glow: '#f59e0b' },
+        palette: { body: '#b91c1c', core: '#fbbf24', glow: '#f59e0b', accent: '#7f1d1d', wing: '#92400e' },
     },
     hivemind: {
         name: '🧠 Hivemind',
@@ -72,7 +72,7 @@ export const BOSS_TYPES = {
         creditValue: 220,
         behavior: 'boss_commander',
         abilities: ['command_allies', 'psionic_wave'],
-        palette: { body: '#7e22ce', head: '#a855f7', limb: '#581c87', accent: '#d8b4fe', glow: '#c084fc' },
+        palette: { body: '#7e22ce', core: '#d8b4fe', glow: '#c084fc', accent: '#581c87', wing: '#a855f7' },
     },
     leviathan: {
         name: '🐉 Leviathan',
@@ -84,7 +84,7 @@ export const BOSS_TYPES = {
         creditValue: 280,
         behavior: 'boss_melee',
         abilities: ['charge', 'tail_sweep'],
-        palette: { body: '#0f766e', head: '#14b8a6', limb: '#134e4a', accent: '#5eead4', glow: '#2dd4bf' },
+        palette: { body: '#0f766e', core: '#5eead4', glow: '#2dd4bf', accent: '#134e4a', wing: '#14b8a6' },
     },
 };
 
