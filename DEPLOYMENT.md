@@ -83,7 +83,7 @@ Nginx configuration that:
 - Sets cache headers:
   - **Service Worker (sw.js)**: `no-cache, no-store, must-revalidate` - ensures users always get the latest version
   - **Static assets (JS, CSS, images)**: 1 year with `immutable` - safe due to Vite's content hashing
-  - **HTML files**: 1 hour with `must-revalidate`
+  - **HTML files**: `no-cache, must-revalidate` — always revalidated so users get fresh asset references after deploys
 - Adds security headers
 - Provides a health check endpoint at `/health`
 
