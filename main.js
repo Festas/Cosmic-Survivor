@@ -133,6 +133,139 @@ const WEAPON_TYPES = {
     plasma: { name: '💥 Plasma', fireRate: 1.6, damage: 1.4, color: '#9d00ff', pierces: true, desc: 'Pierces through enemies' },
 };
 
+// Weapon Evolution System
+// Each weapon can evolve when paired with a specific passive/item at weapon level 5
+const WEAPON_EVOLUTIONS = {
+    basic: {
+        name: '⚡ Railgun',
+        requiredItem: 'eagle_eye', // Requires crit-related item
+        desc: 'Pierces all enemies with massive crits',
+        color: '#00ffff',
+        fireRate: 1.8,
+        damage: 3.0,
+        pierces: true,
+        evolvedStats: { critChance: 0.5, critDamage: 3.0 }
+    },
+    spread: {
+        name: '🌌 Galaxy Burst',
+        requiredItem: 'bullet_storm', // Extra projectile passive
+        desc: '360° bullet ring every shot',
+        color: '#ffd700',
+        fireRate: 1.5,
+        damage: 0.8,
+        projectiles: 12,
+        fullCircle: true,
+        evolvedStats: {}
+    },
+    freeze: {
+        name: '❄️ Absolute Zero',
+        requiredItem: 'fortify', // Armor passive
+        desc: 'Freezes everything in massive radius',
+        color: '#00ffff',
+        fireRate: 0.6,
+        damage: 1.2,
+        aoeFreeze: true,
+        freezeRadius: 200,
+        evolvedStats: {}
+    },
+    rocket: {
+        name: '☄️ Orbital Strike',
+        requiredItem: 'glass_cannon', // Damage passive
+        desc: 'Rains rockets from the sky',
+        color: '#ff4500',
+        fireRate: 2.5,
+        damage: 2.0,
+        orbitalStrike: true,
+        strikeCount: 5,
+        evolvedStats: {}
+    },
+    lightning: {
+        name: '🌩️ Storm Caller',
+        requiredItem: 'quick_hands', // Fire rate passive
+        desc: 'Permanent lightning field around you',
+        color: '#00d4ff',
+        fireRate: 0.5,
+        damage: 0.6,
+        lightningField: true,
+        fieldRadius: 180,
+        evolvedStats: {}
+    },
+    flamethrower: {
+        name: '🔥 Inferno Dash',
+        requiredItem: 'nimble', // Speed passive
+        desc: 'Leave devastating fire trail while moving',
+        color: '#ff6600',
+        fireRate: 0.1,
+        damage: 0.5,
+        infernoDash: true,
+        evolvedStats: { speed: 0.5 }
+    },
+    plasma: {
+        name: '🟣 Void Beam',
+        requiredItem: 'piercing_rounds', // Piercing item
+        desc: 'Continuous sweeping beam of destruction',
+        color: '#9d00ff',
+        fireRate: 0.08,
+        damage: 0.8,
+        voidBeam: true,
+        beamWidth: 15,
+        evolvedStats: {}
+    },
+    laser: {
+        name: '💜 Siphon Ray',
+        requiredItem: 'vampirism', // Life steal passive
+        desc: 'Drains HP continuously from enemies',
+        color: '#ff00ff',
+        fireRate: 0.2,
+        damage: 0.5,
+        siphonRay: true,
+        drainAmount: 0.15,
+        evolvedStats: { lifeSteal: 0.1 }
+    },
+};
+
+function checkWeaponEvolution(slot) {
+    const evolution = WEAPON_EVOLUTIONS[slot.type];
+    if (!evolution || slot.evolved) return;
+    
+    // Check if player has the required item/passive
+    const hasRequired = game.passivesChosen.includes(evolution.requiredItem) ||
+        (game.player && (
+            (evolution.requiredItem === 'piercing_rounds' && game.player.extraPiercing > 0) ||
+            (evolution.requiredItem === 'eagle_eye' && game.player.critChance > 0.2)
+        ));
+    
+    if (hasRequired) {
+        evolveWeapon(slot);
+    } else {
+        showNotification(`${WEAPON_TYPES[slot.type]?.name} ready to evolve! Need: ${evolution.requiredItem.replace(/_/g, ' ')}`, '#ffd93d', 4000);
+    }
+}
+
+function evolveWeapon(slot) {
+    const evolution = WEAPON_EVOLUTIONS[slot.type];
+    if (!evolution) return;
+    
+    slot.evolved = true;
+    slot.evolvedData = evolution;
+    
+    // Apply evolved stats to player
+    if (evolution.evolvedStats) {
+        Object.entries(evolution.evolvedStats).forEach(([stat, value]) => {
+            if (typeof game.player[stat] === 'number') {
+                game.player[stat] += value;
+            }
+        });
+    }
+    
+    // Epic evolution notification
+    showNotification(`🌟 EVOLUTION: ${evolution.name}! 🌟`, '#ffd700', 5000);
+    Sound.play('combo');
+    screenShake(20);
+    createExplosion(game.player.x, game.player.y, evolution.color, 50);
+    createExplosion(game.player.x, game.player.y, '#ffd700', 30);
+}
+
 // Enemy types with behaviors
 const ENEMY_TYPES = {
     normal: { name: '👾 Grunt', color: '#a855f7', speed: 1, health: 1, damage: 1, credits: 1, xp: 1,
@@ -610,7 +743,7 @@ function triggerLevelUp() {
             desc: `New weapon: ${weapon.desc || 'Equip to a weapon slot'}`,
             type: 'weapon',
             apply: p => {
-                p.weaponSlots.push({ type: weaponKey, cooldown: 0 });
+                p.weaponSlots.push({ type: weaponKey, cooldown: 0, level: 1, xp: 0, evolved: false });
                 showNotification(`${weapon.name} equipped!`, weapon.color, 2000);
             }
         });
@@ -900,7 +1033,7 @@ class Player {
         this.facingRight = true;
         this.aimAngle = 0;
         // Multi-weapon system
-        this.weaponSlots = [{ type: 'basic', cooldown: 0 }];
+        this.weaponSlots = [{ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }];
         this.maxWeaponSlots = 4;
         // Gameplay-changing item flags
         this.bulletBounce = 0;
@@ -927,9 +1060,9 @@ class Player {
         this.isInvisible = false;
         // Character-specific starting weapon slots
         if (character.id === 'balanced') {
-            this.weaponSlots = [{ type: 'basic', cooldown: 0 }, { type: 'basic', cooldown: 0 }];
+            this.weaponSlots = [{ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }, { type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }];
         } else if (character.id === 'gunslinger') {
-            this.weaponSlots = [{ type: 'basic', cooldown: 0 }, { type: 'basic', cooldown: 0 }, { type: 'basic', cooldown: 0 }];
+            this.weaponSlots = [{ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }, { type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }, { type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }];
         }
     }
 
@@ -1270,6 +1403,36 @@ class Player {
                     }
                 }
             });
+            // Evolved weapon bonuses
+            if (slot.evolved && slot.evolvedData) {
+                const evo = slot.evolvedData;
+                // Galaxy Burst - 360° ring
+                if (evo.fullCircle) {
+                    for (let ring = 0; ring < evo.projectiles; ring++) {
+                        const ringAngle = (ring / evo.projectiles) * Math.PI * 2;
+                        const b = new Bullet(this.x, this.y, ringAngle, this, weapon);
+                        b.damage *= evo.damage;
+                        b.color = evo.color;
+                        game.bullets.push(b);
+                    }
+                }
+                // Orbital Strike - rain rockets from sky
+                if (evo.orbitalStrike) {
+                    for (let s = 0; s < evo.strikeCount; s++) {
+                        setTimeout(() => {
+                            const sx = game.player.x + (Math.random() - 0.5) * 300;
+                            const sy = game.player.y + (Math.random() - 0.5) * 300;
+                            createExplosion(sx, sy, evo.color, 30);
+                            game.enemies.forEach(e => {
+                                if (Math.hypot(e.x - sx, e.y - sy) < 80) {
+                                    e.takeDamage(game.player.damage * 2, false);
+                                }
+                            });
+                            screenShake(5);
+                        }, s * 200);
+                    }
+                }
+            }
             slot.cooldown = Math.floor(this.fireRate * (weapon.fireRate || 1));
             slot.maxCooldown = slot.cooldown;
             Sound.play('shoot');
@@ -2298,6 +2461,27 @@ class Enemy {
             game.xpOrbs.push(new XPOrb(this.x, this.y, totalXP));
         } else {
             game.xpOrbs.push(new XPOrb(this.x + (Math.random() - 0.5) * 10, this.y + (Math.random() - 0.5) * 10, Math.max(1, totalXP)));
+        }
+        
+        // Weapon XP - level up equipped weapons
+        if (game.player && game.player.weaponSlots) {
+            game.player.weaponSlots.forEach(slot => {
+                if (slot.evolved || slot.level >= 5) return;
+                slot.xp = (slot.xp || 0) + 1;
+                const xpNeeded = slot.level * 15; // 15, 30, 45, 60 kills to level
+                if (slot.xp >= xpNeeded) {
+                    slot.xp = 0;
+                    slot.level++;
+                    const weapon = WEAPON_TYPES[slot.type];
+                    showNotification(`${weapon?.name || slot.type} leveled to ${slot.level}!`, weapon?.color || '#ffd93d', 2000);
+                    Sound.play('levelUp');
+                    
+                    // Check for evolution at level 5
+                    if (slot.level >= 5) {
+                        checkWeaponEvolution(slot);
+                    }
+                }
+            });
         }
         
         // Elite kill tracking
@@ -4002,11 +4186,11 @@ const SHOP_ITEMS = [
       effects: ['Enemies near you take 2 DPS'], apply: p => { p.poisonCloudDmg = (p.poisonCloudDmg || 0) + 2; } },
     // Weapon Slot Items
     { name: '🔧 Weapon Mount', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.UNCOMMON, basePrice: 20,
-      effects: ['+1 Weapon Slot'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'basic', cooldown: 0 }); } },
+      effects: ['+1 Weapon Slot'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }); } },
     { name: '⚡ Auto-Turret Mount', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.RARE, basePrice: 30,
-      effects: ['+1 Slot (Laser)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'laser', cooldown: 0 }); } },
+      effects: ['+1 Slot (Laser)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'laser', cooldown: 0, level: 1, xp: 0, evolved: false }); } },
     { name: '🚀 Heavy Mount', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.EPIC, basePrice: 40,
-      effects: ['+1 Slot (Rocket)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'rocket', cooldown: 0 }); } },
+      effects: ['+1 Slot (Rocket)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'rocket', cooldown: 0, level: 1, xp: 0, evolved: false }); } },
 ];
 
 // Shop state management
@@ -4876,7 +5060,17 @@ function drawWeaponIndicator(ctx) {
         ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.textAlign = 'left';
         ctx.fillText(`S${i + 1}`, sx + 3, y + 12);
         ctx.fillStyle = weapon ? weapon.color : '#fff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
-        ctx.fillText(weapon ? weapon.name.split(' ').pop() : '???', sx + slotWidth / 2, y + 28);
+        const displayName = slot.evolved && slot.evolvedData ? slot.evolvedData.name.split(' ').pop() : (weapon ? weapon.name.split(' ').pop() : '???');
+        const displayColor = slot.evolved && slot.evolvedData ? slot.evolvedData.color : (weapon ? weapon.color : '#fff');
+        ctx.fillStyle = displayColor;
+        ctx.fillText(displayName, sx + slotWidth / 2, y + 28);
+        // Level indicator
+        if (slot.level > 1 || slot.evolved) {
+            ctx.fillStyle = slot.evolved ? '#ffd700' : '#fff';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(slot.evolved ? '★EVO' : `Lv${slot.level}`, sx + slotWidth - 3, y + 12);
+        }
     });
     ctx.restore();
 }
