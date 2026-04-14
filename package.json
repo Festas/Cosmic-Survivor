@@ -6,9 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && npm run copy-assets",
-    "copy-assets": "copyfiles -f main.js game.js dist",
+    "copy-assets": "copyfiles -f main.js game.js multiplayer-client.js dist",
     "preview": "vite preview",
-    "serve": "vite preview"
+    "serve": "vite preview",
+    "server": "cd server && node index.js",
+    "server:install": "cd server && npm install",
+    "dev:all": "npm run server:install && concurrently \"npm run dev\" \"npm run server\""
   },
   "keywords": [
     "game",

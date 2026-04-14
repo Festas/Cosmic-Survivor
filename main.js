@@ -5373,6 +5373,22 @@ function gameOver() {
     game.highScores = game.highScores.slice(0, 10);
     saveHighScores();
     
+    // Sync stats to server in multiplayer
+    if (window.MultiplayerClient && window.MultiplayerClient.authenticated) {
+        window.MultiplayerClient.syncStats({
+            totalKills: game.persistentStats.totalKills,
+            totalCredits: game.persistentStats.totalCredits,
+            maxWave: game.persistentStats.maxWave,
+            gamesPlayed: 1,
+        });
+        window.MultiplayerClient.syncHighScore({
+            wave: game.wave, score, difficulty: game.difficulty,
+            characterId: game.selectedCharacter?.id, timestamp: Date.now()
+        });
+        // Notify other players
+        window.MultiplayerClient.sendGameEvent('game_over', { wave: game.wave, score });
+    }
+    
     document.getElementById('game-over-modal').classList.remove('hidden');
     document.getElementById('final-wave').textContent = game.wave;
     
@@ -5452,6 +5468,11 @@ function restartGame() {
     game.camera.y = 0;
     game.camera.targetX = 0;
     game.camera.targetY = 0;
+    
+    // Reset multiplayer state
+    game.isMultiplayer = false;
+    game.remotePlayers.clear();
+    game.multiplayerPlayerCount = 1;
     
     game.state = 'characterSelect';
     showDifficultySelect();
@@ -6208,6 +6229,323 @@ function showWaveAnnouncement() {
     Sound.play('boss');
 }
 
+// ==================== MULTIPLAYER GAME FUNCTIONS ====================
+
+// Handle player death - multiplayer aware
+function handlePlayerDeath() {
+    if (game.isMultiplayer) {
+        // In multiplayer, notify other players
+        if (window.MultiplayerClient && window.MultiplayerClient.connected) {
+            window.MultiplayerClient.sendGameEvent('player_died', {
+                playerId: game.localPlayerId,
+            });
+        }
+        // Check if ANY remote player is still alive
+        let anyAlive = false;
+        for (const rp of game.remotePlayers.values()) {
+            if (rp.isAlive) { anyAlive = true; break; }
+        }
+        if (!anyAlive) {
+            // All players dead - game over
+            gameOver();
+        } else {
+            // Local player dead, but others still alive - spectate
+            showNotification('💀 You have been eliminated! Spectating...', '#ff6b6b', 5000);
+            game.player.health = 0;
+        }
+    } else {
+        gameOver();
+    }
+}
+
+// Send local player state to multiplayer server
+function sendLocalPlayerState() {
+    if (!window.MultiplayerClient || !window.MultiplayerClient.connected || !game.player) return;
+    
+    window.MultiplayerClient.sendPlayerState({
+        x: game.player.x,
+        y: game.player.y,
+        health: game.player.health,
+        maxHealth: game.player.maxHealth,
+        isAlive: game.player.health > 0,
+        facingRight: game.player.facingRight,
+        aimAngle: game.player.aimAngle,
+        isMoving: game.player.isMoving,
+        walkFrame: game.player.walkFrame,
+        isDashing: game.player.isDashing,
+        characterId: game.player.characterId,
+        activeWeaponSlot: game.activeWeaponSlot,
+        weaponSlots: game.player.weaponSlots.map(s => ({ type: s.type, level: s.level, evolved: s.evolved })),
+        level: game.stats.level,
+    });
+}
+
+// Initialize multiplayer callbacks
+function initMultiplayerCallbacks() {
+    const mp = window.MultiplayerClient;
+    if (!mp) return;
+
+    mp.onPlayerStateUpdate = (playerId, state) => {
+        const rp = game.remotePlayers.get(playerId);
+        if (rp) {
+            rp.updateFromNetwork(state);
+        }
+    };
+
+    mp.onGameStart = (data) => {
+        game.isMultiplayer = true;
+        game.multiplayerPlayerCount = data.playerCount;
+        game.remotePlayers.clear();
+        
+        // Create remote players for all non-local players
+        data.players.forEach(p => {
+            if (p.id !== mp.localPlayerId) {
+                const rp = new RemotePlayer(p);
+                game.remotePlayers.set(p.id, rp);
+            } else {
+                // Set local player spawn position
+                game.localPlayerId = p.id;
+                if (game.player) {
+                    game.player.x = p.spawnX;
+                    game.player.y = p.spawnY;
+                }
+            }
+        });
+
+        // Close lobby modal, start the game
+        const lobbyModal = document.getElementById('multiplayer-lobby-modal');
+        if (lobbyModal) lobbyModal.classList.add('hidden');
+        
+        game.difficulty = data.settings.difficulty || 'normal';
+        game.difficultySettings = CONFIG.DIFFICULTY[game.difficulty];
+        game.coopSettings.sharedXP = data.settings.sharedXP !== false;
+        
+        game.state = 'playing';
+        spawnWave();
+        
+        showNotification(`🎮 Co-op game started with ${data.playerCount} players!`, '#00ff88', 3000);
+    };
+
+    mp.onPlayerJoined = (playerId, displayName, lobby) => {
+        showNotification(`${displayName} joined the room!`, '#4ecdc4', 2000);
+        updateLobbyUI(lobby);
+    };
+
+    mp.onPlayerLeft = (playerId, lobby) => {
+        // Remove from remote players if in game
+        const rp = game.remotePlayers.get(playerId);
+        if (rp) {
+            showNotification(`${rp.displayName} disconnected`, '#ff6b6b', 3000);
+            game.remotePlayers.delete(playerId);
+        }
+        updateLobbyUI(lobby);
+    };
+
+    mp.onLobbyUpdate = (lobby) => {
+        updateLobbyUI(lobby);
+    };
+
+    mp.onGameEvent = (event, data, playerId) => {
+        if (event === 'player_died') {
+            const rp = game.remotePlayers.get(playerId);
+            if (rp) {
+                rp.isAlive = false;
+                showNotification(`💀 ${rp.displayName} has been eliminated!`, '#ff6b6b', 3000);
+            }
+            // Check if all players are dead
+            if (game.player.health <= 0) {
+                let anyAlive = false;
+                for (const r of game.remotePlayers.values()) {
+                    if (r.isAlive) { anyAlive = true; break; }
+                }
+                if (!anyAlive) gameOver();
+            }
+        } else if (event === 'wave_complete') {
+            // Sync wave state
+        } else if (event === 'game_over') {
+            gameOver();
+        } else if (event === 'enemy_killed') {
+            // Shared XP handling - broadcast kills
+            if (data && data.xp && game.coopSettings.sharedXP) {
+                game.stats.xp += Math.floor(data.xp * 0.5); // 50% shared XP
+                while (game.stats.xp >= game.stats.xpToNext) {
+                    game.stats.xp -= game.stats.xpToNext;
+                    game.stats.level++;
+                    game.stats.xpToNext = Math.floor(CONFIG.XP_BASE * Math.pow(CONFIG.XP_SCALING, game.stats.level - 1));
+                    triggerLevelUp();
+                }
+            }
+        }
+    };
+
+    mp.onChatMessage = (msg) => {
+        showNotification(`${msg.displayName}: ${msg.message}`, '#4ecdc4', 4000);
+    };
+
+    mp.onAuthSuccess = (profile) => {
+        showNotification(`Welcome, ${profile.displayName}!`, '#00ff88', 2000);
+        // Sync local stats to server
+        mp.syncStats(game.persistentStats);
+        updateAccountUI(profile);
+    };
+
+    mp.onAuthError = (message) => {
+        showNotification(`Auth error: ${message}`, '#ff6b6b', 3000);
+        const errorEl = document.getElementById('auth-error');
+        if (errorEl) errorEl.textContent = message;
+    };
+
+    mp.onRoomCreated = (roomCode, lobby) => {
+        showNotification(`Room created: ${roomCode}`, '#00ff88', 3000);
+        showLobbyUI(lobby);
+    };
+
+    mp.onRoomJoined = (roomCode, lobby) => {
+        showNotification(`Joined room: ${roomCode}`, '#00ff88', 3000);
+        showLobbyUI(lobby);
+    };
+
+    mp.onJoinError = (message) => {
+        showNotification(`Join error: ${message}`, '#ff6b6b', 3000);
+        const errorEl = document.getElementById('join-error');
+        if (errorEl) errorEl.textContent = message;
+    };
+
+    mp.onDisconnected = () => {
+        if (game.isMultiplayer && game.state === 'playing') {
+            showNotification('⚠️ Disconnected from server!', '#ff6b6b', 5000);
+            // Gracefully continue as single player
+            game.isMultiplayer = false;
+            game.remotePlayers.clear();
+        }
+    };
+}
+
+// ==================== MULTIPLAYER UI FUNCTIONS ====================
+
+function updateLobbyUI(lobby) {
+    const playerList = document.getElementById('lobby-player-list');
+    if (!playerList) return;
+    
+    playerList.innerHTML = '';
+    lobby.players.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'lobby-player' + (p.ready ? ' ready' : '');
+        div.innerHTML = `
+            <span class="lobby-player-dot" style="background:${p.color}"></span>
+            <span class="lobby-player-name">${p.displayName}${p.isHost ? ' 👑' : ''}</span>
+            <span class="lobby-player-character">${p.characterId ? CHARACTERS.find(c => c.id === p.characterId)?.name || p.characterId : 'Choosing...'}</span>
+            <span class="lobby-player-status">${p.ready ? '✅ Ready' : '⏳ Not Ready'}</span>
+        `;
+        playerList.appendChild(div);
+    });
+
+    const roomCodeEl = document.getElementById('lobby-room-code');
+    if (roomCodeEl) roomCodeEl.textContent = lobby.code;
+
+    const startBtn = document.getElementById('lobby-start-btn');
+    if (startBtn) {
+        const mp = window.MultiplayerClient;
+        const isHost = mp && lobby.hostId === mp.localPlayerId;
+        startBtn.style.display = isHost ? 'block' : 'none';
+        startBtn.disabled = !lobby.players.every(p => p.ready);
+    }
+}
+
+function showLobbyUI(lobby) {
+    // Hide other modals
+    document.getElementById('start-modal')?.classList.add('hidden');
+    document.getElementById('character-select-modal')?.classList.add('hidden');
+    
+    let modal = document.getElementById('multiplayer-lobby-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'multiplayer-lobby-modal';
+        modal.className = 'modal';
+        document.getElementById('game-container').appendChild(modal);
+    }
+    
+    modal.innerHTML = `
+        <div class="modal-content multiplayer-lobby">
+            <h2>🎮 Co-op Lobby</h2>
+            <div class="lobby-room-code-display">
+                <span>Room Code:</span>
+                <span id="lobby-room-code" class="room-code-value">${lobby.code}</span>
+                <button class="btn-small" onclick="navigator.clipboard.writeText('${lobby.code}').then(() => showNotification('Code copied!', '#00ff88', 1500))">📋 Copy</button>
+            </div>
+            <div class="lobby-settings">
+                <span>Difficulty: <strong>${lobby.settings.difficulty}</strong></span>
+                <span>Max Players: <strong>${lobby.settings.maxPlayers}</strong></span>
+                <span>Shared XP: <strong>${lobby.settings.sharedXP ? 'Yes' : 'No'}</strong></span>
+            </div>
+            <h3>Players (${lobby.players.length}/${lobby.settings.maxPlayers})</h3>
+            <div id="lobby-player-list"></div>
+            <div class="lobby-character-select">
+                <h3>Select Character</h3>
+                <div id="lobby-character-list" class="lobby-char-grid"></div>
+            </div>
+            <div class="lobby-actions">
+                <button id="lobby-ready-btn" class="btn-primary">Ready Up</button>
+                <button id="lobby-start-btn" class="btn-primary" style="display:none">Start Game</button>
+                <button id="lobby-leave-btn" class="btn-secondary">Leave Room</button>
+            </div>
+        </div>
+    `;
+    modal.classList.remove('hidden');
+
+    // Populate character selection
+    const charList = document.getElementById('lobby-character-list');
+    let selectedCharId = null;
+    CHARACTERS.forEach(char => {
+        const btn = document.createElement('div');
+        btn.className = 'lobby-char-card';
+        btn.innerHTML = `<strong>${char.name}</strong><br><small>${char.description}</small>`;
+        btn.addEventListener('click', () => {
+            selectedCharId = char.id;
+            game.selectedCharacter = char;
+            charList.querySelectorAll('.lobby-char-card').forEach(c => c.classList.remove('selected'));
+            btn.classList.add('selected');
+        });
+        charList.appendChild(btn);
+    });
+
+    // Ready button
+    document.getElementById('lobby-ready-btn').addEventListener('click', () => {
+        if (!selectedCharId) {
+            showNotification('Please select a character first!', '#ffd93d', 2000);
+            return;
+        }
+        const mp = window.MultiplayerClient;
+        if (mp) {
+            game.player = new Player(game.selectedCharacter);
+            mp.setReady(true, selectedCharId);
+        }
+    });
+
+    // Start button (host only)
+    document.getElementById('lobby-start-btn').addEventListener('click', () => {
+        const mp = window.MultiplayerClient;
+        if (mp) mp.startGame();
+    });
+
+    // Leave button
+    document.getElementById('lobby-leave-btn').addEventListener('click', () => {
+        const mp = window.MultiplayerClient;
+        if (mp) mp.leaveRoom();
+        modal.classList.add('hidden');
+        document.getElementById('start-modal')?.classList.remove('hidden');
+    });
+
+    updateLobbyUI(lobby);
+}
+
+function updateAccountUI(profile) {
+    const btn = document.getElementById('account-btn');
+    if (btn) {
+        btn.textContent = profile ? `👤 ${profile.displayName}` : '👤 Account';
+    }
+}
+
 // ==================== GAME LOOP ====================
 let lastTime = 0;
 let timer = 0;
@@ -6822,6 +7160,10 @@ function init() {
     achBtn.textContent = '🏆';
     achBtn.addEventListener('click', showAchievements);
     document.body.appendChild(achBtn);
+    
+    // ===== Multiplayer / Account Buttons =====
+    initMultiplayerUI();
+    initMultiplayerCallbacks();
 }
 
 function showAchievements() {
@@ -6919,4 +7261,245 @@ window.addEventListener('keydown', e => {
 });
 
 window.addEventListener('keyup', e => game.keys[e.key] = false);
+
+// ==================== MULTIPLAYER UI INITIALIZATION ====================
+function initMultiplayerUI() {
+    // Account button
+    const accountBtn = document.createElement('button');
+    accountBtn.id = 'account-btn';
+    accountBtn.className = 'account-btn';
+    accountBtn.textContent = '👤 Account';
+    accountBtn.addEventListener('click', showAccountModal);
+    document.body.appendChild(accountBtn);
+    
+    // Multiplayer button on start screen
+    const startModal = document.getElementById('start-modal');
+    if (startModal) {
+        const modalContent = startModal.querySelector('.modal-content');
+        if (modalContent) {
+            const mpBtn = document.createElement('button');
+            mpBtn.id = 'multiplayer-btn';
+            mpBtn.className = 'btn-primary multiplayer-btn';
+            mpBtn.textContent = '🎮 Co-op Multiplayer';
+            mpBtn.addEventListener('click', showMultiplayerModal);
+            
+            const settingsBtn = document.getElementById('settings-btn');
+            if (settingsBtn) {
+                modalContent.insertBefore(mpBtn, settingsBtn);
+            } else {
+                modalContent.appendChild(mpBtn);
+            }
+        }
+    }
+    
+    // Try auto-connect and restore session
+    if (window.MultiplayerClient) {
+        window.MultiplayerClient.connect();
+        window.MultiplayerClient.restoreSession();
+    }
+}
+
+function showAccountModal() {
+    const mp = window.MultiplayerClient;
+    const isLoggedIn = mp && mp.authenticated;
+    
+    let modal = document.getElementById('account-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'account-modal';
+        modal.className = 'modal';
+        document.getElementById('game-container').appendChild(modal);
+    }
+    
+    if (isLoggedIn) {
+        // Show profile
+        const profile = mp.profile;
+        modal.innerHTML = `
+            <div class="modal-content account-modal">
+                <h2>👤 Account</h2>
+                <div class="account-profile">
+                    <p><strong>Name:</strong> ${profile.displayName}</p>
+                    <p><strong>Username:</strong> ${profile.username}</p>
+                    <div class="account-stats">
+                        <h3>📊 Career Stats</h3>
+                        <p>👾 Total Kills: ${profile.stats?.total_kills || 0}</p>
+                        <p>🌊 Max Wave: ${profile.stats?.max_wave || 0}</p>
+                        <p>💰 Total Credits: ${profile.stats?.total_credits || 0}</p>
+                        <p>🎮 Games Played: ${profile.stats?.total_games || 0}</p>
+                    </div>
+                </div>
+                <button class="btn-secondary" onclick="window.MultiplayerClient.logout(); this.closest('.modal').classList.add('hidden'); updateAccountUI(null);">Logout</button>
+                <button class="btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Close</button>
+            </div>
+        `;
+    } else {
+        // Show login/register form
+        modal.innerHTML = `
+            <div class="modal-content account-modal">
+                <h2>👤 Account</h2>
+                <div id="auth-error" class="auth-error"></div>
+                <div class="auth-tabs">
+                    <button class="auth-tab active" data-tab="login">Login</button>
+                    <button class="auth-tab" data-tab="register">Register</button>
+                </div>
+                <div id="auth-login" class="auth-form">
+                    <input type="text" id="login-username" placeholder="Username" maxlength="20" autocomplete="username">
+                    <input type="password" id="login-password" placeholder="Password" autocomplete="current-password">
+                    <button class="btn-primary" id="login-submit-btn">Login</button>
+                </div>
+                <div id="auth-register" class="auth-form" style="display:none">
+                    <input type="text" id="register-username" placeholder="Username (3-20 chars)" maxlength="20" autocomplete="username">
+                    <input type="text" id="register-display" placeholder="Display Name" maxlength="20">
+                    <input type="password" id="register-password" placeholder="Password (6+ chars)" autocomplete="new-password">
+                    <button class="btn-primary" id="register-submit-btn">Register</button>
+                </div>
+                <div class="auth-divider">— or —</div>
+                <button class="btn-secondary" id="guest-login-btn">Play as Guest</button>
+                <button class="btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Close</button>
+            </div>
+        `;
+        
+        // Tab switching
+        modal.querySelectorAll('.auth-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                modal.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById('auth-login').style.display = tab.dataset.tab === 'login' ? 'block' : 'none';
+                document.getElementById('auth-register').style.display = tab.dataset.tab === 'register' ? 'block' : 'none';
+            });
+        });
+        
+        // Login
+        document.getElementById('login-submit-btn').addEventListener('click', () => {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            if (!username || !password) return;
+            mp.login(username, password);
+        });
+        
+        // Register
+        document.getElementById('register-submit-btn').addEventListener('click', () => {
+            const username = document.getElementById('register-username').value.trim();
+            const display = document.getElementById('register-display').value.trim();
+            const password = document.getElementById('register-password').value;
+            if (!username || !password) return;
+            mp.register(username, password, display || username);
+        });
+        
+        // Guest login
+        document.getElementById('guest-login-btn').addEventListener('click', () => {
+            mp.loginAsGuest();
+        });
+        
+        // Close modal on auth success
+        const origOnAuth = mp.onAuthSuccess;
+        mp.onAuthSuccess = (profile) => {
+            modal.classList.add('hidden');
+            if (origOnAuth) origOnAuth(profile);
+            else {
+                showNotification(`Welcome, ${profile.displayName}!`, '#00ff88', 2000);
+                updateAccountUI(profile);
+            }
+        };
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+function showMultiplayerModal() {
+    const mp = window.MultiplayerClient;
+    
+    if (!mp || !mp.connected) {
+        showNotification('⚠️ Cannot connect to multiplayer server', '#ff6b6b', 3000);
+        return;
+    }
+    
+    if (!mp.authenticated) {
+        showAccountModal();
+        showNotification('Please log in or create an account first', '#ffd93d', 3000);
+        return;
+    }
+    
+    let modal = document.getElementById('multiplayer-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'multiplayer-modal';
+        modal.className = 'modal';
+        document.getElementById('game-container').appendChild(modal);
+    }
+    
+    modal.innerHTML = `
+        <div class="modal-content multiplayer-modal">
+            <h2>🎮 Co-op Multiplayer</h2>
+            <p class="intro-text">Play with up to 4 players on different devices!</p>
+            <div class="mp-options">
+                <div class="mp-option">
+                    <h3>🏠 Create Room</h3>
+                    <p>Host a game and invite friends</p>
+                    <div class="mp-create-settings">
+                        <label>Difficulty:
+                            <select id="mp-difficulty">
+                                <option value="easy">Easy</option>
+                                <option value="normal" selected>Normal</option>
+                                <option value="hard">Hard</option>
+                                <option value="nightmare">Nightmare</option>
+                            </select>
+                        </label>
+                        <label>Max Players:
+                            <select id="mp-max-players">
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4" selected>4</option>
+                            </select>
+                        </label>
+                        <label>
+                            <input type="checkbox" id="mp-shared-xp" checked> Shared XP
+                        </label>
+                    </div>
+                    <button class="btn-primary" id="mp-create-btn">Create Room</button>
+                </div>
+                <div class="mp-option">
+                    <h3>🔗 Join Room</h3>
+                    <p>Enter a room code to join a friend</p>
+                    <input type="text" id="mp-room-code" placeholder="Enter room code" maxlength="6" style="text-transform: uppercase;">
+                    <div id="join-error" class="auth-error"></div>
+                    <button class="btn-primary" id="mp-join-btn">Join Room</button>
+                </div>
+            </div>
+            <button class="btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Back</button>
+        </div>
+    `;
+    
+    modal.classList.remove('hidden');
+    document.getElementById('start-modal')?.classList.add('hidden');
+    
+    // Create room handler
+    document.getElementById('mp-create-btn').addEventListener('click', () => {
+        mp.createRoom({
+            difficulty: document.getElementById('mp-difficulty').value,
+            maxPlayers: parseInt(document.getElementById('mp-max-players').value),
+            sharedXP: document.getElementById('mp-shared-xp').checked,
+        });
+        modal.classList.add('hidden');
+    });
+    
+    // Join room handler
+    document.getElementById('mp-join-btn').addEventListener('click', () => {
+        const code = document.getElementById('mp-room-code').value.trim().toUpperCase();
+        if (code.length !== 6) {
+            document.getElementById('join-error').textContent = 'Room code must be 6 characters';
+            return;
+        }
+        mp.joinRoom(code);
+        modal.classList.add('hidden');
+    });
+    
+    // Allow Enter key to join
+    document.getElementById('mp-room-code').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('mp-join-btn').click();
+        }
+    });
+}
+
 window.addEventListener('load', init);
