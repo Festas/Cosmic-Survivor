@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && npm run copy-assets",
-    "copy-assets": "copyfiles -f main.js game.js multiplayer-client.js dist",
+    "copy-assets": "copyfiles -f main.js game.js multiplayer-client.js game-integration.js dist",
     "preview": "vite preview",
     "serve": "vite preview",
     "server": "cd server && node index.js",
@@ -26,5 +26,8 @@
     "concurrently": "^9.1.2",
     "copyfiles": "^2.4.1",
     "vite": "^5.0.0"
+  },
+  "dependencies": {
+    "ws": "^8.20.0"
   }
 }
