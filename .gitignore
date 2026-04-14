@@ -28,3 +28,9 @@ dist/
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# Server database files
+server/*.db
+server/*.db-shm
+server/*.db-wal
+server/node_modules/
