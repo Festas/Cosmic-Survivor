@@ -501,6 +501,8 @@ const game = {
     waveModifier: null,
     fogOfWar: false,
     creditMultiplier: 1,
+    corruption: 0,
+    devilDealActive: false,
     obstacles: [],
     hazards: [],
     blackHoles: [],
@@ -1546,6 +1548,7 @@ class Player {
     }
 
     heal(amount) {
+        if (this.healingBlocked) return;
         const heal = Math.min(amount, this.maxHealth - this.health);
         this.health += heal;
         if (heal > 0) {
@@ -1845,6 +1848,16 @@ class Enemy {
             this.health = this.maxHealth;
             this.damage = (4 + wave * 1.2 + Math.pow(wave, 1.1) * 0.3) * enemyType.damage * diffSettings.enemyDamageMult;
             this.creditValue = Math.floor((2 + wave * 0.8) * enemyType.credits * (diffSettings.creditMult || 1));
+
+            // Corruption scaling - enemies harder but better rewards at high corruption
+            if (game.corruption >= 5) {
+                const corruptionMult = 1 + (game.corruption - 4) * 0.08;
+                this.maxHealth *= corruptionMult;
+                this.health = this.maxHealth;
+                this.damage *= (1 + (game.corruption - 4) * 0.05);
+                this.creditValue = Math.floor(this.creditValue * (1 + game.corruption * 0.1));
+            }
+
             this.color = enemyType.color;
             this.canTeleport = enemyType.canTeleport;
             this.isRanged = enemyType.ranged;
@@ -4100,6 +4113,48 @@ const RARITY = {
     LEGENDARY: { name: 'Legendary', color: '#f59e0b', priceMultiplier: 3 }
 };
 
+// Devil Deal items - cost HP instead of credits, offered after boss waves
+const DEVIL_DEAL_ITEMS = [
+    { name: '😈 Dark Power', hpCost: 20, effects: ['+30% Damage', '-20 Max HP'],
+      apply: p => { p.damage = Math.floor(p.damage * 1.3); p.maxHealth -= 20; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Soul Pact', hpCost: 25, effects: ['+50% Fire Rate', '-25 Max HP'],
+      apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.5)); p.maxHealth -= 25; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Blood Oath', hpCost: 15, effects: ['+25% Life Steal', '-15 Max HP'],
+      apply: p => { p.lifeSteal += 0.25; p.maxHealth -= 15; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Forbidden Knowledge', hpCost: 30, effects: ['+2 Projectiles', '+15 Damage', '-30 Max HP'],
+      apply: p => { p.projectileCount += 2; p.damage += 15; p.maxHealth -= 30; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Shadow Step', hpCost: 20, effects: ['+30% Dodge', '+1 Speed', '-20 Max HP'],
+      apply: p => { p.dodge = Math.min(0.7, p.dodge + 0.3); p.speed += 1; p.maxHealth -= 20; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Eldritch Eye', hpCost: 25, effects: ['+40% Crit', '+1.5x Crit Dmg', '-25 Max HP'],
+      apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.4); p.critDamage += 1.5; p.maxHealth -= 25; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Demonic Vigor', hpCost: 10, effects: ['+3 Projectiles', '+1 Speed', '-10 Max HP'],
+      apply: p => { p.projectileCount += 3; p.speed += 1; p.maxHealth -= 10; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Void Touch', hpCost: 35, effects: ['+All Bullets Pierce', 'Chain Lightning', '-35 Max HP'],
+      apply: p => { p.extraPiercing = (p.extraPiercing || 0) + 5; p.chainLightningChance = (p.chainLightningChance || 0) + 0.3; p.maxHealth -= 35; p.health = Math.min(p.health, p.maxHealth); } },
+];
+
+// Cursed items - appear in shop at discount but have drawbacks + add corruption
+const CURSED_ITEMS = [
+    { name: '👑 Cursed Crown', rarity: RARITY.EPIC, basePrice: 12, corruption: 2,
+      effects: ['+50% Damage', '-30% Fire Rate', '+2 Corruption'],
+      apply: p => { p.damage = Math.floor(p.damage * 1.5); p.fireRate = Math.floor(p.fireRate * 1.3); } },
+    { name: '💎 Glass Cannon', rarity: RARITY.LEGENDARY, basePrice: 8, corruption: 3,
+      effects: ['2x Damage', 'Max HP set to 1', '+3 Corruption'],
+      apply: p => { p.damage *= 2; p.maxHealth = 1; p.health = 1; } },
+    { name: '🩸 Berserker\'s Blood', rarity: RARITY.EPIC, basePrice: 15, corruption: 2,
+      effects: ['+80% Damage below 30% HP', 'No healing', '+2 Corruption'],
+      apply: p => { p.berserkerSoul = (p.berserkerSoul || 0) + 0.8; p.healingBlocked = true; } },
+    { name: '💥 Unstable Core', rarity: RARITY.RARE, basePrice: 10, corruption: 1,
+      effects: ['+3 Projectiles', 'Random spread', '+1 Corruption'],
+      apply: p => { p.projectileCount += 3; p.unstableSpread = true; } },
+    { name: '🕳️ Void Shard', rarity: RARITY.EPIC, basePrice: 14, corruption: 2,
+      effects: ['+4 Piercing', '+200 Range', '-2 Speed', '+2 Corruption'],
+      apply: p => { p.extraPiercing = (p.extraPiercing || 0) + 4; p.range += 200; p.speed = Math.max(1, p.speed - 2); } },
+    { name: '💀 Death\'s Embrace', rarity: RARITY.LEGENDARY, basePrice: 5, corruption: 4,
+      effects: ['Enemies explode on death', '-50 Max HP', '+4 Corruption'],
+      apply: p => { p.explosiveFinale = true; p.explosionRadius = (p.explosionRadius || 0) + 80; p.maxHealth -= 50; p.health = Math.min(p.health, p.maxHealth); } },
+];
+
 const SHOP_ITEMS = [
     // Common Stat Items
     { name: '💚 Medkit', category: ITEM_CATEGORIES.STAT, rarity: RARITY.COMMON, basePrice: 8,
@@ -4251,10 +4306,33 @@ function generateShopOfferings() {
         }
     }
     
+    // 25% chance to replace one item with a cursed item (after wave 5)
+    if (game.wave >= 5 && Math.random() < 0.25) {
+        const cursed = CURSED_ITEMS[Math.floor(Math.random() * CURSED_ITEMS.length)];
+        const replaceIndex = Math.floor(Math.random() * offerings.length);
+        if (!shopState.lockedItems.has(replaceIndex)) {
+            offerings[replaceIndex] = {
+                ...cursed,
+                price: Math.ceil(cursed.basePrice * (1 + game.wave * 0.05)),
+                isCursed: true,
+                category: ITEM_CATEGORIES.SPECIAL,
+            };
+        }
+    }
+
     return offerings;
 }
 
 function openShop() {
+    // After boss waves, offer devil deal first
+    const justBeatBoss = (game.wave - 1) % CONFIG.BOSS_WAVE_INTERVAL === 0 && game.wave > 1;
+    if (justBeatBoss && !game.devilDealActive) {
+        game.devilDealActive = true;
+        showDevilDeal();
+        return;
+    }
+    game.devilDealActive = false;
+
     game.state = 'shop';
     document.getElementById('shop-modal').classList.remove('hidden');
     document.getElementById('completed-wave').textContent = game.wave - 1;
@@ -4276,6 +4354,72 @@ function openShop() {
     }
     
     renderShop();
+}
+
+function showDevilDeal() {
+    // Pick 2 random devil deal items
+    const shuffled = [...DEVIL_DEAL_ITEMS].sort(() => Math.random() - 0.5);
+    const deals = shuffled.slice(0, 2);
+    
+    const modal = document.createElement('div');
+    modal.id = 'devil-deal-modal';
+    modal.className = 'modal devil-deal-modal';
+    modal.innerHTML = `
+        <div class="modal-content devil-deal-content" style="background: rgba(30, 0, 0, 0.95); border: 2px solid #dc2626;">
+            <h2 style="color: #dc2626;">😈 Devil's Bargain 😈</h2>
+            <p style="color: #fca5a5; margin-bottom: 15px;">Trade your life force for power...</p>
+            <div class="devil-deals" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                ${deals.map((deal, i) => `
+                    <div class="devil-deal-card" data-index="${i}" style="
+                        background: rgba(50, 0, 0, 0.8); border: 1px solid #991b1b; padding: 15px; border-radius: 8px;
+                        cursor: pointer; min-width: 200px; max-width: 250px; transition: all 0.2s;">
+                        <h3 style="color: #fca5a5; margin: 0 0 8px 0;">${deal.name}</h3>
+                        <div style="margin-bottom: 8px;">
+                            ${deal.effects.map(e => `<p style="color: ${e.startsWith('+') ? '#4ade80' : e.startsWith('-') ? '#f87171' : '#fbbf24'}; margin: 2px 0; font-size: 13px;">${e}</p>`).join('')}
+                        </div>
+                        <p style="color: #dc2626; font-weight: bold; font-size: 14px;">Cost: ❤️ ${deal.hpCost} Max HP</p>
+                    </div>
+                `).join('')}
+            </div>
+            <button id="skip-devil-deal" style="
+                margin-top: 15px; padding: 8px 20px; background: #334155; border: 1px solid #475569;
+                color: #94a3b8; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                Skip (No deal)
+            </button>
+        </div>
+    `;
+    
+    document.getElementById('game-container').appendChild(modal);
+    
+    // Add click handlers for deals
+    modal.querySelectorAll('.devil-deal-card').forEach(el => {
+        el.addEventListener('mouseenter', () => { el.style.borderColor = '#dc2626'; el.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.5)'; });
+        el.addEventListener('mouseleave', () => { el.style.borderColor = '#991b1b'; el.style.boxShadow = 'none'; });
+        el.addEventListener('click', () => {
+            const index = parseInt(el.dataset.index);
+            const deal = deals[index];
+            
+            if (game.player.maxHealth <= deal.hpCost) {
+                showNotification('Not enough HP for this deal!', '#ff6b6b', 2000);
+                return;
+            }
+            
+            deal.apply(game.player);
+            Sound.play('boss');
+            screenShake(10);
+            showNotification(`${deal.name} accepted!`, '#dc2626', 3000);
+            createExplosion(game.player.x, game.player.y, '#dc2626', 30);
+            
+            modal.remove();
+            openShop();
+        });
+    });
+    
+    // Skip button
+    modal.querySelector('#skip-devil-deal').addEventListener('click', () => {
+        modal.remove();
+        openShop();
+    });
 }
 
 function renderShop() {
@@ -4301,7 +4445,7 @@ function renderShop() {
         const canAfford = game.credits >= item.price;
         
         const div = document.createElement('div');
-        div.className = `shop-item rarity-${item.rarity.name.toLowerCase()}${!canAfford ? ' disabled' : ''}${isLocked ? ' locked' : ''}`;
+        div.className = `shop-item rarity-${item.rarity.name.toLowerCase()}${item.isCursed ? ' cursed-item' : ''}${!canAfford ? ' disabled' : ''}${isLocked ? ' locked' : ''}`;
         div.dataset.index = index;
         
         // Create effects display
@@ -4368,6 +4512,20 @@ function toggleItemLock(index) {
 function purchaseItem(item, index) {
     game.credits -= item.price;
     item.apply(game.player);
+
+    // Track corruption from cursed items
+    if (item.isCursed && item.corruption) {
+        game.corruption += item.corruption;
+        showNotification(`Corruption: ${game.corruption}`, '#7c3aed', 2000);
+        
+        // Corruption effects
+        if (game.corruption >= 10) {
+            showNotification('⚠️ MAX CORRUPTION! The Cosmic Devourer stirs...', '#ff0000', 4000);
+        } else if (game.corruption >= 5) {
+            showNotification('⚠️ High corruption! Enemies are stronger but drop better loot', '#fbbf24', 3000);
+        }
+    }
+
     game.persistentStats.upgradesPurchased++;
     savePersistentStats();
     Sound.play('powerup');
@@ -4758,6 +4916,8 @@ function restartGame() {
     game.waveModifier = null;
     game.fogOfWar = false;
     game.creditMultiplier = 1;
+    game.corruption = 0;
+    game.devilDealActive = false;
     game.eliteKills = 0;
     game.xpOrbs = [];
     game.blackHoles = [];
@@ -5174,6 +5334,30 @@ function drawWaveModifier(ctx) {
     ctx.restore();
 }
 
+function drawCorruptionIndicator(ctx) {
+    if (game.corruption <= 0) return;
+    
+    ctx.save();
+    const x = 10;
+    const y = 115;
+    
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(x, y, 130, 22);
+    
+    // Corruption bar
+    const fillPercent = Math.min(game.corruption / 10, 1);
+    const barColor = game.corruption >= 10 ? '#dc2626' : game.corruption >= 5 ? '#f59e0b' : '#7c3aed';
+    ctx.fillStyle = barColor;
+    ctx.fillRect(x, y, 130 * fillPercent, 22);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`☠️ Corruption: ${game.corruption}`, x + 5, y + 15);
+    ctx.restore();
+}
+
 function drawDashIndicator(ctx) {
     if (!game.player) return;
     const x = 20;
@@ -5524,6 +5708,7 @@ function gameLoop(timestamp) {
         drawDashIndicator(game.ctx);
         drawDPSMeter(game.ctx);
         drawWaveModifier(game.ctx);
+        drawCorruptionIndicator(game.ctx);
         updateDPS();
     } else if (game.paused) {
         // Still draw everything when paused
