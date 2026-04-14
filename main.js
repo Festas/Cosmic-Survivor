@@ -1838,6 +1838,14 @@ class Enemy {
             this.isCharging = false;
             this.chargeTargetX = 0;
             this.chargeTargetY = 0;
+            // Boss phase system
+            this.phase = 1;
+            this.phaseThresholds = [1.0, 0.6, 0.3]; // Phase changes at 60% and 30% HP
+            this.phaseTransitioning = false;
+            this.phaseTransitionTimer = 0;
+            this.specialAttackCooldown = 0;
+            this.shockwaveChargeTimer = 0;
+            this.isChargingShockwave = false;
         } else {
             const enemyType = ENEMY_TYPES[type] || ENEMY_TYPES.normal;
             this.type = type;
@@ -1947,6 +1955,106 @@ class Enemy {
 
         // Boss abilities
         if (this.isBoss) {
+            // Boss phase transitions
+            const healthPercent = this.health / this.maxHealth;
+            const newPhase = healthPercent <= 0.3 ? 3 : healthPercent <= 0.6 ? 2 : 1;
+            
+            if (newPhase > this.phase) {
+                this.phase = newPhase;
+                this.phaseTransitioning = true;
+                this.phaseTransitionTimer = 60; // 1 second invulnerable during transition
+                
+                // Phase transition effects
+                screenShake(15);
+                createExplosion(this.x, this.y, this.color, 40);
+                
+                if (this.phase === 2) {
+                    showNotification(`${this.name} enters Phase 2!`, '#ff6b6b', 3000);
+                    // Phase 2: speed boost
+                    this.speed *= 1.3;
+                    Sound.play('boss');
+                } else if (this.phase === 3) {
+                    showNotification(`${this.name} enters FINAL PHASE!`, '#ff0000', 4000);
+                    // Phase 3: desperate, very aggressive
+                    this.speed *= 1.5;
+                    this.damage *= 1.3;
+                    Sound.play('boss');
+                    createExplosion(this.x, this.y, '#ff0000', 60);
+                }
+            }
+            
+            if (this.phaseTransitioning) {
+                this.phaseTransitionTimer--;
+                if (this.phaseTransitionTimer <= 0) {
+                    this.phaseTransitioning = false;
+                }
+                // Pulsing invulnerability visual
+                if (game.frameCount % 4 < 2) {
+                    createParticles(this.x, this.y, this.color, 2);
+                }
+            }
+            
+            // Phase-specific special attacks
+            if (this.specialAttackCooldown > 0) this.specialAttackCooldown--;
+            
+            if (!this.phaseTransitioning && this.specialAttackCooldown <= 0) {
+                // Phase 2+: Shockwave attack (all boss types)
+                if (this.phase >= 2 && !this.isChargingShockwave) {
+                    const playerDist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+                    if (playerDist < 250) {
+                        this.isChargingShockwave = true;
+                        this.shockwaveChargeTimer = 45; // 0.75s telegraph
+                        createTextParticle(this.x, this.y - this.size - 20, '⚠️', '#ff0000', 24);
+                    }
+                }
+                
+                // Phase 3: Bullet burst (all boss types)
+                if (this.phase >= 3 && this.specialAttackCooldown <= 0) {
+                    const burstCount = 8 + Math.floor(Math.random() * 8);
+                    for (let i = 0; i < burstCount; i++) {
+                        const angle = (i / burstCount) * Math.PI * 2;
+                        game.bullets.push({
+                            x: this.x,
+                            y: this.y,
+                            angle,
+                            speed: 3 + Math.random() * 2,
+                            size: 6,
+                            damage: this.damage * 0.4,
+                            color: this.color,
+                            isEnemyBullet: true,
+                        });
+                    }
+                    this.specialAttackCooldown = this.phase >= 3 ? 180 : 300;
+                    createExplosion(this.x, this.y, this.color, 25);
+                }
+            }
+            
+            // Shockwave execution
+            if (this.isChargingShockwave) {
+                this.shockwaveChargeTimer--;
+                // Telegraph: red circle growing
+                if (this.shockwaveChargeTimer <= 0) {
+                    // Execute shockwave
+                    this.isChargingShockwave = false;
+                    this.specialAttackCooldown = this.phase >= 3 ? 120 : 240;
+                    
+                    const shockRadius = 200;
+                    const playerDist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+                    if (playerDist < shockRadius) {
+                        game.player.takeDamage(this.damage * 0.8);
+                        // Knockback
+                        if (!game.player.knockbackImmune) {
+                            const angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
+                            game.player.x += Math.cos(angle) * 80;
+                            game.player.y += Math.sin(angle) * 80;
+                            game.player.x = Math.max(game.player.size, Math.min(CONFIG.CANVAS_WIDTH - game.player.size, game.player.x));
+                            game.player.y = Math.max(game.player.size, Math.min(CONFIG.CANVAS_HEIGHT - game.player.size, game.player.y));
+                        }
+                    }
+                    screenShake(12);
+                    createExplosion(this.x, this.y, '#ff4444', 35);
+                }
+            }
             if (this.canSummon && this.summonCooldown <= 0 && game.enemies.length < 30) {
                 this.summonMinions();
                 this.summonCooldown = 300;
@@ -2402,6 +2510,11 @@ class Enemy {
     }
 
     takeDamage(amount, isCrit = false) {
+        // Boss phase transition invulnerability
+        if (this.isBoss && this.phaseTransitioning) {
+            createTextParticle(this.x, this.y, 'IMMUNE!', '#ffd93d', 14);
+            return false;
+        }
         // Sentinel shield absorbs damage first
         if (this.canShield && this.shieldActive && this.shieldHealth > 0) {
             const absorbed = Math.min(amount, this.shieldHealth);
@@ -3355,6 +3468,18 @@ class Enemy {
         ctx.setLineDash([6, 4]);
         ctx.beginPath(); ctx.arc(cx, cy, s * 0.9, 0, Math.PI * 2); ctx.stroke();
         ctx.setLineDash([]);
+        
+        // Phase glow effect
+        if (this.phase >= 2) {
+            ctx.save();
+            const glowPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.5;
+            ctx.globalAlpha = glowPulse * (this.phase >= 3 ? 0.4 : 0.2);
+            ctx.fillStyle = this.phase >= 3 ? '#ff0000' : '#ff6b00';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
         
         // Health bar
         if (this.health < this.maxHealth) {
@@ -5430,6 +5555,77 @@ function drawDPSMeter(ctx) {
     ctx.restore();
 }
 
+function drawBossHealthBar(ctx) {
+    const boss = game.enemies.find(e => e.isBoss);
+    if (!boss || game.state !== 'playing') return;
+    
+    const barWidth = 500;
+    const barHeight = 20;
+    const x = CONFIG.CANVAS_WIDTH / 2 - barWidth / 2;
+    const y = 15;
+    
+    ctx.save();
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x - 5, y - 5, barWidth + 10, barHeight + 30);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 5, y - 5, barWidth + 10, barHeight + 30);
+    
+    // Boss name
+    ctx.fillStyle = '#fca5a5';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${boss.name}`, CONFIG.CANVAS_WIDTH / 2, y + 8);
+    
+    // Health bar background
+    ctx.fillStyle = 'rgba(50, 0, 0, 0.8)';
+    ctx.fillRect(x, y + 12, barWidth, barHeight);
+    
+    // Health fill
+    const healthPercent = boss.health / boss.maxHealth;
+    const healthColor = boss.phase >= 3 ? '#dc2626' : boss.phase >= 2 ? '#f59e0b' : '#ef4444';
+    ctx.fillStyle = healthColor;
+    ctx.fillRect(x, y + 12, barWidth * healthPercent, barHeight);
+    
+    // Phase markers
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + barWidth * 0.6, y + 12);
+    ctx.lineTo(x + barWidth * 0.6, y + 12 + barHeight);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + barWidth * 0.3, y + 12);
+    ctx.lineTo(x + barWidth * 0.3, y + 12 + barHeight);
+    ctx.stroke();
+    
+    // Phase indicator
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Phase ${boss.phase}/3`, x + barWidth, y + 8);
+    
+    // HP text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.ceil(boss.health)} / ${Math.ceil(boss.maxHealth)}`, CONFIG.CANVAS_WIDTH / 2, y + 27);
+    
+    // Charging shockwave telegraph
+    if (boss.isChargingShockwave) {
+        const chargeProgress = 1 - (boss.shockwaveChargeTimer / 45);
+        ctx.fillStyle = '#ff0000';
+        ctx.font = 'bold 14px monospace';
+        ctx.globalAlpha = 0.5 + Math.sin(Date.now() * 0.02) * 0.5;
+        ctx.fillText('⚠️ INCOMING ATTACK ⚠️', CONFIG.CANVAS_WIDTH / 2, y + barHeight + 35);
+        ctx.globalAlpha = 1;
+    }
+    
+    ctx.restore();
+}
+
 function showWaveAnnouncement() {
     const waveTheme = getCurrentTheme();
     if (waveTheme.waves[0] === game.wave) showNotification(`🌍 ${waveTheme.name}`, '#ffd93d', 3000);
@@ -5563,6 +5759,25 @@ function gameLoop(timestamp) {
     
     // Draw arena obstacles
     drawArenaObstacles(ctx);
+    
+    // Boss shockwave telegraph
+    game.enemies.forEach(e => {
+        if (e.isBoss && e.isChargingShockwave) {
+            ctx.save();
+            const progress = 1 - (e.shockwaveChargeTimer / 45);
+            ctx.globalAlpha = 0.2 + progress * 0.3;
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 8]);
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, 200 * progress, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+            ctx.fill();
+            ctx.restore();
+        }
+    });
     
     // Draw black holes
     if (game.blackHoles) {
@@ -5709,6 +5924,7 @@ function gameLoop(timestamp) {
         drawDPSMeter(game.ctx);
         drawWaveModifier(game.ctx);
         drawCorruptionIndicator(game.ctx);
+        drawBossHealthBar(game.ctx);
         updateDPS();
     } else if (game.paused) {
         // Still draw everything when paused
