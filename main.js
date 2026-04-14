@@ -346,7 +346,7 @@ const ELITE_MODIFIERS = {
 // XP level-up passive abilities (pick 1 of 3)
 const PASSIVE_ABILITIES = [
     { id: 'glass_cannon', name: '🔥 Glass Cannon', desc: '+15% Damage, -10% Max HP', apply: p => { p.damage = Math.floor(p.damage * 1.15); p.maxHealth = Math.floor(p.maxHealth * 0.9); p.health = Math.min(p.health, p.maxHealth); } },
-    { id: 'fortify', name: '🛡️ Fortify', desc: '+2 Armor, +15 Max HP', apply: p => { p.armor += 2; p.maxHealth += 15; p.health += 15; } },
+    { id: 'fortify', name: '🛡️ Fortify', desc: '+2 Armor, +15 Max HP', apply: p => { p.armor += 2; p.maxHealth += 15; p.health = Math.min(p.health + 15, p.maxHealth); } },
     { id: 'quick_hands', name: '⚡ Quick Hands', desc: '+10% Fire Rate', apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.9)); } },
     { id: 'nimble', name: '🏃 Nimble', desc: '+0.3 Speed, +5% Dodge', apply: p => { p.speed += 0.3; p.dodge = Math.min(0.7, p.dodge + 0.05); } },
     { id: 'vampirism', name: '🧛 Vampirism', desc: '+8% Life Steal', apply: p => { p.lifeSteal += 0.08; } },
@@ -391,7 +391,7 @@ const TRANSFORMATIVE_ITEMS = [
     { id: 'blood_shield', name: '🩸 Blood Shield', desc: 'Overkill damage on enemies becomes temp shield', category: 'defensive',
       apply: p => { p.bloodShield = true; p.tempShield = p.tempShield || 0; } },
     { id: 'iron_skin', name: '🛡️ Iron Skin', desc: '+4 Armor, +20 Max HP', category: 'defensive',
-      apply: p => { p.armor += 4; p.maxHealth += 20; p.health += 20; } },
+      apply: p => { p.armor += 4; p.maxHealth += 20; p.health = Math.min(p.health + 20, p.maxHealth); } },
     
     // Utility
     { id: 'black_hole', name: '🌀 Black Hole', desc: 'Every 25s, spawn a vortex pulling enemies', category: 'utility',
@@ -4391,11 +4391,11 @@ const SHOP_ITEMS = [
       
     // Uncommon Items with Trade-offs
     { name: '⚡ Energy Drink', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 12,
-      effects: ['+25% Fire Rate', '-5 Max HP'], apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.75)); p.maxHealth -= 5; } },
+      effects: ['+25% Fire Rate', '-5 Max HP'], apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.75)); p.maxHealth -= 5; p.health = Math.min(p.health, p.maxHealth); } },
     { name: '🎯 Focus Lens', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 15,
       effects: ['+150 Range', '-0.3 Speed'], apply: p => { p.range += 150; p.speed = Math.max(1, p.speed - 0.3); } },
     { name: '⚔️ Battle Fury', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 14,
-      effects: ['+8 Damage', '-10 Max HP'], apply: p => { p.damage += 8; p.maxHealth -= 10; } },
+      effects: ['+8 Damage', '-10 Max HP'], apply: p => { p.damage += 8; p.maxHealth -= 10; p.health = Math.min(p.health, p.maxHealth); } },
     { name: '🦅 Eagle Eye', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 16,
       effects: ['+15% Crit Chance', '+100 Range'], apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.15); p.range += 100; } },
     { name: '🌪️ Whirlwind', category: ITEM_CATEGORIES.STAT, rarity: RARITY.UNCOMMON, basePrice: 15,
@@ -4407,9 +4407,9 @@ const SHOP_ITEMS = [
     { name: '🎯 Multi-Shot', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 22,
       effects: ['+1 Projectile', '-3 Damage'], apply: p => { p.projectileCount += 1; p.damage = Math.max(1, p.damage - 3); } },
     { name: '💉 Vampire Fang', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 20,
-      effects: ['+20% Life Steal', '-15 Max HP'], apply: p => { p.lifeSteal += 0.20; p.maxHealth -= 15; } },
+      effects: ['+20% Life Steal', '-15 Max HP'], apply: p => { p.lifeSteal += 0.20; p.maxHealth -= 15; p.health = Math.min(p.health, p.maxHealth); } },
     { name: '⚡ Overclocked Core', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 20,
-      effects: ['+35% Fire Rate', '+10 Damage', '-20 Max HP'], apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.65)); p.damage += 10; p.maxHealth -= 20; } },
+      effects: ['+35% Fire Rate', '+10 Damage', '-20 Max HP'], apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.65)); p.damage += 10; p.maxHealth -= 20; p.health = Math.min(p.health, p.maxHealth); } },
     { name: '🎲 Lucky Charm', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.RARE, basePrice: 18,
       effects: ['+20% Crit Chance', '+15% Dodge'], apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.20); p.dodge = Math.min(0.7, p.dodge + 0.15); } },
     
@@ -4421,15 +4421,15 @@ const SHOP_ITEMS = [
     { name: '🌟 Nova Burst', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.EPIC, basePrice: 28,
       effects: ['+2 Projectiles', '+15 Damage', '-20% Fire Rate'], apply: p => { p.projectileCount += 2; p.damage += 15; p.fireRate = Math.floor(p.fireRate * 1.2); } },
     { name: '⚡ Lightning Reflexes', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.EPIC, basePrice: 25,
-      effects: ['+25% Dodge', '+1.2 Speed', '-10 Max HP'], apply: p => { p.dodge = Math.min(0.7, p.dodge + 0.25); p.speed += 1.2; p.maxHealth -= 10; } },
+      effects: ['+25% Dodge', '+1.2 Speed', '-10 Max HP'], apply: p => { p.dodge = Math.min(0.7, p.dodge + 0.25); p.speed += 1.2; p.maxHealth -= 10; p.health = Math.min(p.health, p.maxHealth); } },
     
     // Legendary Items
     { name: '👑 Crown of Power', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.LEGENDARY, basePrice: 35,
-      effects: ['+20 Damage', '+2 Projectiles', '+100 Range', '-30 Max HP'], apply: p => { p.damage += 20; p.projectileCount += 2; p.range += 100; p.maxHealth -= 30; } },
+      effects: ['+20 Damage', '+2 Projectiles', '+100 Range', '-30 Max HP'], apply: p => { p.damage += 20; p.projectileCount += 2; p.range += 100; p.maxHealth -= 30; p.health = Math.min(p.health, p.maxHealth); } },
     { name: '🔮 Mystic Orb', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.LEGENDARY, basePrice: 38,
       effects: ['+40% Crit Chance', '+1.5x Crit Dmg', '+30% Life Steal'], apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.40); p.critDamage += 1.5; p.lifeSteal += 0.30; } },
     { name: '⚔️ God Slayer', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.LEGENDARY, basePrice: 40,
-      effects: ['+35 Damage', '+50% Fire Rate', '-40 Max HP', '-1.0 Speed'], apply: p => { p.damage += 35; p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.5)); p.maxHealth -= 40; p.speed = Math.max(1, p.speed - 1.0); } },
+      effects: ['+35 Damage', '+50% Fire Rate', '-40 Max HP', '-1.0 Speed'], apply: p => { p.damage += 35; p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.5)); p.maxHealth -= 40; p.health = Math.min(p.health, p.maxHealth); p.speed = Math.max(1, p.speed - 1.0); } },
     { name: '🌌 Cosmic Shield', category: ITEM_CATEGORIES.SPECIAL, rarity: RARITY.LEGENDARY, basePrice: 36,
       effects: ['+100 Max HP', '+10 Armor', '+30% Dodge', '-1.2 Speed'], apply: p => { p.maxHealth += 100; p.armor += 10; p.dodge = Math.min(0.7, p.dodge + 0.30); p.speed = Math.max(1, p.speed - 1.2); } },
     
@@ -5231,10 +5231,15 @@ function updateUI() {
         lastUIValues.credits = game.credits;
     }
     
+    // Safety clamp: ensure health never exceeds maxHealth
+    if (game.player.health > game.player.maxHealth) {
+        game.player.health = game.player.maxHealth;
+    }
+    
     // Only update health if it changed (rounded)
     const health = Math.ceil(game.player.health);
     if (lastUIValues.health !== health || lastUIValues.maxHealth !== game.player.maxHealth) {
-        const healthPercent = (game.player.health / game.player.maxHealth) * 100;
+        const healthPercent = Math.min((game.player.health / game.player.maxHealth) * 100, 100);
         const healthBar = document.getElementById('health-bar');
         healthBar.style.width = healthPercent + '%';
         document.getElementById('health-text').textContent = `${health} / ${game.player.maxHealth}`;
@@ -5255,53 +5260,105 @@ function updateUI() {
 // ==================== TOUCH CONTROLS ====================
 function setupTouchControls() {
     const canvas = game.canvas;
+    let joystickTouchId = null;
     
     canvas.addEventListener('touchstart', e => {
         e.preventDefault();
-        const touch = e.touches[0];
-        const pos = getTouchPos(touch);
         
-        if (pos.x < CONFIG.CANVAS_WIDTH / 2) {
-            game.joystick.active = true;
-            game.joystick.startX = pos.x;
-            game.joystick.startY = pos.y;
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            const pos = getTouchPos(touch);
+            
+            // Any touch on the lower 70% of the screen activates joystick
+            if (!game.joystick.active && pos.y > CONFIG.CANVAS_HEIGHT * 0.3) {
+                joystickTouchId = touch.identifier;
+                game.joystick.active = true;
+                game.joystick.startX = pos.x;
+                game.joystick.startY = pos.y;
+            }
         }
     }, { passive: false });
     
     canvas.addEventListener('touchmove', e => {
         e.preventDefault();
-        if (!game.joystick.active) return;
         
-        const touch = e.touches[0];
-        const pos = getTouchPos(touch);
-        
-        const dx = pos.x - game.joystick.startX;
-        const dy = pos.y - game.joystick.startY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const maxDist = 50;
-        
-        if (dist > 0) {
-            const clamp = Math.min(dist, maxDist);
-            game.joystick.x = (dx / dist) * (clamp / maxDist);
-            game.joystick.y = (dy / dist) * (clamp / maxDist);
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier !== joystickTouchId) continue;
+            if (!game.joystick.active) continue;
+            
+            const pos = getTouchPos(touch);
+            
+            const dx = pos.x - game.joystick.startX;
+            const dy = pos.y - game.joystick.startY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const maxDist = 60;
+            
+            if (dist > 0) {
+                const clamp = Math.min(dist, maxDist);
+                game.joystick.x = (dx / dist) * (clamp / maxDist);
+                game.joystick.y = (dy / dist) * (clamp / maxDist);
+            }
         }
     }, { passive: false });
     
     canvas.addEventListener('touchend', e => {
         e.preventDefault();
+        
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const touch = e.changedTouches[i];
+            if (touch.identifier === joystickTouchId) {
+                game.joystick.active = false;
+                game.joystick.x = 0;
+                game.joystick.y = 0;
+                joystickTouchId = null;
+            }
+        }
+    }, { passive: false });
+    
+    canvas.addEventListener('touchcancel', e => {
         game.joystick.active = false;
         game.joystick.x = 0;
         game.joystick.y = 0;
+        joystickTouchId = null;
     }, { passive: false });
 }
 
 function drawJoystick(ctx) {
+    const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Show joystick hint when not active on mobile
+    if (isMobile && !game.joystick.active && game.state === 'playing') {
+        ctx.save();
+        const hintX = 100;
+        const hintY = CONFIG.CANVAS_HEIGHT - 120;
+        
+        const pulse = Math.sin(Date.now() * 0.003) * 0.08 + 0.15;
+        ctx.globalAlpha = pulse;
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(hintX, hintY, 50, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('TOUCH TO MOVE', hintX, hintY + 70);
+        
+        ctx.restore();
+        return;
+    }
+    
     if (!game.joystick.active) return;
     
     const startX = game.joystick.startX;
     const startY = game.joystick.startY;
-    const currentX = startX + game.joystick.x * 50;
-    const currentY = startY + game.joystick.y * 50;
+    const currentX = startX + game.joystick.x * 60;
+    const currentY = startY + game.joystick.y * 60;
     
     ctx.save();
     
@@ -5310,7 +5367,7 @@ function drawJoystick(ctx) {
     ctx.globalAlpha = pulse;
     ctx.fillStyle = '#4ecdc4';
     ctx.beginPath();
-    ctx.arc(startX, startY, 50, 0, Math.PI * 2);
+    ctx.arc(startX, startY, 60, 0, Math.PI * 2);
     ctx.fill();
     
     // Outer ring for better definition
@@ -5318,11 +5375,11 @@ function drawJoystick(ctx) {
     ctx.strokeStyle = '#00ff88';
     ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.arc(startX, startY, 50, 0, Math.PI * 2);
+    ctx.arc(startX, startY, 60, 0, Math.PI * 2);
     ctx.stroke();
     
-    // Inner control stick with radial gradient for glow effect (more performant than shadow)
-    const gradient = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, 30);
+    // Inner control stick with radial gradient for glow effect
+    const gradient = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, 35);
     gradient.addColorStop(0, '#00ff88');
     gradient.addColorStop(0.7, '#00ff88');
     gradient.addColorStop(1, 'rgba(0, 255, 136, 0)');
@@ -5330,14 +5387,14 @@ function drawJoystick(ctx) {
     ctx.globalAlpha = 0.7;
     ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.arc(currentX, currentY, 30, 0, Math.PI * 2);
+    ctx.arc(currentX, currentY, 35, 0, Math.PI * 2);
     ctx.fill();
     
     // Solid center
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#00ff88';
     ctx.beginPath();
-    ctx.arc(currentX, currentY, 25, 0, Math.PI * 2);
+    ctx.arc(currentX, currentY, 28, 0, Math.PI * 2);
     ctx.fill();
     
     ctx.restore();
@@ -5418,10 +5475,12 @@ function drawPauseMenu(ctx) {
     ctx.fillStyle = 'rgba(26, 26, 46, 0.95)';
     ctx.strokeStyle = '#00ff88';
     ctx.lineWidth = 3;
-    const menuX = CONFIG.CANVAS_WIDTH / 2 - 250;
-    const menuY = CONFIG.CANVAS_HEIGHT / 2 - 200;
-    ctx.fillRect(menuX, menuY, 500, 400);
-    ctx.strokeRect(menuX, menuY, 500, 400);
+    const menuW = Math.min(500, CONFIG.CANVAS_WIDTH - 40);
+    const menuH = Math.min(400, CONFIG.CANVAS_HEIGHT - 80);
+    const menuX = CONFIG.CANVAS_WIDTH / 2 - menuW / 2;
+    const menuY = CONFIG.CANVAS_HEIGHT / 2 - menuH / 2;
+    ctx.fillRect(menuX, menuY, menuW, menuH);
+    ctx.strokeRect(menuX, menuY, menuW, menuH);
     
     // Title
     ctx.fillStyle = '#ffd93d';
@@ -5476,7 +5535,8 @@ function drawPauseMenu(ctx) {
 function drawWeaponIndicator(ctx) {
     if (!game.player) return;
     const slots = game.player.weaponSlots;
-    const slotWidth = 80;
+    const isMobile = CONFIG.CANVAS_WIDTH < 800;
+    const slotWidth = isMobile ? 60 : 80;
     const totalWidth = slots.length * slotWidth + (slots.length - 1) * 5;
     const x = CONFIG.CANVAS_WIDTH - totalWidth - 10;
     const y = CONFIG.CANVAS_HEIGHT - 50;
@@ -5515,8 +5575,9 @@ function drawWeaponIndicator(ctx) {
 function drawMinimap(ctx) {
     if (game.state !== 'playing') return;
     
-    const mapW = 150;
-    const mapH = 100;
+    const isMobile = CONFIG.CANVAS_WIDTH < 800;
+    const mapW = isMobile ? 100 : 150;
+    const mapH = isMobile ? 67 : 100;
     const mapX = CONFIG.CANVAS_WIDTH - mapW - 10;
     const mapY = CONFIG.CANVAS_HEIGHT - mapH - 10;
     const scaleX = mapW / CONFIG.WORLD_WIDTH;
@@ -5610,7 +5671,7 @@ function drawComboCounter(ctx) {
 }
 
 function drawXPBar(ctx) {
-    const barWidth = 300;
+    const barWidth = Math.min(300, CONFIG.CANVAS_WIDTH - 100);
     const barHeight = 8;
     const x = CONFIG.CANVAS_WIDTH / 2 - barWidth / 2;
     const y = CONFIG.CANVAS_HEIGHT - 25;
@@ -5766,7 +5827,7 @@ function drawBossHealthBar(ctx) {
     const boss = game.enemies.find(e => e.isBoss);
     if (!boss || game.state !== 'playing') return;
     
-    const barWidth = 500;
+    const barWidth = Math.min(500, CONFIG.CANVAS_WIDTH - 60);
     const barHeight = 20;
     const x = CONFIG.CANVAS_WIDTH / 2 - barWidth / 2;
     const y = 15;
@@ -6201,25 +6262,60 @@ function resizeCanvas() {
     
     const containerWidth = container.clientWidth;
     const containerHeight = container.clientHeight;
+    const aspect = containerWidth / containerHeight;
+    const isMobile = containerWidth <= 1024 || 'ontouchstart' in window;
     
-    // Calculate scale to fit canvas while maintaining aspect ratio
-    const scaleX = containerWidth / CONFIG.CANVAS_WIDTH;
-    const scaleY = containerHeight / CONFIG.CANVAS_HEIGHT;
-    canvasScale = Math.min(scaleX, scaleY);
-    
-    // Apply scaling via CSS
-    const scaledWidth = CONFIG.CANVAS_WIDTH * canvasScale;
-    const scaledHeight = CONFIG.CANVAS_HEIGHT * canvasScale;
-    
-    canvas.style.width = scaledWidth + 'px';
-    canvas.style.height = scaledHeight + 'px';
-    
-    // Center the canvas
-    canvasOffsetX = (containerWidth - scaledWidth) / 2;
-    canvasOffsetY = (containerHeight - scaledHeight) / 2;
-    
-    canvas.style.marginLeft = canvasOffsetX + 'px';
-    canvas.style.marginTop = canvasOffsetY + 'px';
+    if (isMobile) {
+        // On mobile, dynamically adjust canvas resolution to fill the viewport
+        const maxDim = 1200;
+        let canvasW, canvasH;
+        
+        if (aspect >= 1) {
+            // Landscape
+            canvasW = maxDim;
+            canvasH = Math.round(maxDim / aspect);
+        } else {
+            // Portrait - fill the full screen height
+            canvasH = maxDim;
+            canvasW = Math.round(maxDim * aspect);
+        }
+        
+        canvas.width = canvasW;
+        canvas.height = canvasH;
+        CONFIG.CANVAS_WIDTH = canvasW;
+        CONFIG.CANVAS_HEIGHT = canvasH;
+        
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.marginLeft = '0';
+        canvas.style.marginTop = '0';
+        
+        canvasScale = containerWidth / canvasW;
+        canvasOffsetX = 0;
+        canvasOffsetY = 0;
+    } else {
+        // Desktop: maintain original aspect ratio
+        canvas.width = 1200;
+        canvas.height = 800;
+        CONFIG.CANVAS_WIDTH = 1200;
+        CONFIG.CANVAS_HEIGHT = 800;
+        
+        const scaleX = containerWidth / CONFIG.CANVAS_WIDTH;
+        const scaleY = containerHeight / CONFIG.CANVAS_HEIGHT;
+        canvasScale = Math.min(scaleX, scaleY);
+        
+        const scaledWidth = CONFIG.CANVAS_WIDTH * canvasScale;
+        const scaledHeight = CONFIG.CANVAS_HEIGHT * canvasScale;
+        
+        canvas.style.width = scaledWidth + 'px';
+        canvas.style.height = scaledHeight + 'px';
+        
+        canvasOffsetX = (containerWidth - scaledWidth) / 2;
+        canvasOffsetY = (containerHeight - scaledHeight) / 2;
+        
+        canvas.style.marginLeft = canvasOffsetX + 'px';
+        canvas.style.marginTop = canvasOffsetY + 'px';
+    }
 }
 
 // Convert touch coordinates to canvas coordinates
