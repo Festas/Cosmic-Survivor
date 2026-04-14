@@ -5,6 +5,8 @@
 const CONFIG = {
     CANVAS_WIDTH: 1200,
     CANVAS_HEIGHT: 800,
+    WORLD_WIDTH: 3000,
+    WORLD_HEIGHT: 2000,
     WAVE_DURATION: 60,
     WAVE_CLEAR_COUNTDOWN: 5,
     PLAYER_SIZE: 30,
@@ -467,7 +469,7 @@ const game = {
     touchActive: false,
     joystick: { x: 0, y: 0, active: false, startX: 0, startY: 0 },
     currentWeapon: 'basic',
-    camera: { shake: 0, offsetX: 0, offsetY: 0 },
+    camera: { shake: 0, offsetX: 0, offsetY: 0, x: 0, y: 0, targetX: 0, targetY: 0 },
     paused: false,
     powerups: [],
     activePowerups: [],
@@ -836,6 +838,21 @@ function screenShake(intensity = CONFIG.SCREEN_SHAKE_INTENSITY) {
 }
 
 function updateCamera() {
+    // Camera follows player with smooth lerp
+    if (game.player) {
+        game.camera.targetX = game.player.x - CONFIG.CANVAS_WIDTH / 2;
+        game.camera.targetY = game.player.y - CONFIG.CANVAS_HEIGHT / 2;
+        
+        // Clamp to world bounds
+        game.camera.targetX = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - CONFIG.CANVAS_WIDTH, game.camera.targetX));
+        game.camera.targetY = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - CONFIG.CANVAS_HEIGHT, game.camera.targetY));
+        
+        // Smooth follow (lerp)
+        game.camera.x += (game.camera.targetX - game.camera.x) * 0.08;
+        game.camera.y += (game.camera.targetY - game.camera.y) * 0.08;
+    }
+    
+    // Screen shake
     if (game.camera.shake > 0) {
         game.camera.offsetX = (Math.random() - 0.5) * game.camera.shake;
         game.camera.offsetY = (Math.random() - 0.5) * game.camera.shake;
@@ -994,8 +1011,8 @@ function hasPowerup(effect) {
 // ==================== PLAYER CLASS ====================
 class Player {
     constructor(character) {
-        this.x = CONFIG.CANVAS_WIDTH / 2;
-        this.y = CONFIG.CANVAS_HEIGHT / 2;
+        this.x = CONFIG.WORLD_WIDTH / 2;
+        this.y = CONFIG.WORLD_HEIGHT / 2;
         this.size = CONFIG.PLAYER_SIZE;
         this.characterId = character.id;
         this.maxHealth = character.maxHealth;
@@ -1102,9 +1119,8 @@ class Player {
         if (this.isDashing) {
             this.x += this.dashVx;
             this.y += this.dashVy;
-            this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
-            this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
-            createParticles(this.x, this.y, '#4ecdc4', 2);
+            this.x = Math.max(this.size, Math.min(CONFIG.WORLD_WIDTH - this.size, this.x));
+            this.y = Math.max(this.size, Math.min(CONFIG.WORLD_HEIGHT - this.size, this.y));
             this.isDashing = false;
         }
         
@@ -1141,8 +1157,8 @@ class Player {
 
         this.x += dx * currentSpeed;
         this.y += dy * currentSpeed;
-        this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
-        this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
+        this.x = Math.max(this.size, Math.min(CONFIG.WORLD_WIDTH - this.size, this.x));
+        this.y = Math.max(this.size, Math.min(CONFIG.WORLD_HEIGHT - this.size, this.y));
 
         // Movement tracking for walk animation
         this.isMoving = (dx !== 0 || dy !== 0);
@@ -1342,8 +1358,8 @@ class Player {
                                 }
                             }
                             
-                            return this.x >= 0 && this.x <= CONFIG.CANVAS_WIDTH && 
-                                   this.y >= 0 && this.y <= CONFIG.CANVAS_HEIGHT;
+                            return this.x >= 0 && this.x <= CONFIG.WORLD_WIDTH && 
+                                   this.y >= 0 && this.y <= CONFIG.WORLD_HEIGHT;
                         },
                         draw(ctx) {
                             ctx.fillStyle = this.color;
@@ -2047,8 +2063,8 @@ class Enemy {
                             const angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
                             game.player.x += Math.cos(angle) * 80;
                             game.player.y += Math.sin(angle) * 80;
-                            game.player.x = Math.max(game.player.size, Math.min(CONFIG.CANVAS_WIDTH - game.player.size, game.player.x));
-                            game.player.y = Math.max(game.player.size, Math.min(CONFIG.CANVAS_HEIGHT - game.player.size, game.player.y));
+                            game.player.x = Math.max(game.player.size, Math.min(CONFIG.WORLD_WIDTH - game.player.size, game.player.x));
+                            game.player.y = Math.max(game.player.size, Math.min(CONFIG.WORLD_HEIGHT - game.player.size, game.player.y));
                         }
                     }
                     screenShake(12);
@@ -2284,8 +2300,8 @@ class Enemy {
         }
         
         // Keep enemy in bounds
-        this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
-        this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
+        this.x = Math.max(this.size, Math.min(CONFIG.WORLD_WIDTH - this.size, this.x));
+        this.y = Math.max(this.size, Math.min(CONFIG.WORLD_HEIGHT - this.size, this.y));
         
         // Update walk animation
         const movedX = this.x - this.prevX;
@@ -2348,8 +2364,8 @@ class Enemy {
         const dist = 150 + Math.random() * 100;
         this.x = game.player.x + Math.cos(angle) * dist;
         this.y = game.player.y + Math.sin(angle) * dist;
-        this.x = Math.max(50, Math.min(CONFIG.CANVAS_WIDTH - 50, this.x));
-        this.y = Math.max(50, Math.min(CONFIG.CANVAS_HEIGHT - 50, this.y));
+        this.x = Math.max(50, Math.min(CONFIG.WORLD_WIDTH - 50, this.x));
+        this.y = Math.max(50, Math.min(CONFIG.WORLD_HEIGHT - 50, this.y));
         createParticles(this.x, this.y, this.color, 15);
     }
 
@@ -3910,13 +3926,13 @@ class Bullet {
         if (game.player && game.player.bulletBounce > 0) {
             if (this.bounceLeft === undefined) this.bounceLeft = game.player.bulletBounce;
             if (this.bounceLeft > 0) {
-                if (this.x < 0 || this.x > CONFIG.CANVAS_WIDTH) { this.angle = Math.PI - this.angle; this.x = Math.max(1, Math.min(CONFIG.CANVAS_WIDTH - 1, this.x)); this.bounceLeft--; return true; }
-                if (this.y < 0 || this.y > CONFIG.CANVAS_HEIGHT) { this.angle = -this.angle; this.y = Math.max(1, Math.min(CONFIG.CANVAS_HEIGHT - 1, this.y)); this.bounceLeft--; return true; }
+                if (this.x < 0 || this.x > CONFIG.WORLD_WIDTH) { this.angle = Math.PI - this.angle; this.x = Math.max(1, Math.min(CONFIG.WORLD_WIDTH - 1, this.x)); this.bounceLeft--; return true; }
+                if (this.y < 0 || this.y > CONFIG.WORLD_HEIGHT) { this.angle = -this.angle; this.y = Math.max(1, Math.min(CONFIG.WORLD_HEIGHT - 1, this.y)); this.bounceLeft--; return true; }
             }
         }
 
-        return this.x >= 0 && this.x <= CONFIG.CANVAS_WIDTH && 
-               this.y >= 0 && this.y <= CONFIG.CANVAS_HEIGHT;
+        return this.x >= 0 && this.x <= CONFIG.WORLD_WIDTH && 
+               this.y >= 0 && this.y <= CONFIG.WORLD_HEIGHT;
     }
 
     explode() {
@@ -4830,9 +4846,9 @@ function generateArenaObstacles() {
     const count = Math.min(3 + Math.floor(game.wave / 3), 12);
     const margin = 80;
     for (let i = 0; i < count; i++) {
-        const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
-        const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
-        if (Math.hypot(x - CONFIG.CANVAS_WIDTH / 2, y - CONFIG.CANVAS_HEIGHT / 2) < 120) continue;
+        const x = margin + Math.random() * (CONFIG.WORLD_WIDTH - margin * 2);
+        const y = margin + Math.random() * (CONFIG.WORLD_HEIGHT - margin * 2);
+        if (Math.hypot(x - CONFIG.WORLD_WIDTH / 2, y - CONFIG.WORLD_HEIGHT / 2) < 120) continue;
         const types = ['rock', 'crater', 'pillar'];
         const type = types[Math.floor(Math.random() * types.length)];
         const radius = 20 + Math.random() * 25;
@@ -4842,9 +4858,9 @@ function generateArenaObstacles() {
     if (theme.hazardColor) {
         const hzCount = Math.min(2 + Math.floor(game.wave / 5), 6);
         for (let i = 0; i < hzCount; i++) {
-            const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
-            const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
-            if (Math.hypot(x - CONFIG.CANVAS_WIDTH / 2, y - CONFIG.CANVAS_HEIGHT / 2) < 150) continue;
+            const x = margin + Math.random() * (CONFIG.WORLD_WIDTH - margin * 2);
+            const y = margin + Math.random() * (CONFIG.WORLD_HEIGHT - margin * 2);
+            if (Math.hypot(x - CONFIG.WORLD_WIDTH / 2, y - CONFIG.WORLD_HEIGHT / 2) < 150) continue;
             const htype = theme.key === 'ice' ? 'ice_patch' : theme.key === 'lava' ? 'lava_pool' : 'void_zone';
             game.hazards.push({ x, y, radius: 40 + Math.random() * 30, type: htype, color: theme.hazardColor, damage: 1 + game.wave * 0.2 });
         }
@@ -4927,7 +4943,7 @@ function spawnWave() {
         Sound.play('boss');
         const bossTypes = Object.keys(BOSS_TYPES);
         const bossType = bossTypes[Math.floor(game.wave / CONFIG.BOSS_WAVE_INTERVAL) % bossTypes.length];
-        const boss = new Enemy(CONFIG.CANVAS_WIDTH / 2, -100, game.wave, bossType, true);
+        const boss = new Enemy(game.player.x + 300, game.player.y - 300, game.wave, bossType, true);
         game.enemies.push(boss);
         showNotification(`BOSS WAVE: ${boss.name}`);
     } else {
@@ -4941,14 +4957,14 @@ function spawnWave() {
         
         for (let i = 0; i < enemyCount; i++) {
             setTimeout(() => {
-                const side = Math.floor(Math.random() * 4);
-                let x, y;
-                switch(side) {
-                    case 0: x = Math.random() * CONFIG.CANVAS_WIDTH; y = -50; break;
-                    case 1: x = CONFIG.CANVAS_WIDTH + 50; y = Math.random() * CONFIG.CANVAS_HEIGHT; break;
-                    case 2: x = Math.random() * CONFIG.CANVAS_WIDTH; y = CONFIG.CANVAS_HEIGHT + 50; break;
-                    case 3: x = -50; y = Math.random() * CONFIG.CANVAS_HEIGHT; break;
-                }
+                const px = game.player ? game.player.x : CONFIG.WORLD_WIDTH / 2;
+                const py = game.player ? game.player.y : CONFIG.WORLD_HEIGHT / 2;
+                const spawnDist = 500 + Math.random() * 200;
+                const spawnAngle = Math.random() * Math.PI * 2;
+                let x = px + Math.cos(spawnAngle) * spawnDist;
+                let y = py + Math.sin(spawnAngle) * spawnDist;
+                x = Math.max(50, Math.min(CONFIG.WORLD_WIDTH - 50, x));
+                y = Math.max(50, Math.min(CONFIG.WORLD_HEIGHT - 50, y));
                 
                 let typeKeys = Object.keys(ENEMY_TYPES).filter(t => {
                     if (t === 'tank') return game.wave >= 3;
@@ -5102,6 +5118,10 @@ function restartGame() {
     game.eliteKills = 0;
     game.xpOrbs = [];
     game.blackHoles = [];
+    game.camera.x = 0;
+    game.camera.y = 0;
+    game.camera.targetX = 0;
+    game.camera.targetY = 0;
     
     game.state = 'characterSelect';
     showDifficultySelect();
@@ -5313,6 +5333,8 @@ function drawComboMeter(ctx) {
 // Draw pause menu
 function drawPauseMenu(ctx) {
     ctx.save();
+    // Undo camera transform so pause menu is screen-relative
+    ctx.translate(game.camera.x, game.camera.y);
     
     // Semi-transparent overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
@@ -5417,53 +5439,61 @@ function drawWeaponIndicator(ctx) {
 }
 
 function drawMinimap(ctx) {
-    const size = CONFIG.MINIMAP_SIZE;
-    const margin = CONFIG.MINIMAP_MARGIN;
-    const x = CONFIG.CANVAS_WIDTH - size - margin;
-    const y = CONFIG.CANVAS_HEIGHT - size - margin;
-    const scaleX = size / CONFIG.CANVAS_WIDTH;
-    const scaleY = size / CONFIG.CANVAS_HEIGHT;
+    if (game.state !== 'playing') return;
+    
+    const mapW = 150;
+    const mapH = 100;
+    const mapX = CONFIG.CANVAS_WIDTH - mapW - 10;
+    const mapY = CONFIG.CANVAS_HEIGHT - mapH - 10;
+    const scaleX = mapW / CONFIG.WORLD_WIDTH;
+    const scaleY = mapH / CONFIG.WORLD_HEIGHT;
+    
+    ctx.save();
     
     // Background
-    ctx.save();
     ctx.globalAlpha = 0.6;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(x, y, size, size);
-    ctx.strokeStyle = '#00ff88';
+    ctx.fillStyle = '#0a0a1e';
+    ctx.fillRect(mapX, mapY, mapW, mapH);
+    ctx.strokeStyle = '#334155';
     ctx.lineWidth = 1;
-    ctx.strokeRect(x, y, size, size);
+    ctx.strokeRect(mapX, mapY, mapW, mapH);
+    
+    // Camera view rectangle
+    ctx.strokeStyle = '#4ecdc4';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+        mapX + game.camera.x * scaleX,
+        mapY + game.camera.y * scaleY,
+        CONFIG.CANVAS_WIDTH * scaleX,
+        CONFIG.CANVAS_HEIGHT * scaleY
+    );
     
     // Player dot
-    ctx.fillStyle = '#4ecdc4';
-    ctx.beginPath();
-    ctx.arc(x + game.player.x * scaleX, y + game.player.y * scaleY, 3, 0, Math.PI * 2);
-    ctx.fill();
+    if (game.player) {
+        ctx.fillStyle = '#00ff88';
+        ctx.beginPath();
+        ctx.arc(mapX + game.player.x * scaleX, mapY + game.player.y * scaleY, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
     
     // Enemy dots
+    ctx.fillStyle = '#ff6b6b';
     game.enemies.forEach(e => {
-        if (e.isBoss) {
-            ctx.fillStyle = '#ff0000';
-            ctx.beginPath();
-            ctx.arc(x + e.x * scaleX, y + e.y * scaleY, 3, 0, Math.PI * 2);
-            ctx.fill();
-        } else if (e.isElite) {
-            ctx.fillStyle = e.eliteModifier?.color || '#ffd93d';
-            ctx.beginPath();
-            ctx.arc(x + e.x * scaleX, y + e.y * scaleY, 2, 0, Math.PI * 2);
-            ctx.fill();
-        } else {
-            ctx.fillStyle = '#ff6b6b';
-            ctx.fillRect(x + e.x * scaleX - 1, y + e.y * scaleY - 1, 2, 2);
-        }
-    });
-    
-    // Powerup dots
-    game.powerups.forEach(p => {
-        ctx.fillStyle = p.data.color;
+        const dotSize = e.isBoss ? 3 : 1;
         ctx.beginPath();
-        ctx.arc(x + p.x * scaleX, y + p.y * scaleY, 2, 0, Math.PI * 2);
+        ctx.arc(mapX + e.x * scaleX, mapY + e.y * scaleY, dotSize, 0, Math.PI * 2);
         ctx.fill();
     });
+    
+    // XP orb clusters (draw every 5th for performance)
+    if (game.xpOrbs) {
+        ctx.fillStyle = '#a855f7';
+        game.xpOrbs.forEach((orb, i) => {
+            if (i % 5 === 0) {
+                ctx.fillRect(mapX + orb.x * scaleX - 0.5, mapY + orb.y * scaleY - 0.5, 1, 1);
+            }
+        });
+    }
     
     ctx.restore();
 }
@@ -5728,8 +5758,8 @@ function initStarfield() {
     game.stars = [];
     for (let i = 0; i < 150; i++) {
         game.stars.push({
-            x: Math.random() * CONFIG.CANVAS_WIDTH,
-            y: Math.random() * CONFIG.CANVAS_HEIGHT,
+            x: Math.random() * CONFIG.WORLD_WIDTH,
+            y: Math.random() * CONFIG.WORLD_HEIGHT,
             size: Math.random() * 2,
             speed: 0.1 + Math.random() * 0.5,
             twinkle: Math.random() * Math.PI * 2,
@@ -5741,9 +5771,9 @@ function updateStarfield() {
     game.stars.forEach(star => {
         star.y += star.speed;
         star.twinkle += 0.05;
-        if (star.y > CONFIG.CANVAS_HEIGHT) {
+        if (star.y > CONFIG.WORLD_HEIGHT) {
             star.y = 0;
-            star.x = Math.random() * CONFIG.CANVAS_WIDTH;
+            star.x = Math.random() * CONFIG.WORLD_WIDTH;
         }
     });
 }
@@ -5782,12 +5812,12 @@ function gameLoop(timestamp) {
     
     // Apply camera offset
     ctx.save();
-    ctx.translate(game.camera.offsetX, game.camera.offsetY);
+    ctx.translate(-game.camera.x + game.camera.offsetX, -game.camera.y + game.camera.offsetY);
     
     // Background
     const theme = game.arenaTheme || getCurrentTheme();
     ctx.fillStyle = theme.bgColor;
-    ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+    ctx.fillRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
     
     // Animated starfield
     updateStarfield();
@@ -5799,16 +5829,20 @@ function gameLoop(timestamp) {
         const gridPulse = Math.sin(timestamp * 0.0005) * 0.02 + 0.05;
         ctx.strokeStyle = theme.gridColor || `rgba(78, 205, 196, ${gridPulse})`;
         ctx.lineWidth = 1;
-        for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += 50) {
+        const camX = Math.floor(game.camera.x);
+        const camY = Math.floor(game.camera.y);
+        const gridStartX = Math.floor(camX / 50) * 50;
+        const gridStartY = Math.floor(camY / 50) * 50;
+        for (let x = gridStartX; x < camX + CONFIG.CANVAS_WIDTH + 50; x += 50) {
             ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, CONFIG.CANVAS_HEIGHT);
+            ctx.moveTo(x, camY);
+            ctx.lineTo(x, camY + CONFIG.CANVAS_HEIGHT);
             ctx.stroke();
         }
-        for (let y = 0; y < CONFIG.CANVAS_HEIGHT; y += 50) {
+        for (let y = gridStartY; y < camY + CONFIG.CANVAS_HEIGHT + 50; y += 50) {
             ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(CONFIG.CANVAS_WIDTH, y);
+            ctx.moveTo(camX, y);
+            ctx.lineTo(camX + CONFIG.CANVAS_WIDTH, y);
             ctx.stroke();
         }
     }
@@ -5910,7 +5944,7 @@ function gameLoop(timestamp) {
                     }
                 }
                 
-                return b.x >= 0 && b.x <= CONFIG.CANVAS_WIDTH && b.y >= 0 && b.y <= CONFIG.CANVAS_HEIGHT;
+                return b.x >= 0 && b.x <= CONFIG.WORLD_WIDTH && b.y >= 0 && b.y <= CONFIG.WORLD_HEIGHT;
             }
             return b.update();
         });
@@ -5948,10 +5982,6 @@ function gameLoop(timestamp) {
         game.bullets.forEach(b => b.draw(ctx));
         game.player.draw(ctx);
         drawParticles(ctx);
-        drawNotifications(ctx);
-        drawJoystick(ctx);
-        drawActivePowerups(ctx);
-        drawComboMeter(ctx);
         
         updateUI();
         
@@ -5966,13 +5996,17 @@ function gameLoop(timestamp) {
             fogGradient.addColorStop(0.7, 'rgba(0,0,0,0.6)');
             fogGradient.addColorStop(1, 'rgba(0,0,0,0.85)');
             ctx.fillStyle = fogGradient;
-            ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+            ctx.fillRect(game.camera.x, game.camera.y, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
             ctx.restore();
         }
         
-        // Draw weapon indicator (outside camera transform)
+        // Draw HUD elements (outside camera transform)
         ctx.restore();
         ctx.save();
+        drawNotifications(ctx);
+        drawJoystick(ctx);
+        drawActivePowerups(ctx);
+        drawComboMeter(ctx);
         drawWeaponIndicator(ctx);
         drawMinimap(game.ctx);
         drawXPBar(game.ctx);
