@@ -7423,13 +7423,18 @@ function showAccountModal() {
             });
         });
         
-        // Login
-        document.getElementById('login-submit-btn').addEventListener('click', () => {
+        function checkConnection() {
             if (!mp || !mp.connected) {
                 const errorEl = document.getElementById('auth-error');
                 if (errorEl) errorEl.textContent = 'Not connected to server. Please wait and try again.';
-                return;
+                return false;
             }
+            return true;
+        }
+
+        // Login
+        document.getElementById('login-submit-btn').addEventListener('click', () => {
+            if (!checkConnection()) return;
             const username = document.getElementById('login-username').value.trim();
             const password = document.getElementById('login-password').value;
             if (!username || !password) return;
@@ -7438,11 +7443,7 @@ function showAccountModal() {
         
         // Register
         document.getElementById('register-submit-btn').addEventListener('click', () => {
-            if (!mp || !mp.connected) {
-                const errorEl = document.getElementById('auth-error');
-                if (errorEl) errorEl.textContent = 'Not connected to server. Please wait and try again.';
-                return;
-            }
+            if (!checkConnection()) return;
             const username = document.getElementById('register-username').value.trim();
             const display = document.getElementById('register-display').value.trim();
             const password = document.getElementById('register-password').value;
@@ -7452,11 +7453,7 @@ function showAccountModal() {
         
         // Guest login
         document.getElementById('guest-login-btn').addEventListener('click', () => {
-            if (!mp || !mp.connected) {
-                const errorEl = document.getElementById('auth-error');
-                if (errorEl) errorEl.textContent = 'Not connected to server. Please wait and try again.';
-                return;
-            }
+            if (!checkConnection()) return;
             mp.loginAsGuest();
         });
         
