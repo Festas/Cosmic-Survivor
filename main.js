@@ -1,5 +1,6 @@
 // Extended Game - Cosmic Survivor
 // This is the main refactored game file with all improvements
+// With Co-op Multiplayer Support (up to 4 players)
 
 // ==================== CONFIGURATION ====================
 const CONFIG = {
@@ -517,6 +518,16 @@ const game = {
             return true;
         }
     })(),
+    // ===== Multiplayer State =====
+    isMultiplayer: false,
+    remotePlayers: new Map(), // playerId -> RemotePlayer instance
+    localPlayerId: null,
+    multiplayerPlayerCount: 1,
+    coopSettings: {
+        sharedXP: true,
+        friendlyFire: false,
+        difficultyScale: 1.0,
+    },
 };
 
 function loadPersistentStats() {
@@ -839,10 +850,11 @@ function screenShake(intensity = CONFIG.SCREEN_SHAKE_INTENSITY) {
 }
 
 function updateCamera() {
-    // Camera follows player with smooth lerp
-    if (game.player) {
-        game.camera.targetX = game.player.x - CONFIG.CANVAS_WIDTH / 2;
-        game.camera.targetY = game.player.y - CONFIG.CANVAS_HEIGHT / 2;
+    // Camera follows local player (in multiplayer, only follow the local player)
+    const targetPlayer = game.player;
+    if (targetPlayer) {
+        game.camera.targetX = targetPlayer.x - CONFIG.CANVAS_WIDTH / 2;
+        game.camera.targetY = targetPlayer.y - CONFIG.CANVAS_HEIGHT / 2;
         
         // Clamp to world bounds
         game.camera.targetX = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - CONFIG.CANVAS_WIDTH, game.camera.targetX));
@@ -1126,7 +1138,7 @@ class Player {
             }
             if (this.health <= 0) {
                 this.health = 0;
-                gameOver();
+                handlePlayerDeath();
                 return; // Stop further updates
             }
         }
@@ -1590,7 +1602,7 @@ class Player {
                 // Brief invulnerability
                 this.dashInvulnerable = 60;
             } else {
-                gameOver();
+                handlePlayerDeath();
             }
         }
     }
@@ -1849,6 +1861,239 @@ class Player {
     }
 }
 
+// ==================== REMOTE PLAYER CLASS (Multiplayer) ====================
+class RemotePlayer {
+    constructor(playerData) {
+        this.id = playerData.id;
+        this.displayName = playerData.displayName || 'Player';
+        this.characterId = playerData.characterId;
+        this.playerIndex = playerData.playerIndex || 0;
+        this.color = playerData.color || '#ff6b6b';
+        
+        // Position & state (interpolated)
+        this.x = playerData.spawnX || CONFIG.WORLD_WIDTH / 2;
+        this.y = playerData.spawnY || CONFIG.WORLD_HEIGHT / 2;
+        this.targetX = this.x;
+        this.targetY = this.y;
+        this.size = CONFIG.PLAYER_SIZE;
+        
+        // Visual state
+        this.health = 100;
+        this.maxHealth = 100;
+        this.isAlive = true;
+        this.facingRight = true;
+        this.aimAngle = 0;
+        this.isMoving = false;
+        this.walkFrame = 0;
+        this.walkTimer = 0;
+        this.isDashing = false;
+        this.level = 1;
+        this.activeWeaponSlot = 0;
+        this.weaponSlots = [{ type: 'basic', level: 1 }];
+        
+        // Interpolation
+        this.interpFactor = 0.15;
+        this.lastUpdateTime = Date.now();
+    }
+
+    updateFromNetwork(state) {
+        if (state.x !== undefined) this.targetX = state.x;
+        if (state.y !== undefined) this.targetY = state.y;
+        if (state.health !== undefined) this.health = state.health;
+        if (state.maxHealth !== undefined) this.maxHealth = state.maxHealth;
+        if (state.isAlive !== undefined) this.isAlive = state.isAlive;
+        if (state.facingRight !== undefined) this.facingRight = state.facingRight;
+        if (state.aimAngle !== undefined) this.aimAngle = state.aimAngle;
+        if (state.isMoving !== undefined) this.isMoving = state.isMoving;
+        if (state.walkFrame !== undefined) this.walkFrame = state.walkFrame;
+        if (state.isDashing !== undefined) this.isDashing = state.isDashing;
+        if (state.level !== undefined) this.level = state.level;
+        if (state.activeWeaponSlot !== undefined) this.activeWeaponSlot = state.activeWeaponSlot;
+        if (state.weaponSlots !== undefined) this.weaponSlots = state.weaponSlots;
+        if (state.characterId !== undefined) this.characterId = state.characterId;
+        this.lastUpdateTime = Date.now();
+    }
+
+    update() {
+        // Smooth interpolation toward target position
+        this.x += (this.targetX - this.x) * this.interpFactor;
+        this.y += (this.targetY - this.y) * this.interpFactor;
+        
+        // Walk animation for visual smoothness
+        if (this.isMoving) {
+            this.walkTimer++;
+            if (this.walkTimer >= 8) {
+                this.walkTimer = 0;
+                this.walkFrame = this.walkFrame === 0 ? 1 : 0;
+            }
+        } else {
+            this.walkTimer = 0;
+            this.walkFrame = 0;
+        }
+    }
+
+    draw(ctx) {
+        if (!this.isAlive) return;
+        
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        
+        const scale = this.facingRight ? 1 : -1;
+        ctx.scale(scale, 1);
+
+        // Draw astronaut body (simplified version of Player.draw)
+        const s = this.size;
+        
+        // Suit body
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.ellipse(0, 2, s * 0.35, s * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = this._lightenColor(this.color, 30);
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        
+        // Helmet
+        ctx.fillStyle = '#1a1a2e';
+        ctx.beginPath();
+        ctx.arc(0, -s * 0.25, s * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Visor
+        ctx.fillStyle = this.color;
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.arc(s * 0.05, -s * 0.25, s * 0.2, -0.3, 1.2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+        
+        // Visor shine
+        ctx.fillStyle = 'rgba(255,255,255,0.4)';
+        ctx.beginPath();
+        ctx.arc(-s * 0.05, -s * 0.32, s * 0.06, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Legs with walk animation
+        const legOffset = this.walkFrame === 1 ? 3 : -3;
+        ctx.fillStyle = this._darkenColor(this.color, 30);
+        ctx.fillRect(-s * 0.2, s * 0.3, s * 0.15, s * 0.2 + legOffset);
+        ctx.fillRect(s * 0.05, s * 0.3, s * 0.15, s * 0.2 - legOffset);
+        
+        // Arms
+        ctx.fillRect(-s * 0.4, -s * 0.05, s * 0.15, s * 0.25);
+        ctx.fillRect(s * 0.25, -s * 0.05, s * 0.15, s * 0.25);
+        
+        ctx.restore();
+        
+        // Player name tag above head
+        ctx.save();
+        ctx.fillStyle = this.color;
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(this.displayName, this.x, this.y - s - 8);
+        
+        // Level badge
+        ctx.fillStyle = '#ffd93d';
+        ctx.font = '9px monospace';
+        ctx.fillText(`Lv.${this.level}`, this.x, this.y - s + 2);
+        
+        // Health bar
+        if (this.health < this.maxHealth) {
+            const barWidth = 40;
+            const barHeight = 4;
+            const barX = this.x - barWidth / 2;
+            const barY = this.y - s - 18;
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillRect(barX, barY, barWidth, barHeight);
+            
+            const healthPercent = Math.max(0, this.health / this.maxHealth);
+            ctx.fillStyle = healthPercent > 0.5 ? '#00ff88' : healthPercent > 0.25 ? '#ffd93d' : '#ff6b6b';
+            ctx.fillRect(barX, barY, barWidth * healthPercent, barHeight);
+        }
+        
+        // Dash effect
+        if (this.isDashing) {
+            ctx.globalAlpha = 0.3;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, s * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        
+        ctx.restore();
+    }
+    
+    _lightenColor(hex, amount) {
+        const num = parseInt(hex.replace('#', ''), 16);
+        const r = Math.min(255, (num >> 16) + amount);
+        const g = Math.min(255, ((num >> 8) & 0x00FF) + amount);
+        const b = Math.min(255, (num & 0x0000FF) + amount);
+        return `rgb(${r},${g},${b})`;
+    }
+    
+    _darkenColor(hex, amount) {
+        const num = parseInt(hex.replace('#', ''), 16);
+        const r = Math.max(0, (num >> 16) - amount);
+        const g = Math.max(0, ((num >> 8) & 0x00FF) - amount);
+        const b = Math.max(0, (num & 0x0000FF) - amount);
+        return `rgb(${r},${g},${b})`;
+    }
+}
+
+// ==================== MULTIPLAYER HELPERS ====================
+// Returns the nearest alive player target (local + remote) to a position
+function getNearestPlayerTarget(fromX, fromY) {
+    let nearest = null;
+    let nearestDist = Infinity;
+
+    // Check local player
+    if (game.player && game.player.health > 0) {
+        const d = Math.hypot(game.player.x - fromX, game.player.y - fromY);
+        if (d < nearestDist) {
+            nearest = game.player;
+            nearestDist = d;
+        }
+    }
+
+    // Check remote players in multiplayer
+    if (game.isMultiplayer) {
+        for (const rp of game.remotePlayers.values()) {
+            if (rp.isAlive) {
+                const d = Math.hypot(rp.x - fromX, rp.y - fromY);
+                if (d < nearestDist) {
+                    nearest = rp;
+                    nearestDist = d;
+                }
+            }
+        }
+    }
+
+    return nearest || game.player;
+}
+
+// Get all alive players as an array
+function getAllAlivePlayers() {
+    const players = [];
+    if (game.player && game.player.health > 0) {
+        players.push(game.player);
+    }
+    if (game.isMultiplayer) {
+        for (const rp of game.remotePlayers.values()) {
+            if (rp.isAlive) players.push(rp);
+        }
+    }
+    return players;
+}
+
+// Get a random alive player (for spawn targeting)
+function getRandomAlivePlayer() {
+    const players = getAllAlivePlayers();
+    if (players.length === 0) return game.player;
+    return players[Math.floor(Math.random() * players.length)];
+}
+
 // ==================== ENEMY CLASS ====================
 class Enemy {
     constructor(x, y, wave, type, isBoss = false) {
@@ -1995,10 +2240,12 @@ class Enemy {
         this.prevX = this.x;
         this.prevY = this.y;
         
-        let targetX = game.player.x, targetY = game.player.y;
-        if (game.player.decoy && game.player.decoy.health > 0 && !this.isBoss) {
+        // Target nearest player (supports multiplayer)
+        const nearestPlayer = getNearestPlayerTarget(this.x, this.y);
+        let targetX = nearestPlayer.x, targetY = nearestPlayer.y;
+        if (game.player && game.player.decoy && game.player.decoy.health > 0 && !this.isBoss) {
             const distDecoy = Math.hypot(game.player.decoy.x - this.x, game.player.decoy.y - this.y);
-            const distPlayer = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+            const distPlayer = Math.hypot(nearestPlayer.x - this.x, nearestPlayer.y - this.y);
             if (distDecoy < distPlayer * 0.8) { targetX = game.player.decoy.x; targetY = game.player.decoy.y; }
         }
         const dx = targetX - this.x;
@@ -5017,12 +5264,19 @@ function spawnWave() {
         Sound.play('boss');
         const bossTypes = Object.keys(BOSS_TYPES);
         const bossType = bossTypes[Math.floor(game.wave / CONFIG.BOSS_WAVE_INTERVAL) % bossTypes.length];
-        const boss = new Enemy(game.player.x + 300, game.player.y - 300, game.wave, bossType, true);
+        const spawnTarget = getRandomAlivePlayer();
+        const boss = new Enemy(spawnTarget.x + 300, spawnTarget.y - 300, game.wave, bossType, true);
         game.enemies.push(boss);
         showNotification(`BOSS WAVE: ${boss.name}`);
     } else {
         // Better enemy count scaling: starts at 8, exponential feel in later waves
         let enemyCount = Math.floor(8 + game.wave * 2 + Math.pow(game.wave, 1.2));
+        
+        // Scale enemy count for multiplayer (30% more per extra player)
+        if (game.isMultiplayer) {
+            const playerCount = 1 + game.remotePlayers.size;
+            enemyCount = Math.floor(enemyCount * (1 + (playerCount - 1) * 0.3));
+        }
         
         // Apply wave modifier to enemy count
         if (game.waveModifier && game.waveModifier.enemyCountMult) {
@@ -5031,8 +5285,10 @@ function spawnWave() {
         
         for (let i = 0; i < enemyCount; i++) {
             setTimeout(() => {
-                const px = game.player ? game.player.x : CONFIG.WORLD_WIDTH / 2;
-                const py = game.player ? game.player.y : CONFIG.WORLD_HEIGHT / 2;
+                // Spawn around a random alive player
+                const spawnTarget = getRandomAlivePlayer();
+                const px = spawnTarget ? spawnTarget.x : CONFIG.WORLD_WIDTH / 2;
+                const py = spawnTarget ? spawnTarget.y : CONFIG.WORLD_HEIGHT / 2;
                 const spawnDist = 500 + Math.random() * 200;
                 const spawnAngle = Math.random() * Math.PI * 2;
                 let x = px + Math.cos(spawnAngle) * spawnDist;
@@ -5611,6 +5867,18 @@ function drawMinimap(ctx) {
         ctx.fill();
     }
     
+    // Remote player dots (multiplayer)
+    if (game.isMultiplayer) {
+        for (const rp of game.remotePlayers.values()) {
+            if (rp.isAlive) {
+                ctx.fillStyle = rp.color;
+                ctx.beginPath();
+                ctx.arc(mapX + rp.x * scaleX, mapY + rp.y * scaleY, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+    
     // Enemy dots
     ctx.fillStyle = '#ff6b6b';
     game.enemies.forEach(e => {
@@ -6102,13 +6370,23 @@ function gameLoop(timestamp) {
         }
         
         game.player.update();
+        
+        // Update remote players (multiplayer)
+        if (game.isMultiplayer) {
+            for (const rp of game.remotePlayers.values()) {
+                rp.update();
+            }
+            // Send local player state to server
+            sendLocalPlayerState();
+        }
+        
         game.enemies.forEach(e => e.update());
         game.bullets = game.bullets.filter(b => {
             if (b.isEnemyBullet) {
                 b.x += Math.cos(b.angle) * b.speed;
                 b.y += Math.sin(b.angle) * b.speed;
                 
-                // Check collision with player
+                // Check collision with local player
                 const distPlayer = Math.hypot(game.player.x - b.x, game.player.y - b.y);
                 if (distPlayer < game.player.size + b.size) {
                     game.player.takeDamage(b.damage);
@@ -6172,6 +6450,12 @@ function gameLoop(timestamp) {
         game.enemies.forEach(e => e.draw(ctx));
         game.bullets.forEach(b => b.draw(ctx));
         game.player.draw(ctx);
+        // Draw remote players (multiplayer)
+        if (game.isMultiplayer) {
+            for (const rp of game.remotePlayers.values()) {
+                rp.draw(ctx);
+            }
+        }
         drawParticles(ctx);
         
         updateUI();
@@ -6233,6 +6517,11 @@ function gameLoop(timestamp) {
         game.enemies.forEach(e => e.draw(ctx));
         game.bullets.forEach(b => b.draw(ctx));
         game.player.draw(ctx);
+        if (game.isMultiplayer) {
+            for (const rp of game.remotePlayers.values()) {
+                rp.draw(ctx);
+            }
+        }
         drawParticles(ctx);
         drawPauseMenu(ctx);
     }

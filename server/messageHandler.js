@@ -1,0 +1,493 @@
+// WebSocket message handler for Cosmic Survivor multiplayer server
+import {
+    createRoom, joinRoom, getRoom, getRoomByPlayerId,
+    removeRoom, startRoomCleanup
+} from './rooms.js';
+import {
+    initDatabase, createUser, loginUser, createGuestUser,
+    getUserProfile, updateUserStats, addAchievement, addHighScore,
+    getGlobalLeaderboard, closeDatabase
+} from './database.js';
+import { v4 as uuidv4 } from 'uuid';
+
+// Connected clients: ws -> { userId, playerId, roomCode }
+const clients = new Map();
+
+// Session tokens: token -> userId
+const sessions = new Map();
+
+export function initMessageHandler() {
+    initDatabase();
+    startRoomCleanup();
+    console.log('[Server] Message handler initialized');
+}
+
+export function handleConnection(ws) {
+    const connectionId = uuidv4();
+    clients.set(ws, { connectionId, userId: null, playerId: null, roomCode: null });
+    
+    send(ws, { type: 'connected', connectionId });
+}
+
+export function handleMessage(ws, rawMessage) {
+    let message;
+    try {
+        message = JSON.parse(rawMessage);
+    } catch {
+        send(ws, { type: 'error', message: 'Invalid message format' });
+        return;
+    }
+
+    const client = clients.get(ws);
+    if (!client) return;
+
+    switch (message.type) {
+        // ========== AUTH ==========
+        case 'register':
+            handleRegister(ws, client, message);
+            break;
+        case 'login':
+            handleLogin(ws, client, message);
+            break;
+        case 'guest_login':
+            handleGuestLogin(ws, client, message);
+            break;
+        case 'restore_session':
+            handleRestoreSession(ws, client, message);
+            break;
+
+        // ========== ROOMS ==========
+        case 'create_room':
+            handleCreateRoom(ws, client, message);
+            break;
+        case 'join_room':
+            handleJoinRoom(ws, client, message);
+            break;
+        case 'leave_room':
+            handleLeaveRoom(ws, client);
+            break;
+        case 'player_ready':
+            handlePlayerReady(ws, client, message);
+            break;
+        case 'start_game':
+            handleStartGame(ws, client);
+            break;
+        case 'room_settings':
+            handleRoomSettings(ws, client, message);
+            break;
+
+        // ========== GAMEPLAY ==========
+        case 'player_state':
+            handlePlayerState(ws, client, message);
+            break;
+        case 'game_event':
+            handleGameEvent(ws, client, message);
+            break;
+        case 'chat_message':
+            handleChatMessage(ws, client, message);
+            break;
+
+        // ========== DATA SYNC ==========
+        case 'sync_stats':
+            handleSyncStats(ws, client, message);
+            break;
+        case 'sync_achievement':
+            handleSyncAchievement(ws, client, message);
+            break;
+        case 'sync_highscore':
+            handleSyncHighScore(ws, client, message);
+            break;
+        case 'get_leaderboard':
+            handleGetLeaderboard(ws, client);
+            break;
+        case 'get_profile':
+            handleGetProfile(ws, client);
+            break;
+
+        default:
+            send(ws, { type: 'error', message: `Unknown message type: ${message.type}` });
+    }
+}
+
+export function handleDisconnect(ws) {
+    const client = clients.get(ws);
+    if (!client) return;
+
+    // Remove from room if in one
+    if (client.roomCode) {
+        const room = getRoom(client.roomCode);
+        if (room) {
+            room.removePlayer(client.playerId);
+            if (room.isEmpty()) {
+                removeRoom(room.code);
+            } else {
+                room.broadcast({
+                    type: 'player_left',
+                    playerId: client.playerId,
+                    lobby: room.getLobbyState()
+                });
+            }
+        }
+    }
+
+    clients.delete(ws);
+}
+
+// ========== AUTH HANDLERS ==========
+
+function handleRegister(ws, client, msg) {
+    const result = createUser(msg.username, msg.password, msg.displayName);
+    if (result.error) {
+        send(ws, { type: 'auth_error', message: result.error });
+        return;
+    }
+
+    const token = uuidv4();
+    sessions.set(token, result.userId);
+    client.userId = result.userId;
+    client.playerId = result.userId;
+
+    const profile = getUserProfile(result.userId);
+    send(ws, {
+        type: 'auth_success',
+        token,
+        profile
+    });
+}
+
+function handleLogin(ws, client, msg) {
+    const result = loginUser(msg.username, msg.password);
+    if (result.error) {
+        send(ws, { type: 'auth_error', message: result.error });
+        return;
+    }
+
+    const token = uuidv4();
+    sessions.set(token, result.userId);
+    client.userId = result.userId;
+    client.playerId = result.userId;
+
+    const profile = getUserProfile(result.userId);
+    send(ws, {
+        type: 'auth_success',
+        token,
+        profile
+    });
+}
+
+function handleGuestLogin(ws, client) {
+    const result = createGuestUser();
+    const token = uuidv4();
+    sessions.set(token, result.userId);
+    client.userId = result.userId;
+    client.playerId = result.userId;
+
+    send(ws, {
+        type: 'auth_success',
+        token,
+        profile: {
+            userId: result.userId,
+            username: result.username,
+            displayName: result.displayName,
+            isGuest: true,
+            stats: { total_kills: 0, total_credits: 0, max_wave: 0, upgrades_purchased: 0, weapons_unlocked: 1 },
+            achievements: [],
+            highScores: []
+        }
+    });
+}
+
+function handleRestoreSession(ws, client, msg) {
+    const userId = sessions.get(msg.token);
+    if (!userId) {
+        send(ws, { type: 'auth_error', message: 'Session expired' });
+        return;
+    }
+
+    client.userId = userId;
+    client.playerId = userId;
+
+    const profile = getUserProfile(userId);
+    if (!profile) {
+        send(ws, { type: 'auth_error', message: 'User not found' });
+        return;
+    }
+
+    send(ws, { type: 'auth_success', token: msg.token, profile });
+}
+
+// ========== ROOM HANDLERS ==========
+
+function handleCreateRoom(ws, client, msg) {
+    if (!client.userId) {
+        send(ws, { type: 'error', message: 'Must be logged in to create a room' });
+        return;
+    }
+
+    // Leave existing room first
+    if (client.roomCode) {
+        handleLeaveRoom(ws, client);
+    }
+
+    const profile = getUserProfile(client.userId);
+    const displayName = profile ? profile.displayName : 'Player';
+    const room = createRoom(client.userId, displayName, msg.settings || {});
+    
+    // Set the WebSocket for the host
+    const hostPlayer = room.players.get(client.userId);
+    if (hostPlayer) hostPlayer.ws = ws;
+
+    client.roomCode = room.code;
+
+    send(ws, {
+        type: 'room_created',
+        roomCode: room.code,
+        lobby: room.getLobbyState()
+    });
+}
+
+function handleJoinRoom(ws, client, msg) {
+    if (!client.userId) {
+        send(ws, { type: 'error', message: 'Must be logged in to join a room' });
+        return;
+    }
+
+    // Leave existing room first
+    if (client.roomCode) {
+        handleLeaveRoom(ws, client);
+    }
+
+    const profile = getUserProfile(client.userId);
+    const displayName = profile ? profile.displayName : 'Player';
+    const result = joinRoom(msg.roomCode, client.userId, displayName, ws);
+
+    if (result.error) {
+        send(ws, { type: 'join_error', message: result.error });
+        return;
+    }
+
+    client.roomCode = result.room.code;
+
+    // Notify joiner
+    send(ws, {
+        type: 'room_joined',
+        roomCode: result.room.code,
+        lobby: result.room.getLobbyState()
+    });
+
+    // Notify other players
+    result.room.broadcast({
+        type: 'player_joined',
+        playerId: client.userId,
+        displayName,
+        lobby: result.room.getLobbyState()
+    }, client.userId);
+}
+
+function handleLeaveRoom(ws, client) {
+    if (!client.roomCode) return;
+
+    const room = getRoom(client.roomCode);
+    if (room) {
+        room.removePlayer(client.playerId);
+        if (room.isEmpty()) {
+            removeRoom(room.code);
+        } else {
+            room.broadcast({
+                type: 'player_left',
+                playerId: client.playerId,
+                lobby: room.getLobbyState()
+            });
+        }
+    }
+
+    client.roomCode = null;
+    send(ws, { type: 'room_left' });
+}
+
+function handlePlayerReady(ws, client, msg) {
+    if (!client.roomCode) return;
+
+    const room = getRoom(client.roomCode);
+    if (!room) return;
+
+    room.setPlayerReady(client.playerId, msg.ready, msg.characterId);
+
+    room.broadcastAll({
+        type: 'lobby_update',
+        lobby: room.getLobbyState()
+    });
+}
+
+function handleStartGame(ws, client) {
+    if (!client.roomCode) return;
+
+    const room = getRoom(client.roomCode);
+    if (!room) return;
+
+    // Only host can start
+    if (room.hostId !== client.playerId) {
+        send(ws, { type: 'error', message: 'Only the host can start the game' });
+        return;
+    }
+
+    const result = room.startGame();
+    if (result.error) {
+        send(ws, { type: 'error', message: result.error });
+        return;
+    }
+
+    // Determine spawn positions spread around center
+    const playerCount = room.players.size;
+    const spawnPositions = [];
+    for (let i = 0; i < playerCount; i++) {
+        const angle = (i / playerCount) * Math.PI * 2;
+        spawnPositions.push({
+            x: 1500 + Math.cos(angle) * 100, // World center + offset
+            y: 1000 + Math.sin(angle) * 100,
+        });
+    }
+
+    let idx = 0;
+    const playersData = [];
+    for (const [id, player] of room.players) {
+        playersData.push({
+            id: player.id,
+            displayName: player.displayName,
+            characterId: player.characterId,
+            playerIndex: player.playerIndex,
+            color: player.color,
+            spawnX: spawnPositions[idx].x,
+            spawnY: spawnPositions[idx].y,
+        });
+        idx++;
+    }
+
+    room.broadcastAll({
+        type: 'game_start',
+        players: playersData,
+        settings: room.settings,
+        playerCount: room.players.size,
+    });
+}
+
+function handleRoomSettings(ws, client, msg) {
+    if (!client.roomCode) return;
+
+    const room = getRoom(client.roomCode);
+    if (!room || room.hostId !== client.playerId) return;
+
+    if (msg.settings) {
+        if (msg.settings.difficulty) room.settings.difficulty = msg.settings.difficulty;
+        if (msg.settings.sharedXP !== undefined) room.settings.sharedXP = msg.settings.sharedXP;
+        if (msg.settings.friendlyFire !== undefined) room.settings.friendlyFire = msg.settings.friendlyFire;
+    }
+
+    room.broadcastAll({
+        type: 'lobby_update',
+        lobby: room.getLobbyState()
+    });
+}
+
+// ========== GAMEPLAY HANDLERS ==========
+
+function handlePlayerState(ws, client, msg) {
+    if (!client.roomCode) return;
+
+    const room = getRoom(client.roomCode);
+    if (!room || room.state !== 'playing') return;
+
+    room.updatePlayerState(client.playerId, msg.state);
+
+    // Broadcast to other players
+    room.broadcast({
+        type: 'player_state_update',
+        playerId: client.playerId,
+        state: msg.state,
+        timestamp: Date.now()
+    }, client.playerId);
+}
+
+function handleGameEvent(ws, client, msg) {
+    if (!client.roomCode) return;
+
+    const room = getRoom(client.roomCode);
+    if (!room) return;
+
+    // Relay game events to all players
+    // Events: enemy_killed, player_damaged, wave_complete, game_over, 
+    //         enemy_spawned, pickup_collected, xp_collected, level_up, etc.
+    room.broadcast({
+        type: 'game_event',
+        event: msg.event,
+        data: msg.data,
+        playerId: client.playerId,
+        timestamp: Date.now()
+    }, client.playerId);
+
+    // Handle specific events server-side
+    if (msg.event === 'game_over') {
+        room.state = 'lobby';
+        // Reset ready states
+        for (const [, player] of room.players) {
+            player.ready = player.isHost;
+        }
+    }
+}
+
+function handleChatMessage(ws, client, msg) {
+    if (!client.roomCode) return;
+
+    const room = getRoom(client.roomCode);
+    if (!room) return;
+
+    const player = room.players.get(client.playerId);
+    if (!player) return;
+
+    room.broadcastAll({
+        type: 'chat_message',
+        playerId: client.playerId,
+        displayName: player.displayName,
+        message: (msg.message || '').substring(0, 200), // Limit message length
+        timestamp: Date.now()
+    });
+}
+
+// ========== DATA SYNC HANDLERS ==========
+
+function handleSyncStats(ws, client, msg) {
+    if (!client.userId) return;
+    updateUserStats(client.userId, msg.stats || {});
+    send(ws, { type: 'stats_synced' });
+}
+
+function handleSyncAchievement(ws, client, msg) {
+    if (!client.userId) return;
+    addAchievement(client.userId, msg.achievementId);
+}
+
+function handleSyncHighScore(ws, client, msg) {
+    if (!client.userId) return;
+    addHighScore(client.userId, msg.score || {});
+}
+
+function handleGetLeaderboard(ws, client) {
+    const leaderboard = getGlobalLeaderboard();
+    send(ws, { type: 'leaderboard', entries: leaderboard });
+}
+
+function handleGetProfile(ws, client) {
+    if (!client.userId) {
+        send(ws, { type: 'error', message: 'Not logged in' });
+        return;
+    }
+    const profile = getUserProfile(client.userId);
+    send(ws, { type: 'profile', profile });
+}
+
+// Helper
+function send(ws, data) {
+    if (ws.readyState === 1) {
+        ws.send(JSON.stringify(data));
+    }
+}
