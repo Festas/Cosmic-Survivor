@@ -11,6 +11,7 @@ const MultiplayerClient = {
     profile: null,
     room: null,
     localPlayerId: null,
+    _lastRoomCode: null, // Track last room for rejoin on reconnect
     
     // Callbacks (set by the game)
     onConnected: null,
@@ -35,6 +36,8 @@ const MultiplayerClient = {
     // State sync throttling
     _lastStateSend: 0,
     _stateSendInterval: 50, // Send state every 50ms (20 Hz)
+    // Delay before attempting room rejoin after reconnect (allows session restore to complete)
+    _sessionRestoreDelay: 500,
 
     connect(serverUrl) {
         if (this.ws && this.ws.readyState <= 1) {
@@ -61,6 +64,16 @@ const MultiplayerClient = {
             }
             
             if (this.onConnected) this.onConnected();
+
+            // Attempt to rejoin the last room after reconnect
+            if (this._lastRoomCode && this.sessionToken) {
+                setTimeout(() => {
+                    if (this.authenticated && this._lastRoomCode && !this.room) {
+                        console.log('[MP] Attempting to rejoin room:', this._lastRoomCode);
+                        this.joinRoom(this._lastRoomCode);
+                    }
+                }, this._sessionRestoreDelay);
+            }
         };
 
         this.ws.onclose = () => {
@@ -140,14 +153,17 @@ const MultiplayerClient = {
             // Rooms
             case 'room_created':
                 this.room = msg.lobby;
+                this._lastRoomCode = msg.roomCode;
                 if (this.onRoomCreated) this.onRoomCreated(msg.roomCode, msg.lobby);
                 break;
             case 'room_joined':
                 this.room = msg.lobby;
+                this._lastRoomCode = msg.roomCode;
                 if (this.onRoomJoined) this.onRoomJoined(msg.roomCode, msg.lobby);
                 break;
             case 'room_left':
                 this.room = null;
+                this._lastRoomCode = null;
                 if (this.onRoomLeft) this.onRoomLeft();
                 break;
             case 'player_joined':
@@ -244,6 +260,7 @@ const MultiplayerClient = {
     leaveRoom() {
         this.send({ type: 'leave_room' });
         this.room = null;
+        this._lastRoomCode = null;
     },
 
     setReady(ready, characterId) {

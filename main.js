@@ -2301,7 +2301,8 @@ class Enemy {
             if (!this.phaseTransitioning && this.specialAttackCooldown <= 0) {
                 // Phase 2+: Shockwave attack (all boss types)
                 if (this.phase >= 2 && !this.isChargingShockwave) {
-                    const playerDist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+                    const nearestForShockwave = getNearestPlayerTarget(this.x, this.y);
+                    const playerDist = Math.hypot(nearestForShockwave.x - this.x, nearestForShockwave.y - this.y);
                     if (playerDist < 250) {
                         this.isChargingShockwave = true;
                         this.shockwaveChargeTimer = 45; // 0.75s telegraph
@@ -2869,6 +2870,16 @@ class Enemy {
         const baseXP = this.isBoss ? (BOSS_TYPES[this.type]?.xp || 50) : (ENEMY_TYPES[this.type]?.xp || 1);
         const xpMult = game.difficultySettings?.xpMult || 1;
         const totalXP = Math.floor(baseXP * xpMult * (this.isElite ? 2 : 1));
+
+        // Broadcast enemy kill to co-op partners for shared XP
+        if (game.isMultiplayer && window.MultiplayerClient && window.MultiplayerClient.connected) {
+            window.MultiplayerClient.sendGameEvent('enemy_killed', {
+                xp: totalXP,
+                type: this.type,
+                isBoss: this.isBoss,
+                isElite: this.isElite,
+            });
+        }
 
         // Split large XP into multiple orbs
         if (totalXP >= 25) {
@@ -5358,6 +5369,11 @@ function nextWave() {
     shopState.rerollCost = 0;
     shopState.rerollCount = 0;
     
+    // In multiplayer, host broadcasts wave_start to sync all clients
+    if (game.isMultiplayer && window.MultiplayerClient && window.MultiplayerClient.isHost()) {
+        window.MultiplayerClient.sendGameEvent('wave_start', { wave: game.wave });
+    }
+    
     spawnWave();
     checkAchievements();
 }
@@ -6363,7 +6379,17 @@ function initMultiplayerCallbacks() {
                 if (!anyAlive) gameOver();
             }
         } else if (event === 'wave_complete') {
-            // Sync wave state
+            // Host has declared wave complete — sync to non-host clients
+            Sound.play('waveComplete');
+            openShop();
+        } else if (event === 'wave_start') {
+            // Host started next wave — sync wave number and spawn
+            if (data && typeof data.wave === 'number' && data.wave > 0) {
+                game.wave = data.wave;
+            }
+            game.state = 'playing';
+            document.getElementById('shop-modal').classList.add('hidden');
+            spawnWave();
         } else if (event === 'game_over') {
             gameOver();
         } else if (event === 'enemy_killed') {
@@ -6433,12 +6459,27 @@ function updateLobbyUI(lobby) {
     lobby.players.forEach(p => {
         const div = document.createElement('div');
         div.className = 'lobby-player' + (p.ready ? ' ready' : '');
-        div.innerHTML = `
-            <span class="lobby-player-dot" style="background:${p.color}"></span>
-            <span class="lobby-player-name">${p.displayName}${p.isHost ? ' 👑' : ''}</span>
-            <span class="lobby-player-character">${p.characterId ? CHARACTERS.find(c => c.id === p.characterId)?.name || p.characterId : 'Choosing...'}</span>
-            <span class="lobby-player-status">${p.ready ? '✅ Ready' : '⏳ Not Ready'}</span>
-        `;
+        
+        const dot = document.createElement('span');
+        dot.className = 'lobby-player-dot';
+        dot.style.background = p.color;
+        
+        const name = document.createElement('span');
+        name.className = 'lobby-player-name';
+        name.textContent = p.displayName + (p.isHost ? ' 👑' : '');
+        
+        const charSpan = document.createElement('span');
+        charSpan.className = 'lobby-player-character';
+        charSpan.textContent = p.characterId ? (CHARACTERS.find(c => c.id === p.characterId)?.name || p.characterId) : 'Choosing...';
+        
+        const status = document.createElement('span');
+        status.className = 'lobby-player-status';
+        status.textContent = p.ready ? '✅ Ready' : '⏳ Not Ready';
+        
+        div.appendChild(dot);
+        div.appendChild(name);
+        div.appendChild(charSpan);
+        div.appendChild(status);
         playerList.appendChild(div);
     });
 
@@ -6704,8 +6745,19 @@ function gameLoop(timestamp) {
             timer = 0;
             game.timeLeft--;
             if (game.timeLeft <= 0) {
-                Sound.play('waveComplete');
-                openShop();
+                if (game.isMultiplayer) {
+                    // In multiplayer, only the host triggers wave completion
+                    const mp = window.MultiplayerClient;
+                    if (mp && mp.isHost()) {
+                        mp.sendGameEvent('wave_complete', { wave: game.wave });
+                        Sound.play('waveComplete');
+                        openShop();
+                    }
+                    // Non-host clients wait for the host's wave_complete event
+                } else {
+                    Sound.play('waveComplete');
+                    openShop();
+                }
             }
         }
         
@@ -7393,15 +7445,18 @@ function showAccountModal() {
             mp.loginAsGuest();
         });
         
-        // Close modal on auth success
+        // Close modal on auth success — wrap the original callback properly
         const origOnAuth = mp.onAuthSuccess;
         mp.onAuthSuccess = (profile) => {
             modal.classList.add('hidden');
-            if (origOnAuth) origOnAuth(profile);
-            else {
+            if (origOnAuth) {
+                origOnAuth(profile);
+            } else {
                 showNotification(`Welcome, ${profile.displayName}!`, '#00ff88', 2000);
                 updateAccountUI(profile);
             }
+            // Restore the original callback after use so future auth flows work correctly
+            mp.onAuthSuccess = origOnAuth;
         };
     }
     
