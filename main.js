@@ -2342,7 +2342,7 @@ class Enemy {
     
     // === STALKER: Dart-shaped predator with motion trail ===
     _drawStalker(ctx, cx, cy, s, t, p, angle) {
-        const moveAngle = Math.atan2(this.y - this.prevY || 0, this.x - this.prevX || 0.01);
+        const moveAngle = Math.atan2((this.y - (this.prevY ?? this.y)), (this.x - (this.prevX ?? this.x)) || 0.01);
         // Motion trail
         ctx.globalAlpha = 0.15;
         ctx.fillStyle = p.glow;
@@ -2740,7 +2740,7 @@ class Enemy {
     
     // === DETONATOR: Living bomb/mine with pulsing core ===
     _drawDetonator(ctx, cx, cy, s, t, p) {
-        const playerDist = game.player ? Math.hypot(game.player.x - cx, game.player.y - cy) : 999;
+        const playerDist = game.player ? Math.hypot(game.player.x - cx, game.player.y - cy) : CONFIG.CANVAS_WIDTH;
         const urgency = Math.max(0.3, 1 - playerDist / 400);
         const pulse = Math.sin(t * (0.008 + urgency * 0.02)) * 0.3 + 0.7;
         // Danger glow
@@ -2788,7 +2788,7 @@ class Enemy {
     
     // === LEECH: Segmented cosmic worm ===
     _drawLeech(ctx, cx, cy, s, t, p, angle) {
-        const moveAngle = Math.atan2(this.y - (this.prevY || this.y), this.x - (this.prevX || this.x));
+        const moveAngle = Math.atan2((this.y - (this.prevY ?? this.y)), (this.x - (this.prevX ?? this.x)) || 0.01);
         const segCount = 5;
         // Body segments (tail to head)
         for (let i = segCount - 1; i >= 0; i--) {
