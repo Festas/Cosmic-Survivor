@@ -785,7 +785,12 @@ function updateUI() {
     document.getElementById('time-left').textContent = Math.ceil(game.timeLeft);
     document.getElementById('credit-amount').textContent = game.credits;
     
-    const healthPercent = (game.player.health / game.player.maxHealth) * 100;
+    // Safety clamp
+    if (game.player.health > game.player.maxHealth) {
+        game.player.health = game.player.maxHealth;
+    }
+    
+    const healthPercent = Math.min((game.player.health / game.player.maxHealth) * 100, 100);
     document.getElementById('health-bar').style.width = healthPercent + '%';
     document.getElementById('health-text').textContent = 
         `${Math.ceil(game.player.health)} / ${game.player.maxHealth}`;

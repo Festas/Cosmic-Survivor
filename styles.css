@@ -1264,6 +1264,27 @@ body {
     border-radius: 8px;
     padding: 10px;
     z-index: 100;
+    pointer-events: all;
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .synergy-panel {
+        width: 180px;
+        top: 80px;
+        left: 6px;
+        padding: 8px;
+        font-size: 12px;
+    }
+    
+    .synergy-header h3 {
+        font-size: 13px;
+    }
+    
+    .synergy-list {
+        max-height: 150px;
+    }
 }
 
 .synergy-header {
@@ -1341,7 +1362,8 @@ body {
     border-radius: 10px;
     padding: 15px 30px;
     z-index: 200;
-    min-width: 400px;
+    min-width: 300px;
+    max-width: 90%;
     text-align: center;
     animation: eventSlideIn 0.5s ease-out;
 }

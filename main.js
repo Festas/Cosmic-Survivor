@@ -5475,10 +5475,12 @@ function drawPauseMenu(ctx) {
     ctx.fillStyle = 'rgba(26, 26, 46, 0.95)';
     ctx.strokeStyle = '#00ff88';
     ctx.lineWidth = 3;
-    const menuX = CONFIG.CANVAS_WIDTH / 2 - 250;
-    const menuY = CONFIG.CANVAS_HEIGHT / 2 - 200;
-    ctx.fillRect(menuX, menuY, 500, 400);
-    ctx.strokeRect(menuX, menuY, 500, 400);
+    const menuW = Math.min(500, CONFIG.CANVAS_WIDTH - 40);
+    const menuH = Math.min(400, CONFIG.CANVAS_HEIGHT - 80);
+    const menuX = CONFIG.CANVAS_WIDTH / 2 - menuW / 2;
+    const menuY = CONFIG.CANVAS_HEIGHT / 2 - menuH / 2;
+    ctx.fillRect(menuX, menuY, menuW, menuH);
+    ctx.strokeRect(menuX, menuY, menuW, menuH);
     
     // Title
     ctx.fillStyle = '#ffd93d';
@@ -5533,7 +5535,8 @@ function drawPauseMenu(ctx) {
 function drawWeaponIndicator(ctx) {
     if (!game.player) return;
     const slots = game.player.weaponSlots;
-    const slotWidth = 80;
+    const isMobile = CONFIG.CANVAS_WIDTH < 800;
+    const slotWidth = isMobile ? 60 : 80;
     const totalWidth = slots.length * slotWidth + (slots.length - 1) * 5;
     const x = CONFIG.CANVAS_WIDTH - totalWidth - 10;
     const y = CONFIG.CANVAS_HEIGHT - 50;
@@ -5572,8 +5575,9 @@ function drawWeaponIndicator(ctx) {
 function drawMinimap(ctx) {
     if (game.state !== 'playing') return;
     
-    const mapW = 150;
-    const mapH = 100;
+    const isMobile = CONFIG.CANVAS_WIDTH < 800;
+    const mapW = isMobile ? 100 : 150;
+    const mapH = isMobile ? 67 : 100;
     const mapX = CONFIG.CANVAS_WIDTH - mapW - 10;
     const mapY = CONFIG.CANVAS_HEIGHT - mapH - 10;
     const scaleX = mapW / CONFIG.WORLD_WIDTH;
@@ -5667,7 +5671,7 @@ function drawComboCounter(ctx) {
 }
 
 function drawXPBar(ctx) {
-    const barWidth = 300;
+    const barWidth = Math.min(300, CONFIG.CANVAS_WIDTH - 100);
     const barHeight = 8;
     const x = CONFIG.CANVAS_WIDTH / 2 - barWidth / 2;
     const y = CONFIG.CANVAS_HEIGHT - 25;
@@ -5823,7 +5827,7 @@ function drawBossHealthBar(ctx) {
     const boss = game.enemies.find(e => e.isBoss);
     if (!boss || game.state !== 'playing') return;
     
-    const barWidth = 500;
+    const barWidth = Math.min(500, CONFIG.CANVAS_WIDTH - 60);
     const barHeight = 20;
     const x = CONFIG.CANVAS_WIDTH / 2 - barWidth / 2;
     const y = 15;
