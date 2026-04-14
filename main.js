@@ -5,6 +5,8 @@
 const CONFIG = {
     CANVAS_WIDTH: 1200,
     CANVAS_HEIGHT: 800,
+    WORLD_WIDTH: 3000,
+    WORLD_HEIGHT: 2000,
     WAVE_DURATION: 60,
     WAVE_CLEAR_COUNTDOWN: 5,
     PLAYER_SIZE: 30,
@@ -133,6 +135,139 @@ const WEAPON_TYPES = {
     plasma: { name: '💥 Plasma', fireRate: 1.6, damage: 1.4, color: '#9d00ff', pierces: true, desc: 'Pierces through enemies' },
 };
 
+// Weapon Evolution System
+// Each weapon can evolve when paired with a specific passive/item at weapon level 5
+const WEAPON_EVOLUTIONS = {
+    basic: {
+        name: '⚡ Railgun',
+        requiredItem: 'eagle_eye', // Requires crit-related item
+        desc: 'Pierces all enemies with massive crits',
+        color: '#00ffff',
+        fireRate: 1.8,
+        damage: 3.0,
+        pierces: true,
+        evolvedStats: { critChance: 0.5, critDamage: 3.0 }
+    },
+    spread: {
+        name: '🌌 Galaxy Burst',
+        requiredItem: 'bullet_storm', // Extra projectile passive
+        desc: '360° bullet ring every shot',
+        color: '#ffd700',
+        fireRate: 1.5,
+        damage: 0.8,
+        projectiles: 12,
+        fullCircle: true,
+        evolvedStats: {}
+    },
+    freeze: {
+        name: '❄️ Absolute Zero',
+        requiredItem: 'fortify', // Armor passive
+        desc: 'Freezes everything in massive radius',
+        color: '#00ffff',
+        fireRate: 0.6,
+        damage: 1.2,
+        aoeFreeze: true,
+        freezeRadius: 200,
+        evolvedStats: {}
+    },
+    rocket: {
+        name: '☄️ Orbital Strike',
+        requiredItem: 'glass_cannon', // Damage passive
+        desc: 'Rains rockets from the sky',
+        color: '#ff4500',
+        fireRate: 2.5,
+        damage: 2.0,
+        orbitalStrike: true,
+        strikeCount: 5,
+        evolvedStats: {}
+    },
+    lightning: {
+        name: '🌩️ Storm Caller',
+        requiredItem: 'quick_hands', // Fire rate passive
+        desc: 'Permanent lightning field around you',
+        color: '#00d4ff',
+        fireRate: 0.5,
+        damage: 0.6,
+        lightningField: true,
+        fieldRadius: 180,
+        evolvedStats: {}
+    },
+    flamethrower: {
+        name: '🔥 Inferno Dash',
+        requiredItem: 'nimble', // Speed passive
+        desc: 'Leave devastating fire trail while moving',
+        color: '#ff6600',
+        fireRate: 0.1,
+        damage: 0.5,
+        infernoDash: true,
+        evolvedStats: { speed: 0.5 }
+    },
+    plasma: {
+        name: '🟣 Void Beam',
+        requiredItem: 'piercing_rounds', // Piercing item
+        desc: 'Continuous sweeping beam of destruction',
+        color: '#9d00ff',
+        fireRate: 0.08,
+        damage: 0.8,
+        voidBeam: true,
+        beamWidth: 15,
+        evolvedStats: {}
+    },
+    laser: {
+        name: '💜 Siphon Ray',
+        requiredItem: 'vampirism', // Life steal passive
+        desc: 'Drains HP continuously from enemies',
+        color: '#ff00ff',
+        fireRate: 0.2,
+        damage: 0.5,
+        siphonRay: true,
+        drainAmount: 0.15,
+        evolvedStats: { lifeSteal: 0.1 }
+    },
+};
+
+function checkWeaponEvolution(slot) {
+    const evolution = WEAPON_EVOLUTIONS[slot.type];
+    if (!evolution || slot.evolved) return;
+    
+    // Check if player has the required item/passive
+    const hasRequired = game.passivesChosen.includes(evolution.requiredItem) ||
+        (game.player && (
+            (evolution.requiredItem === 'piercing_rounds' && game.player.extraPiercing > 0) ||
+            (evolution.requiredItem === 'eagle_eye' && game.player.critChance > 0.2)
+        ));
+    
+    if (hasRequired) {
+        evolveWeapon(slot);
+    } else {
+        showNotification(`${WEAPON_TYPES[slot.type]?.name} ready to evolve! Need: ${evolution.requiredItem.replace(/_/g, ' ')}`, '#ffd93d', 4000);
+    }
+}
+
+function evolveWeapon(slot) {
+    const evolution = WEAPON_EVOLUTIONS[slot.type];
+    if (!evolution) return;
+    
+    slot.evolved = true;
+    slot.evolvedData = evolution;
+    
+    // Apply evolved stats to player
+    if (evolution.evolvedStats) {
+        Object.entries(evolution.evolvedStats).forEach(([stat, value]) => {
+            if (typeof game.player[stat] === 'number') {
+                game.player[stat] += value;
+            }
+        });
+    }
+    
+    // Epic evolution notification
+    showNotification(`🌟 EVOLUTION: ${evolution.name}! 🌟`, '#ffd700', 5000);
+    Sound.play('combo');
+    screenShake(20);
+    createExplosion(game.player.x, game.player.y, evolution.color, 50);
+    createExplosion(game.player.x, game.player.y, '#ffd700', 30);
+}
+
 // Enemy types with behaviors
 const ENEMY_TYPES = {
     normal: { name: '👾 Grunt', color: '#a855f7', speed: 1, health: 1, damage: 1, credits: 1, xp: 1,
@@ -224,6 +359,53 @@ const PASSIVE_ABILITIES = [
     { id: 'thorns', name: '🌵 Thorns', desc: 'Reflect 20% melee damage back', apply: p => { p.thorns = (p.thorns || 0) + 0.2; } },
 ];
 
+// Transformative items - game-changing abilities offered at level-up
+const TRANSFORMATIVE_ITEMS = [
+    // Offensive
+    { id: 'ricochet_rounds', name: '🏀 Ricochet Rounds', desc: 'Bullets bounce off walls 3 times', category: 'offensive',
+      apply: p => { p.bulletBounce = (p.bulletBounce || 0) + 3; } },
+    { id: 'homing_tears', name: '🎯 Homing Tears', desc: 'Projectiles curve toward enemies', category: 'offensive',
+      apply: p => { p.homingStrength = (p.homingStrength || 0) + 0.03; } },
+    { id: 'explosive_finale', name: '💥 Explosive Finale', desc: 'Kills cause 60px explosions', category: 'offensive',
+      apply: p => { p.explosiveFinale = true; p.explosionRadius = (p.explosionRadius || 0) + 60; } },
+    { id: 'chain_lightning', name: '⚡ Chain Lightning', desc: '20% chance hits arc to another enemy', category: 'offensive',
+      apply: p => { p.chainLightningChance = (p.chainLightningChance || 0) + 0.2; } },
+    { id: 'orbital_blades', name: '🔵 Orbital Blades', desc: '+2 orbiting blades deal contact damage', category: 'offensive',
+      apply: p => { p.orbitalCount = (p.orbitalCount || 0) + 2; } },
+    { id: 'toxic_trail', name: '☠️ Toxic Trail', desc: 'Leave poison clouds when moving', category: 'offensive',
+      apply: p => { p.fireTrail = true; p.poisonCloudDmg = (p.poisonCloudDmg || 0) + 3; } },
+    { id: 'mirror_shot', name: '🪞 Mirror Shot', desc: 'Bullets spawn a reverse copy', category: 'offensive',
+      apply: p => { p.mirrorShot = true; } },
+    { id: 'piercing_rounds', name: '🗡️ Piercing Rounds', desc: 'Bullets pierce +2 enemies', category: 'offensive',
+      apply: p => { p.extraPiercing = (p.extraPiercing || 0) + 2; } },
+    { id: 'berserker_soul', name: '🔥 Berserker Soul', desc: '+40% damage when below 40% HP', category: 'offensive',
+      apply: p => { p.berserkerSoul = (p.berserkerSoul || 0) + 0.4; } },
+    
+    // Defensive
+    { id: 'second_wind', name: '💨 Second Wind', desc: 'Revive once with 30% HP on death', category: 'defensive',
+      apply: p => { p.secondWind = true; } },
+    { id: 'thorns_aura', name: '🌵 Thorns Aura', desc: 'Nearby enemies take 5 DPS', category: 'defensive',
+      apply: p => { p.thornsAuraDmg = (p.thornsAuraDmg || 0) + 5; } },
+    { id: 'phase_shift', name: '👻 Phase Shift', desc: '1s invulnerability after taking damage (5s CD)', category: 'defensive',
+      apply: p => { p.phaseShift = true; p.phaseShiftCooldown = 0; } },
+    { id: 'blood_shield', name: '🩸 Blood Shield', desc: 'Overkill damage on enemies becomes temp shield', category: 'defensive',
+      apply: p => { p.bloodShield = true; p.tempShield = p.tempShield || 0; } },
+    { id: 'iron_skin', name: '🛡️ Iron Skin', desc: '+4 Armor, +20 Max HP', category: 'defensive',
+      apply: p => { p.armor += 4; p.maxHealth += 20; p.health += 20; } },
+    
+    // Utility
+    { id: 'black_hole', name: '🌀 Black Hole', desc: 'Every 25s, spawn a vortex pulling enemies', category: 'utility',
+      apply: p => { p.blackHoleCooldown = 0; p.hasBlackHole = true; } },
+    { id: 'chrono_field', name: '⏳ Chrono Field', desc: 'Enemies within 200px move 40% slower', category: 'utility',
+      apply: p => { p.timeDilation = (p.timeDilation || 0) + 0.4; } },
+    { id: 'treasure_hunter', name: '💎 Treasure Hunter', desc: '+25% credit drops, +20 pickup range', category: 'utility',
+      apply: p => { p.creditBonus = (p.creditBonus || 0) + 0.25; p.pickupRange += 20; } },
+    { id: 'xp_magnet', name: '🧲 XP Magnet', desc: 'Triple XP orb attraction range', category: 'utility',
+      apply: p => { p.xpMagnetMult = (p.xpMagnetMult || 1) + 2; } },
+    { id: 'decoy_master', name: '👥 Decoy Master', desc: 'Spawn a decoy that distracts enemies', category: 'utility',
+      apply: p => { p.hasDecoy = true; } },
+];
+
 // Powerup types
 const POWERUP_TYPES = {
     speed: { name: '⚡ Speed Boost', color: '#ffd93d', effect: 'speed', multiplier: 1.5 },
@@ -280,13 +462,14 @@ const game = {
     enemies: [],
     bullets: [],
     pickups: [],
+    xpOrbs: [],
     particles: [],
     stars: [],
     keys: {},
     touchActive: false,
     joystick: { x: 0, y: 0, active: false, startX: 0, startY: 0 },
     currentWeapon: 'basic',
-    camera: { shake: 0, offsetX: 0, offsetY: 0 },
+    camera: { shake: 0, offsetX: 0, offsetY: 0, x: 0, y: 0, targetX: 0, targetY: 0 },
     paused: false,
     powerups: [],
     activePowerups: [],
@@ -317,8 +500,14 @@ const game = {
     playerDPS: { damage: 0, timer: 0, history: [] },
     eliteKills: 0,
     activeWeaponSlot: 0,
+    waveModifier: null,
+    fogOfWar: false,
+    creditMultiplier: 1,
+    corruption: 0,
+    devilDealActive: false,
     obstacles: [],
     hazards: [],
+    blackHoles: [],
     arenaTheme: null,
     soundEnabled: (() => {
         try {
@@ -517,21 +706,85 @@ function checkAchievements() {
 }
 
 function triggerLevelUp() {
-    // Pause the game briefly for level-up choice
     game.paused = true;
     Sound.play('levelUp');
     screenShake(8);
     showNotification(`⬆️ LEVEL ${game.stats.level}!`, '#ffd93d', 3000);
     
-    // Pick 3 random passives
-    const available = PASSIVE_ABILITIES; // All available
     const choices = [];
-    const shuffled = [...available].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < Math.min(3, shuffled.length); i++) {
-        choices.push(shuffled[i]);
+    
+    // Determine what types of choices to offer
+    // Always include at least 1 stat passive and 1 transformative item
+    const availablePassives = PASSIVE_ABILITIES.filter(p => true); // all available
+    const availableItems = TRANSFORMATIVE_ITEMS.filter(item => {
+        // Don't offer items player already has (for non-stackable ones)
+        if (item.id === 'second_wind' && game.player.secondWind) return false;
+        if (item.id === 'mirror_shot' && game.player.mirrorShot) return false;
+        if (item.id === 'phase_shift' && game.player.phaseShift) return false;
+        if (item.id === 'explosive_finale' && game.player.explosiveFinale) return false;
+        if (item.id === 'blood_shield' && game.player.bloodShield) return false;
+        if (item.id === 'black_hole' && game.player.hasBlackHole) return false;
+        if (item.id === 'decoy_master' && game.player.hasDecoy) return false;
+        return true;
+    });
+    
+    // Weapon choice (if player has fewer than maxWeaponSlots)
+    const availableWeapons = Object.keys(WEAPON_TYPES).filter(w => {
+        return !game.player.weaponSlots.some(s => s.type === w);
+    });
+    
+    // Build choices array - mix of types
+    const shuffledPassives = [...availablePassives].sort(() => Math.random() - 0.5);
+    const shuffledItems = [...availableItems].sort(() => Math.random() - 0.5);
+    const shuffledWeapons = [...availableWeapons].sort(() => Math.random() - 0.5);
+    
+    // Slot 1: Transformative item (60%) or weapon (40% if available)
+    if (shuffledWeapons.length > 0 && game.player.weaponSlots.length < game.player.maxWeaponSlots && Math.random() < 0.4) {
+        const weaponKey = shuffledWeapons[0];
+        const weapon = WEAPON_TYPES[weaponKey];
+        choices.push({
+            name: weapon.name,
+            desc: `New weapon: ${weapon.desc || 'Equip to a weapon slot'}`,
+            type: 'weapon',
+            apply: p => {
+                p.weaponSlots.push({ type: weaponKey, cooldown: 0, level: 1, xp: 0, evolved: false });
+                showNotification(`${weapon.name} equipped!`, weapon.color, 2000);
+            }
+        });
+    } else if (shuffledItems.length > 0) {
+        choices.push(shuffledItems[0]);
+    } else {
+        choices.push(shuffledPassives[0]);
     }
     
-    game.levelUpChoices = choices;
+    // Slot 2: Transformative item or passive
+    if (shuffledItems.length > (choices[0]?.type === undefined && shuffledItems[0] === choices[0] ? 1 : 0)) {
+        const idx = choices.some(c => c === shuffledItems[0]) ? 1 : 0;
+        if (shuffledItems[idx]) {
+            choices.push(shuffledItems[idx]);
+        } else {
+            choices.push(shuffledPassives[0]);
+        }
+    } else {
+        choices.push(shuffledPassives[0]);
+    }
+    
+    // Slot 3: Always a passive stat boost
+    const usedPassiveIdx = choices.findIndex(c => shuffledPassives.includes(c));
+    const passiveStart = usedPassiveIdx >= 0 ? 1 : 0;
+    choices.push(shuffledPassives[passiveStart] || shuffledPassives[0]);
+    
+    // Ensure exactly 3 unique choices
+    while (choices.length < 3) {
+        const fallback = shuffledPassives[choices.length] || shuffledPassives[0];
+        if (!choices.includes(fallback)) {
+            choices.push(fallback);
+        } else {
+            choices.push(shuffledPassives[Math.floor(Math.random() * shuffledPassives.length)]);
+        }
+    }
+    
+    game.levelUpChoices = choices.slice(0, 3);
     showLevelUpModal();
 }
 
@@ -549,9 +802,11 @@ function showLevelUpModal() {
             <p class="level-up-subtitle">Choose a passive ability:</p>
             <div class="level-up-choices">
                 ${game.levelUpChoices.map((choice, i) => `
-                    <div class="level-up-choice" data-index="${i}">
+                    <div class="level-up-choice${choice.type === 'weapon' ? ' weapon-choice' : choice.category ? ' item-choice' : ''}" data-index="${i}">
                         <h3>${choice.name}</h3>
                         <p>${choice.desc}</p>
+                        ${choice.category ? `<span class="choice-category">${choice.category}</span>` : ''}
+                        ${choice.type === 'weapon' ? '<span class="choice-category">weapon</span>' : ''}
                     </div>
                 `).join('')}
             </div>
@@ -570,6 +825,7 @@ function showLevelUpModal() {
             
             showNotification(`${chosen.name} acquired!`, '#ffd93d', 2000);
             Sound.play('powerup');
+            createExplosion(game.player.x, game.player.y, '#ffd93d', 25);
             
             modal.remove();
             game.paused = false;
@@ -583,6 +839,21 @@ function screenShake(intensity = CONFIG.SCREEN_SHAKE_INTENSITY) {
 }
 
 function updateCamera() {
+    // Camera follows player with smooth lerp
+    if (game.player) {
+        game.camera.targetX = game.player.x - CONFIG.CANVAS_WIDTH / 2;
+        game.camera.targetY = game.player.y - CONFIG.CANVAS_HEIGHT / 2;
+        
+        // Clamp to world bounds
+        game.camera.targetX = Math.max(0, Math.min(CONFIG.WORLD_WIDTH - CONFIG.CANVAS_WIDTH, game.camera.targetX));
+        game.camera.targetY = Math.max(0, Math.min(CONFIG.WORLD_HEIGHT - CONFIG.CANVAS_HEIGHT, game.camera.targetY));
+        
+        // Smooth follow (lerp)
+        game.camera.x += (game.camera.targetX - game.camera.x) * 0.08;
+        game.camera.y += (game.camera.targetY - game.camera.y) * 0.08;
+    }
+    
+    // Screen shake
     if (game.camera.shake > 0) {
         game.camera.offsetX = (Math.random() - 0.5) * game.camera.shake;
         game.camera.offsetY = (Math.random() - 0.5) * game.camera.shake;
@@ -606,11 +877,29 @@ function showNotification(text, color = '#ffd93d', duration = 2000) {
 }
 
 function checkWaveClear() {
-    // Check if wave is cleared (all enemies defeated)
     if (game.enemies.length === 0 && game.state === 'playing' && game.timeLeft > CONFIG.WAVE_CLEAR_COUNTDOWN) {
         game.timeLeft = CONFIG.WAVE_CLEAR_COUNTDOWN;
-        showNotification(`Wave Cleared! Shop opening in ${CONFIG.WAVE_CLEAR_COUNTDOWN}s...`, '#00ff88');
+        
+        // Wave complete celebration
+        const waveDamageThisWave = game.stats.damageTaken - (game.stats.waveStartDamage || 0);
+        const perfectWave = waveDamageThisWave === 0;
+        
+        if (perfectWave) {
+            showNotification('⭐ PERFECT WAVE! No damage taken! +10 bonus credits ⭐', '#ffd93d', 3000);
+            game.credits += 10;
+            screenShake(5);
+        } else {
+            showNotification(`Wave Cleared! Shop opening soon...`, '#00ff88');
+        }
+        
         Sound.play('powerup');
+        
+        // Celebration particles
+        for (let i = 0; i < 20; i++) {
+            const px = game.player.x + (Math.random() - 0.5) * 200;
+            const py = game.player.y + (Math.random() - 0.5) * 200;
+            createParticles(px, py, perfectWave ? '#ffd93d' : '#00ff88', 3);
+        }
     }
 }
 
@@ -741,8 +1030,8 @@ function hasPowerup(effect) {
 // ==================== PLAYER CLASS ====================
 class Player {
     constructor(character) {
-        this.x = CONFIG.CANVAS_WIDTH / 2;
-        this.y = CONFIG.CANVAS_HEIGHT / 2;
+        this.x = CONFIG.WORLD_WIDTH / 2;
+        this.y = CONFIG.WORLD_HEIGHT / 2;
         this.size = CONFIG.PLAYER_SIZE;
         this.characterId = character.id;
         this.maxHealth = character.maxHealth;
@@ -782,7 +1071,7 @@ class Player {
         this.facingRight = true;
         this.aimAngle = 0;
         // Multi-weapon system
-        this.weaponSlots = [{ type: 'basic', cooldown: 0 }];
+        this.weaponSlots = [{ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }];
         this.maxWeaponSlots = 4;
         // Gameplay-changing item flags
         this.bulletBounce = 0;
@@ -809,9 +1098,9 @@ class Player {
         this.isInvisible = false;
         // Character-specific starting weapon slots
         if (character.id === 'balanced') {
-            this.weaponSlots = [{ type: 'basic', cooldown: 0 }, { type: 'basic', cooldown: 0 }];
+            this.weaponSlots = [{ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }, { type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }];
         } else if (character.id === 'gunslinger') {
-            this.weaponSlots = [{ type: 'basic', cooldown: 0 }, { type: 'basic', cooldown: 0 }, { type: 'basic', cooldown: 0 }];
+            this.weaponSlots = [{ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }, { type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }, { type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }];
         }
     }
 
@@ -845,13 +1134,13 @@ class Player {
         // Dash update
         if (this.dashCooldown > 0) this.dashCooldown--;
         if (this.dashInvulnerable > 0) this.dashInvulnerable--;
+        if (this.phaseShiftCooldown > 0) this.phaseShiftCooldown--;
         
         if (this.isDashing) {
             this.x += this.dashVx;
             this.y += this.dashVy;
-            this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
-            this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
-            createParticles(this.x, this.y, '#4ecdc4', 2);
+            this.x = Math.max(this.size, Math.min(CONFIG.WORLD_WIDTH - this.size, this.x));
+            this.y = Math.max(this.size, Math.min(CONFIG.WORLD_HEIGHT - this.size, this.y));
             this.isDashing = false;
         }
         
@@ -888,8 +1177,8 @@ class Player {
 
         this.x += dx * currentSpeed;
         this.y += dy * currentSpeed;
-        this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
-        this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
+        this.x = Math.max(this.size, Math.min(CONFIG.WORLD_WIDTH - this.size, this.x));
+        this.y = Math.max(this.size, Math.min(CONFIG.WORLD_HEIGHT - this.size, this.y));
 
         // Movement tracking for walk animation
         this.isMoving = (dx !== 0 || dy !== 0);
@@ -929,6 +1218,33 @@ class Player {
         // Poison cloud
         if (this.poisonCloudDmg > 0 && game.frameCount % 30 === 0) {
             game.enemies.forEach(e => { if (Math.hypot(e.x - this.x, e.y - this.y) < 100) e.takeDamage(this.poisonCloudDmg, false); });
+        }
+        // Thorns aura - damage nearby enemies
+        if (this.thornsAuraDmg > 0 && game.frameCount % 30 === 0) {
+            game.enemies.forEach(e => {
+                if (Math.hypot(e.x - this.x, e.y - this.y) < 80) {
+                    e.takeDamage(this.thornsAuraDmg, false);
+                    createParticles(e.x, e.y, '#65a30d', 2);
+                }
+            });
+        }
+        // Black hole ability
+        if (this.hasBlackHole) {
+            if (this.blackHoleCooldown <= 0) {
+                this.blackHoleCooldown = 1500; // 25 seconds
+                game.blackHoles = game.blackHoles || [];
+                game.blackHoles.push({
+                    x: this.x,
+                    y: this.y,
+                    radius: 150,
+                    life: 300, // 5 seconds
+                    maxLife: 300,
+                    pullStrength: 3
+                });
+                createParticles(this.x, this.y, '#8b5cf6', 20);
+                showNotification('🌀 Black Hole!', '#8b5cf6', 1500);
+            }
+            this.blackHoleCooldown--;
         }
         // Decoy management
         if (this.hasDecoy && this.decoy && this.decoy.health > 0) { /* Decoy alive, enemies target it */ }
@@ -1062,8 +1378,8 @@ class Player {
                                 }
                             }
                             
-                            return this.x >= 0 && this.x <= CONFIG.CANVAS_WIDTH && 
-                                   this.y >= 0 && this.y <= CONFIG.CANVAS_HEIGHT;
+                            return this.x >= 0 && this.x <= CONFIG.WORLD_WIDTH && 
+                                   this.y >= 0 && this.y <= CONFIG.WORLD_HEIGHT;
                         },
                         draw(ctx) {
                             ctx.fillStyle = this.color;
@@ -1107,10 +1423,54 @@ class Player {
                         const spreadAngle = angle + (i - 2) * 0.15;
                         game.bullets.push(new Bullet(this.x, this.y, spreadAngle, this, weapon));
                     }
+                    // Mirror shot - fire reverse copy
+                    if (this.mirrorShot && !weapon.continuous) {
+                        const mirrorAngle = angle + Math.PI;
+                        const mirrorBullet = new Bullet(this.x, this.y, mirrorAngle, this, weapon);
+                        mirrorBullet.isMirror = true;
+                        game.bullets.push(mirrorBullet);
+                    }
                 } else {
                     game.bullets.push(new Bullet(this.x, this.y, angle, this, weapon));
+                    // Mirror shot - fire reverse copy
+                    if (this.mirrorShot && !weapon.continuous) {
+                        const mirrorAngle = angle + Math.PI;
+                        const mirrorBullet = new Bullet(this.x, this.y, mirrorAngle, this, weapon);
+                        mirrorBullet.isMirror = true;
+                        game.bullets.push(mirrorBullet);
+                    }
                 }
             });
+            // Evolved weapon bonuses
+            if (slot.evolved && slot.evolvedData) {
+                const evo = slot.evolvedData;
+                // Galaxy Burst - 360° ring
+                if (evo.fullCircle) {
+                    for (let ring = 0; ring < evo.projectiles; ring++) {
+                        const ringAngle = (ring / evo.projectiles) * Math.PI * 2;
+                        const b = new Bullet(this.x, this.y, ringAngle, this, weapon);
+                        b.damage *= evo.damage;
+                        b.color = evo.color;
+                        game.bullets.push(b);
+                    }
+                }
+                // Orbital Strike - rain rockets from sky
+                if (evo.orbitalStrike) {
+                    for (let s = 0; s < evo.strikeCount; s++) {
+                        setTimeout(() => {
+                            const sx = game.player.x + (Math.random() - 0.5) * 300;
+                            const sy = game.player.y + (Math.random() - 0.5) * 300;
+                            createExplosion(sx, sy, evo.color, 30);
+                            game.enemies.forEach(e => {
+                                if (Math.hypot(e.x - sx, e.y - sy) < 80) {
+                                    e.takeDamage(game.player.damage * 2, false);
+                                }
+                            });
+                            screenShake(5);
+                        }, s * 200);
+                    }
+                }
+            }
             slot.cooldown = Math.floor(this.fireRate * (weapon.fireRate || 1));
             slot.maxCooldown = slot.cooldown;
             Sound.play('shoot');
@@ -1135,6 +1495,12 @@ class Player {
         // Dash invulnerability
         if (this.dashInvulnerable > 0) {
             createTextParticle(this.x, this.y, 'INVULNERABLE!', '#4ecdc4', 16);
+            return;
+        }
+        
+        // Phase Shift - invulnerability after damage
+        if (this.phaseShift && this.phaseShiftCooldown > 0) {
+            createTextParticle(this.x, this.y, '👻 PHASE!', '#8b5cf6', 16);
             return;
         }
         
@@ -1169,7 +1535,7 @@ class Player {
             createParticles(this.x, this.y, '#4ecdc4', 8);
             return;
         }
-        const finalDamage = Math.max(1, amount - this.armor);
+        const finalDamage = Math.max(1, Math.floor(amount * (100 / (100 + this.armor))));
         this.health -= finalDamage;
         game.stats.damageTaken += finalDamage;
         
@@ -1205,11 +1571,32 @@ class Player {
             }
         }
         
+        // Trigger Phase Shift cooldown
+        if (this.phaseShift && this.phaseShiftCooldown <= 0) {
+            this.dashInvulnerable = Math.max(this.dashInvulnerable, 60);
+            this.phaseShiftCooldown = 300;
+        }
+
         Sound.play('hit');
-        if (this.health <= 0) gameOver();
+        if (this.health <= 0) {
+            if (this.secondWind) {
+                this.secondWind = false;
+                this.health = Math.floor(this.maxHealth * 0.3);
+                createTextParticle(this.x, this.y, '💨 SECOND WIND!', '#ffd93d', 24);
+                createParticles(this.x, this.y, '#ffd93d', 30);
+                screenShake(15);
+                showNotification('💨 Second Wind! Revived with 30% HP!', '#ffd93d', 3000);
+                Sound.play('levelUp');
+                // Brief invulnerability
+                this.dashInvulnerable = 60;
+            } else {
+                gameOver();
+            }
+        }
     }
 
     heal(amount) {
+        if (this.healingBlocked) return;
         const heal = Math.min(amount, this.maxHealth - this.health);
         this.health += heal;
         if (heal > 0) {
@@ -1499,6 +1886,14 @@ class Enemy {
             this.isCharging = false;
             this.chargeTargetX = 0;
             this.chargeTargetY = 0;
+            // Boss phase system
+            this.phase = 1;
+            this.phaseThresholds = [1.0, 0.6, 0.3]; // Phase changes at 60% and 30% HP
+            this.phaseTransitioning = false;
+            this.phaseTransitionTimer = 0;
+            this.specialAttackCooldown = 0;
+            this.shockwaveChargeTimer = 0;
+            this.isChargingShockwave = false;
         } else {
             const enemyType = ENEMY_TYPES[type] || ENEMY_TYPES.normal;
             this.type = type;
@@ -1509,6 +1904,16 @@ class Enemy {
             this.health = this.maxHealth;
             this.damage = (4 + wave * 1.2 + Math.pow(wave, 1.1) * 0.3) * enemyType.damage * diffSettings.enemyDamageMult;
             this.creditValue = Math.floor((2 + wave * 0.8) * enemyType.credits * (diffSettings.creditMult || 1));
+
+            // Corruption scaling - enemies harder but better rewards at high corruption
+            if (game.corruption >= 5) {
+                const corruptionMult = 1 + (game.corruption - 4) * 0.08;
+                this.maxHealth *= corruptionMult;
+                this.health = this.maxHealth;
+                this.damage *= (1 + (game.corruption - 4) * 0.05);
+                this.creditValue = Math.floor(this.creditValue * (1 + game.corruption * 0.1));
+            }
+
             this.color = enemyType.color;
             this.canTeleport = enemyType.canTeleport;
             this.isRanged = enemyType.ranged;
@@ -1578,6 +1983,10 @@ class Enemy {
             this.shieldMaxHealth = this.maxHealth * 0.4;
         }
         
+        // Speed cap - prevents oppressively fast enemies
+        const maxSpeed = this.isBoss ? 3 : 4;
+        this.speed = Math.min(this.speed, maxSpeed);
+
         this.attackCooldown = 0;
     }
 
@@ -1598,6 +2007,106 @@ class Enemy {
 
         // Boss abilities
         if (this.isBoss) {
+            // Boss phase transitions
+            const healthPercent = this.health / this.maxHealth;
+            const newPhase = healthPercent <= 0.3 ? 3 : healthPercent <= 0.6 ? 2 : 1;
+            
+            if (newPhase > this.phase) {
+                this.phase = newPhase;
+                this.phaseTransitioning = true;
+                this.phaseTransitionTimer = 60; // 1 second invulnerable during transition
+                
+                // Phase transition effects
+                screenShake(15);
+                createExplosion(this.x, this.y, this.color, 40);
+                
+                if (this.phase === 2) {
+                    showNotification(`${this.name} enters Phase 2!`, '#ff6b6b', 3000);
+                    // Phase 2: speed boost
+                    this.speed *= 1.3;
+                    Sound.play('boss');
+                } else if (this.phase === 3) {
+                    showNotification(`${this.name} enters FINAL PHASE!`, '#ff0000', 4000);
+                    // Phase 3: desperate, very aggressive
+                    this.speed *= 1.5;
+                    this.damage *= 1.3;
+                    Sound.play('boss');
+                    createExplosion(this.x, this.y, '#ff0000', 60);
+                }
+            }
+            
+            if (this.phaseTransitioning) {
+                this.phaseTransitionTimer--;
+                if (this.phaseTransitionTimer <= 0) {
+                    this.phaseTransitioning = false;
+                }
+                // Pulsing invulnerability visual
+                if (game.frameCount % 4 < 2) {
+                    createParticles(this.x, this.y, this.color, 2);
+                }
+            }
+            
+            // Phase-specific special attacks
+            if (this.specialAttackCooldown > 0) this.specialAttackCooldown--;
+            
+            if (!this.phaseTransitioning && this.specialAttackCooldown <= 0) {
+                // Phase 2+: Shockwave attack (all boss types)
+                if (this.phase >= 2 && !this.isChargingShockwave) {
+                    const playerDist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+                    if (playerDist < 250) {
+                        this.isChargingShockwave = true;
+                        this.shockwaveChargeTimer = 45; // 0.75s telegraph
+                        createTextParticle(this.x, this.y - this.size - 20, '⚠️', '#ff0000', 24);
+                    }
+                }
+                
+                // Phase 3: Bullet burst (all boss types)
+                if (this.phase >= 3 && this.specialAttackCooldown <= 0) {
+                    const burstCount = 8 + Math.floor(Math.random() * 8);
+                    for (let i = 0; i < burstCount; i++) {
+                        const angle = (i / burstCount) * Math.PI * 2;
+                        game.bullets.push({
+                            x: this.x,
+                            y: this.y,
+                            angle,
+                            speed: 3 + Math.random() * 2,
+                            size: 6,
+                            damage: this.damage * 0.4,
+                            color: this.color,
+                            isEnemyBullet: true,
+                        });
+                    }
+                    this.specialAttackCooldown = this.phase >= 3 ? 180 : 300;
+                    createExplosion(this.x, this.y, this.color, 25);
+                }
+            }
+            
+            // Shockwave execution
+            if (this.isChargingShockwave) {
+                this.shockwaveChargeTimer--;
+                // Telegraph: red circle growing
+                if (this.shockwaveChargeTimer <= 0) {
+                    // Execute shockwave
+                    this.isChargingShockwave = false;
+                    this.specialAttackCooldown = this.phase >= 3 ? 120 : 240;
+                    
+                    const shockRadius = 200;
+                    const playerDist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+                    if (playerDist < shockRadius) {
+                        game.player.takeDamage(this.damage * 0.8);
+                        // Knockback
+                        if (!game.player.knockbackImmune) {
+                            const angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
+                            game.player.x += Math.cos(angle) * 80;
+                            game.player.y += Math.sin(angle) * 80;
+                            game.player.x = Math.max(game.player.size, Math.min(CONFIG.WORLD_WIDTH - game.player.size, game.player.x));
+                            game.player.y = Math.max(game.player.size, Math.min(CONFIG.WORLD_HEIGHT - game.player.size, game.player.y));
+                        }
+                    }
+                    screenShake(12);
+                    createExplosion(this.x, this.y, '#ff4444', 35);
+                }
+            }
             if (this.canSummon && this.summonCooldown <= 0 && game.enemies.length < 30) {
                 this.summonMinions();
                 this.summonCooldown = 300;
@@ -1827,8 +2336,8 @@ class Enemy {
         }
         
         // Keep enemy in bounds
-        this.x = Math.max(this.size, Math.min(CONFIG.CANVAS_WIDTH - this.size, this.x));
-        this.y = Math.max(this.size, Math.min(CONFIG.CANVAS_HEIGHT - this.size, this.y));
+        this.x = Math.max(this.size, Math.min(CONFIG.WORLD_WIDTH - this.size, this.x));
+        this.y = Math.max(this.size, Math.min(CONFIG.WORLD_HEIGHT - this.size, this.y));
         
         // Update walk animation
         const movedX = this.x - this.prevX;
@@ -1839,6 +2348,11 @@ class Enemy {
         } else {
             this.walkTimer = 0;
             this.walkFrame = 0;
+        }
+
+        // Wave modifier: regenerating enemies
+        if (this.regens && !this.isBoss && game.frameCount % 60 === 0) {
+            this.health = Math.min(this.maxHealth, this.health + this.maxHealth * 0.02);
         }
 
         // Attack player
@@ -1886,8 +2400,8 @@ class Enemy {
         const dist = 150 + Math.random() * 100;
         this.x = game.player.x + Math.cos(angle) * dist;
         this.y = game.player.y + Math.sin(angle) * dist;
-        this.x = Math.max(50, Math.min(CONFIG.CANVAS_WIDTH - 50, this.x));
-        this.y = Math.max(50, Math.min(CONFIG.CANVAS_HEIGHT - 50, this.y));
+        this.x = Math.max(50, Math.min(CONFIG.WORLD_WIDTH - 50, this.x));
+        this.y = Math.max(50, Math.min(CONFIG.WORLD_HEIGHT - 50, this.y));
         createParticles(this.x, this.y, this.color, 15);
     }
 
@@ -2048,6 +2562,11 @@ class Enemy {
     }
 
     takeDamage(amount, isCrit = false) {
+        // Boss phase transition invulnerability
+        if (this.isBoss && this.phaseTransitioning) {
+            createTextParticle(this.x, this.y, 'IMMUNE!', '#ffd93d', 14);
+            return false;
+        }
         // Sentinel shield absorbs damage first
         if (this.canShield && this.shieldActive && this.shieldHealth > 0) {
             const absorbed = Math.min(amount, this.shieldHealth);
@@ -2097,19 +2616,50 @@ class Enemy {
         game.stats.enemiesKilled++;
         game.persistentStats.totalKills++;
         
-        // XP gain
+        // Spawn XP orbs instead of giving XP directly
         const baseXP = this.isBoss ? (BOSS_TYPES[this.type]?.xp || 50) : (ENEMY_TYPES[this.type]?.xp || 1);
         const xpMult = game.difficultySettings?.xpMult || 1;
-        const xpGain = Math.floor(baseXP * xpMult * (this.isElite ? 2 : 1));
-        game.stats.xp += xpGain;
-        game.stats.totalXpEarned += xpGain;
+        const totalXP = Math.floor(baseXP * xpMult * (this.isElite ? 2 : 1));
+
+        // Split large XP into multiple orbs
+        if (totalXP >= 25) {
+            const largeOrbs = Math.floor(totalXP / 25);
+            const remainder = totalXP % 25;
+            for (let i = 0; i < largeOrbs; i++) {
+                const angle = (i / largeOrbs) * Math.PI * 2;
+                const spread = 15 + Math.random() * 10;
+                game.xpOrbs.push(new XPOrb(this.x + Math.cos(angle) * spread, this.y + Math.sin(angle) * spread, 25));
+            }
+            if (remainder >= 5) {
+                game.xpOrbs.push(new XPOrb(this.x + (Math.random() - 0.5) * 20, this.y + (Math.random() - 0.5) * 20, remainder));
+            } else if (remainder > 0) {
+                game.xpOrbs.push(new XPOrb(this.x, this.y, remainder));
+            }
+        } else if (totalXP >= 5) {
+            game.xpOrbs.push(new XPOrb(this.x, this.y, totalXP));
+        } else {
+            game.xpOrbs.push(new XPOrb(this.x + (Math.random() - 0.5) * 10, this.y + (Math.random() - 0.5) * 10, Math.max(1, totalXP)));
+        }
         
-        // Check level up
-        while (game.stats.xp >= game.stats.xpToNext) {
-            game.stats.xp -= game.stats.xpToNext;
-            game.stats.level++;
-            game.stats.xpToNext = Math.floor(CONFIG.XP_BASE * Math.pow(CONFIG.XP_SCALING, game.stats.level - 1));
-            triggerLevelUp();
+        // Weapon XP - level up equipped weapons
+        if (game.player && game.player.weaponSlots) {
+            game.player.weaponSlots.forEach(slot => {
+                if (slot.evolved || slot.level >= 5) return;
+                slot.xp = (slot.xp || 0) + 1;
+                const xpNeeded = slot.level * 15; // 15, 30, 45, 60 kills to level
+                if (slot.xp >= xpNeeded) {
+                    slot.xp = 0;
+                    slot.level++;
+                    const weapon = WEAPON_TYPES[slot.type];
+                    showNotification(`${weapon?.name || slot.type} leveled to ${slot.level}!`, weapon?.color || '#ffd93d', 2000);
+                    Sound.play('levelUp');
+                    
+                    // Check for evolution at level 5
+                    if (slot.level >= 5) {
+                        checkWeaponEvolution(slot);
+                    }
+                }
+            });
         }
         
         // Elite kill tracking
@@ -2173,12 +2723,23 @@ class Enemy {
         
         if (this.isBoss) {
             game.stats.bossesDefeated++;
-            showNotification(`${this.name} Defeated!`, '#ffd93d');
-            screenShake(20);
-            createExplosion(this.x, this.y, this.color, 60);
+            showNotification(`🏆 ${this.name} Defeated! 🏆`, '#ffd93d', 4000);
+            screenShake(25);
+            // Massive multi-stage explosion
+            createExplosion(this.x, this.y, this.color, 80);
+            setTimeout(() => createExplosion(this.x + 30, this.y - 20, '#ffd93d', 50), 100);
+            setTimeout(() => createExplosion(this.x - 20, this.y + 30, '#ff6b6b', 60), 200);
+            setTimeout(() => createExplosion(this.x, this.y, '#fff', 40), 300);
         } else {
-            screenShake(3);
-            createExplosion(this.x, this.y, this.color, 20);
+            // Bigger death for elites
+            if (this.isElite) {
+                screenShake(6);
+                createExplosion(this.x, this.y, this.color, 35);
+                createExplosion(this.x, this.y, this.eliteModifier?.color || '#fff', 20);
+            } else {
+                screenShake(3);
+                createExplosion(this.x, this.y, this.color, 20);
+            }
         }
         
         // Chance to spawn powerup (higher for bosses)
@@ -2187,7 +2748,14 @@ class Enemy {
             spawnPowerup(this.x, this.y);
         }
         
-        game.pickups.push(new Pickup(this.x, this.y, this.creditValue));
+        // Kill streak credit bonus
+        let streakBonus = 1;
+        if (game.stats.comboKills >= 20) streakBonus = 2.5;
+        else if (game.stats.comboKills >= 10) streakBonus = 2.0;
+        else if (game.stats.comboKills >= 5) streakBonus = 1.5;
+
+        const creditDrop = Math.floor(this.creditValue * (game.creditMultiplier || 1) * (1 + (game.player?.creditBonus || 0)) * streakBonus);
+        game.pickups.push(new Pickup(this.x, this.y, creditDrop));
         // Vampire blood pools
         if (game.player && game.player.characterId === 'vampire') {
             if (!game.player.bloodPools) game.player.bloodPools = [];
@@ -2970,6 +3538,18 @@ class Enemy {
         ctx.beginPath(); ctx.arc(cx, cy, s * 0.9, 0, Math.PI * 2); ctx.stroke();
         ctx.setLineDash([]);
         
+        // Phase glow effect
+        if (this.phase >= 2) {
+            ctx.save();
+            const glowPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.5;
+            ctx.globalAlpha = glowPulse * (this.phase >= 3 ? 0.4 : 0.2);
+            ctx.fillStyle = this.phase >= 3 ? '#ff0000' : '#ff6b00';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+        
         // Health bar
         if (this.health < this.maxHealth) {
             const barWidth = s * 2;
@@ -3370,6 +3950,19 @@ class Bullet {
                     checkWaveClear();
                 }
                 
+                // Chain lightning
+                if (game.player.chainLightningChance > 0 && Math.random() < game.player.chainLightningChance) {
+                    const nearby = game.enemies.filter(ne => ne !== enemy && Math.hypot(ne.x - enemy.x, ne.y - enemy.y) < 150);
+                    if (nearby.length > 0) {
+                        const target = nearby[Math.floor(Math.random() * nearby.length)];
+                        target.takeDamage(this.damage * 0.5, false);
+                        game.particles.push({
+                            x: enemy.x, y: enemy.y, x2: target.x, y2: target.y,
+                            type: 'lightning_arc', color: '#00d4ff', life: 10, maxLife: 10
+                        });
+                    }
+                }
+                
                 // Visual feedback for crits
                 if (isCrit) {
                     createExplosion(enemy.x, enemy.y, '#ffd93d', 10);
@@ -3393,13 +3986,13 @@ class Bullet {
         if (game.player && game.player.bulletBounce > 0) {
             if (this.bounceLeft === undefined) this.bounceLeft = game.player.bulletBounce;
             if (this.bounceLeft > 0) {
-                if (this.x < 0 || this.x > CONFIG.CANVAS_WIDTH) { this.angle = Math.PI - this.angle; this.x = Math.max(1, Math.min(CONFIG.CANVAS_WIDTH - 1, this.x)); this.bounceLeft--; return true; }
-                if (this.y < 0 || this.y > CONFIG.CANVAS_HEIGHT) { this.angle = -this.angle; this.y = Math.max(1, Math.min(CONFIG.CANVAS_HEIGHT - 1, this.y)); this.bounceLeft--; return true; }
+                if (this.x < 0 || this.x > CONFIG.WORLD_WIDTH) { this.angle = Math.PI - this.angle; this.x = Math.max(1, Math.min(CONFIG.WORLD_WIDTH - 1, this.x)); this.bounceLeft--; return true; }
+                if (this.y < 0 || this.y > CONFIG.WORLD_HEIGHT) { this.angle = -this.angle; this.y = Math.max(1, Math.min(CONFIG.WORLD_HEIGHT - 1, this.y)); this.bounceLeft--; return true; }
             }
         }
 
-        return this.x >= 0 && this.x <= CONFIG.CANVAS_WIDTH && 
-               this.y >= 0 && this.y <= CONFIG.CANVAS_HEIGHT;
+        return this.x >= 0 && this.x <= CONFIG.WORLD_WIDTH && 
+               this.y >= 0 && this.y <= CONFIG.WORLD_HEIGHT;
     }
 
     explode() {
@@ -3454,6 +4047,91 @@ class Pickup {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('$', this.x, this.y + bob);
+        ctx.restore();
+    }
+}
+
+class XPOrb {
+    constructor(x, y, value) {
+        this.x = x;
+        this.y = y;
+        this.value = value;
+        this.size = value >= 25 ? 8 : value >= 5 ? 6 : 4;
+        this.color = value >= 25 ? '#a855f7' : value >= 5 ? '#7c3aed' : '#6366f1';
+        this.glowColor = value >= 25 ? '#c084fc' : value >= 5 ? '#a78bfa' : '#818cf8';
+        this.bobOffset = Math.random() * Math.PI * 2;
+        this.magnetSpeed = 0;
+        this.life = 1800; // 30 seconds before despawn
+    }
+    
+    update() {
+        this.life--;
+        // Magnet effect - accelerate toward player when in range
+        if (game.player) {
+            const dist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
+            const magnetRange = game.player.pickupRange * 2.5;
+            
+            if (dist < magnetRange) {
+                this.magnetSpeed = Math.min(this.magnetSpeed + 0.5, 8);
+                const angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
+                this.x += Math.cos(angle) * this.magnetSpeed;
+                this.y += Math.sin(angle) * this.magnetSpeed;
+            } else {
+                this.magnetSpeed = Math.max(0, this.magnetSpeed - 0.3);
+            }
+            
+            // Collect when close
+            if (dist < game.player.pickupRange) {
+                game.stats.xp += this.value;
+                game.stats.totalXpEarned += this.value;
+                
+                // Check level up
+                while (game.stats.xp >= game.stats.xpToNext) {
+                    game.stats.xp -= game.stats.xpToNext;
+                    game.stats.level++;
+                    game.stats.xpToNext = Math.floor(CONFIG.XP_BASE * Math.pow(CONFIG.XP_SCALING, game.stats.level - 1));
+                    triggerLevelUp();
+                }
+                
+                createParticles(this.x, this.y, this.color, 3);
+                return false; // Remove this orb
+            }
+        }
+        
+        return this.life > 0;
+    }
+    
+    draw(ctx) {
+        const bob = Math.sin(Date.now() * 0.004 + this.bobOffset) * 3;
+        const pulse = Math.sin(Date.now() * 0.006 + this.bobOffset) * 0.3 + 0.7;
+        
+        ctx.save();
+        // Fade out when about to despawn
+        if (this.life < 120) {
+            ctx.globalAlpha = this.life / 120;
+        }
+        
+        // Glow
+        ctx.fillStyle = this.glowColor;
+        ctx.globalAlpha *= 0.3 * pulse;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.size * 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Core
+        ctx.globalAlpha = this.life < 120 ? this.life / 120 : 1;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.size * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Bright center
+        ctx.fillStyle = '#fff';
+        ctx.globalAlpha *= 0.6;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y + bob, this.size * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        
         ctx.restore();
     }
 }
@@ -3591,6 +4269,20 @@ function drawParticles(ctx) {
             ctx.shadowColor = '#ff4500'; ctx.shadowBlur = 8;
             ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (p.life / p.maxLife), 0, Math.PI * 2); ctx.fill();
             ctx.restore();
+        } else if (p.type === 'lightning_arc') {
+            ctx.save();
+            ctx.globalAlpha = p.life / p.maxLife;
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            const midX = (p.x + p.x2) / 2 + (Math.random() - 0.5) * 30;
+            const midY = (p.y + p.y2) / 2 + (Math.random() - 0.5) * 30;
+            ctx.quadraticCurveTo(midX, midY, p.x2, p.y2);
+            ctx.stroke();
+            ctx.restore();
         } else {
             ctx.save();
             ctx.fillStyle = p.color;
@@ -3641,6 +4333,48 @@ const RARITY = {
     EPIC: { name: 'Epic', color: '#a855f7', priceMultiplier: 2.5 },
     LEGENDARY: { name: 'Legendary', color: '#f59e0b', priceMultiplier: 3 }
 };
+
+// Devil Deal items - cost HP instead of credits, offered after boss waves
+const DEVIL_DEAL_ITEMS = [
+    { name: '😈 Dark Power', hpCost: 20, effects: ['+30% Damage', '-20 Max HP'],
+      apply: p => { p.damage = Math.floor(p.damage * 1.3); p.maxHealth -= 20; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Soul Pact', hpCost: 25, effects: ['+50% Fire Rate', '-25 Max HP'],
+      apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.5)); p.maxHealth -= 25; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Blood Oath', hpCost: 15, effects: ['+25% Life Steal', '-15 Max HP'],
+      apply: p => { p.lifeSteal += 0.25; p.maxHealth -= 15; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Forbidden Knowledge', hpCost: 30, effects: ['+2 Projectiles', '+15 Damage', '-30 Max HP'],
+      apply: p => { p.projectileCount += 2; p.damage += 15; p.maxHealth -= 30; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Shadow Step', hpCost: 20, effects: ['+30% Dodge', '+1 Speed', '-20 Max HP'],
+      apply: p => { p.dodge = Math.min(0.7, p.dodge + 0.3); p.speed += 1; p.maxHealth -= 20; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Eldritch Eye', hpCost: 25, effects: ['+40% Crit', '+1.5x Crit Dmg', '-25 Max HP'],
+      apply: p => { p.critChance = Math.min(0.9, p.critChance + 0.4); p.critDamage += 1.5; p.maxHealth -= 25; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Demonic Vigor', hpCost: 10, effects: ['+3 Projectiles', '+1 Speed', '-10 Max HP'],
+      apply: p => { p.projectileCount += 3; p.speed += 1; p.maxHealth -= 10; p.health = Math.min(p.health, p.maxHealth); } },
+    { name: '😈 Void Touch', hpCost: 35, effects: ['+All Bullets Pierce', 'Chain Lightning', '-35 Max HP'],
+      apply: p => { p.extraPiercing = (p.extraPiercing || 0) + 5; p.chainLightningChance = (p.chainLightningChance || 0) + 0.3; p.maxHealth -= 35; p.health = Math.min(p.health, p.maxHealth); } },
+];
+
+// Cursed items - appear in shop at discount but have drawbacks + add corruption
+const CURSED_ITEMS = [
+    { name: '👑 Cursed Crown', rarity: RARITY.EPIC, basePrice: 12, corruption: 2,
+      effects: ['+50% Damage', '-30% Fire Rate', '+2 Corruption'],
+      apply: p => { p.damage = Math.floor(p.damage * 1.5); p.fireRate = Math.floor(p.fireRate * 1.3); } },
+    { name: '💎 Glass Cannon', rarity: RARITY.LEGENDARY, basePrice: 8, corruption: 3,
+      effects: ['2x Damage', 'Max HP set to 1', '+3 Corruption'],
+      apply: p => { p.damage *= 2; p.maxHealth = 1; p.health = 1; } },
+    { name: '🩸 Berserker\'s Blood', rarity: RARITY.EPIC, basePrice: 15, corruption: 2,
+      effects: ['+80% Damage below 30% HP', 'No healing', '+2 Corruption'],
+      apply: p => { p.berserkerSoul = (p.berserkerSoul || 0) + 0.8; p.healingBlocked = true; } },
+    { name: '💥 Unstable Core', rarity: RARITY.RARE, basePrice: 10, corruption: 1,
+      effects: ['+3 Projectiles', 'Random spread', '+1 Corruption'],
+      apply: p => { p.projectileCount += 3; p.unstableSpread = true; } },
+    { name: '🕳️ Void Shard', rarity: RARITY.EPIC, basePrice: 14, corruption: 2,
+      effects: ['+4 Piercing', '+200 Range', '-2 Speed', '+2 Corruption'],
+      apply: p => { p.extraPiercing = (p.extraPiercing || 0) + 4; p.range += 200; p.speed = Math.max(1, p.speed - 2); } },
+    { name: '💀 Death\'s Embrace', rarity: RARITY.LEGENDARY, basePrice: 5, corruption: 4,
+      effects: ['Enemies explode on death', '-50 Max HP', '+4 Corruption'],
+      apply: p => { p.explosiveFinale = true; p.explosionRadius = (p.explosionRadius || 0) + 80; p.maxHealth -= 50; p.health = Math.min(p.health, p.maxHealth); } },
+];
 
 const SHOP_ITEMS = [
     // Common Stat Items
@@ -3728,18 +4462,18 @@ const SHOP_ITEMS = [
       effects: ['Enemies near you take 2 DPS'], apply: p => { p.poisonCloudDmg = (p.poisonCloudDmg || 0) + 2; } },
     // Weapon Slot Items
     { name: '🔧 Weapon Mount', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.UNCOMMON, basePrice: 20,
-      effects: ['+1 Weapon Slot'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'basic', cooldown: 0 }); } },
+      effects: ['+1 Weapon Slot'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }); } },
     { name: '⚡ Auto-Turret Mount', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.RARE, basePrice: 30,
-      effects: ['+1 Slot (Laser)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'laser', cooldown: 0 }); } },
+      effects: ['+1 Slot (Laser)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'laser', cooldown: 0, level: 1, xp: 0, evolved: false }); } },
     { name: '🚀 Heavy Mount', category: ITEM_CATEGORIES.WEAPON, rarity: RARITY.EPIC, basePrice: 40,
-      effects: ['+1 Slot (Rocket)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'rocket', cooldown: 0 }); } },
+      effects: ['+1 Slot (Rocket)'], apply: p => { if (p.weaponSlots.length < p.maxWeaponSlots) p.weaponSlots.push({ type: 'rocket', cooldown: 0, level: 1, xp: 0, evolved: false }); } },
 ];
 
 // Shop state management
 let shopState = {
     currentOfferings: [],
     lockedItems: new Set(),
-    rerollCost: 3,
+    rerollCost: 0,
     rerollCount: 0
 };
 
@@ -3754,7 +4488,7 @@ function generateShopOfferings() {
         { rarity: RARITY.LEGENDARY, weight: 2 }
     ];
     
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 8; i++) {
         // Skip if item is locked from previous reroll
         if (shopState.currentOfferings[i] && shopState.lockedItems.has(i)) {
             offerings.push(shopState.currentOfferings[i]);
@@ -3793,13 +4527,50 @@ function generateShopOfferings() {
         }
     }
     
+    // 25% chance to replace one item with a cursed item (after wave 5)
+    if (game.wave >= 5 && Math.random() < 0.25) {
+        const cursed = CURSED_ITEMS[Math.floor(Math.random() * CURSED_ITEMS.length)];
+        const replaceIndex = Math.floor(Math.random() * offerings.length);
+        if (!shopState.lockedItems.has(replaceIndex)) {
+            offerings[replaceIndex] = {
+                ...cursed,
+                price: Math.ceil(cursed.basePrice * (1 + game.wave * 0.05)),
+                isCursed: true,
+                category: ITEM_CATEGORIES.SPECIAL,
+            };
+        }
+    }
+
     return offerings;
 }
 
 function openShop() {
+    // After boss waves, offer devil deal first
+    const justBeatBoss = (game.wave - 1) % CONFIG.BOSS_WAVE_INTERVAL === 0 && game.wave > 1;
+    if (justBeatBoss && !game.devilDealActive) {
+        game.devilDealActive = true;
+        showDevilDeal();
+        return;
+    }
+    game.devilDealActive = false;
+
     game.state = 'shop';
+
+    // Interest mechanic - earn 10% of unspent credits
+    const interest = Math.floor(game.credits * 0.1);
+    if (interest > 0) {
+        game.credits += interest;
+        showNotification(`💰 Interest: +${interest} credits (10% of savings)`, '#ffd93d', 3000);
+    }
+
     document.getElementById('shop-modal').classList.remove('hidden');
     document.getElementById('completed-wave').textContent = game.wave - 1;
+
+    // Show credits with interest info in shop
+    const interestDisplay = document.getElementById('shop-credits');
+    if (interestDisplay) {
+        interestDisplay.textContent = game.credits;
+    }
     
     // Check for perfect wave or low health survival
     if (game.stats.damageTaken === game.stats.waveStartDamage) {
@@ -3813,11 +4584,77 @@ function openShop() {
     if (shopState.currentOfferings.length === 0) {
         shopState.currentOfferings = generateShopOfferings();
         shopState.lockedItems.clear();
-        shopState.rerollCost = 3;
+        shopState.rerollCost = 0;
         shopState.rerollCount = 0;
     }
     
     renderShop();
+}
+
+function showDevilDeal() {
+    // Pick 2 random devil deal items
+    const shuffled = [...DEVIL_DEAL_ITEMS].sort(() => Math.random() - 0.5);
+    const deals = shuffled.slice(0, 2);
+    
+    const modal = document.createElement('div');
+    modal.id = 'devil-deal-modal';
+    modal.className = 'modal devil-deal-modal';
+    modal.innerHTML = `
+        <div class="modal-content devil-deal-content" style="background: rgba(30, 0, 0, 0.95); border: 2px solid #dc2626;">
+            <h2 style="color: #dc2626;">😈 Devil's Bargain 😈</h2>
+            <p style="color: #fca5a5; margin-bottom: 15px;">Trade your life force for power...</p>
+            <div class="devil-deals" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                ${deals.map((deal, i) => `
+                    <div class="devil-deal-card" data-index="${i}" style="
+                        background: rgba(50, 0, 0, 0.8); border: 1px solid #991b1b; padding: 15px; border-radius: 8px;
+                        cursor: pointer; min-width: 200px; max-width: 250px; transition: all 0.2s;">
+                        <h3 style="color: #fca5a5; margin: 0 0 8px 0;">${deal.name}</h3>
+                        <div style="margin-bottom: 8px;">
+                            ${deal.effects.map(e => `<p style="color: ${e.startsWith('+') ? '#4ade80' : e.startsWith('-') ? '#f87171' : '#fbbf24'}; margin: 2px 0; font-size: 13px;">${e}</p>`).join('')}
+                        </div>
+                        <p style="color: #dc2626; font-weight: bold; font-size: 14px;">Cost: ❤️ ${deal.hpCost} Max HP</p>
+                    </div>
+                `).join('')}
+            </div>
+            <button id="skip-devil-deal" style="
+                margin-top: 15px; padding: 8px 20px; background: #334155; border: 1px solid #475569;
+                color: #94a3b8; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                Skip (No deal)
+            </button>
+        </div>
+    `;
+    
+    document.getElementById('game-container').appendChild(modal);
+    
+    // Add click handlers for deals
+    modal.querySelectorAll('.devil-deal-card').forEach(el => {
+        el.addEventListener('mouseenter', () => { el.style.borderColor = '#dc2626'; el.style.boxShadow = '0 0 15px rgba(220, 38, 38, 0.5)'; });
+        el.addEventListener('mouseleave', () => { el.style.borderColor = '#991b1b'; el.style.boxShadow = 'none'; });
+        el.addEventListener('click', () => {
+            const index = parseInt(el.dataset.index);
+            const deal = deals[index];
+            
+            if (game.player.maxHealth <= deal.hpCost) {
+                showNotification('Not enough HP for this deal!', '#ff6b6b', 2000);
+                return;
+            }
+            
+            deal.apply(game.player);
+            Sound.play('boss');
+            screenShake(10);
+            showNotification(`${deal.name} accepted!`, '#dc2626', 3000);
+            createExplosion(game.player.x, game.player.y, '#dc2626', 30);
+            
+            modal.remove();
+            openShop();
+        });
+    });
+    
+    // Skip button
+    modal.querySelector('#skip-devil-deal').addEventListener('click', () => {
+        modal.remove();
+        openShop();
+    });
 }
 
 function renderShop() {
@@ -3843,7 +4680,7 @@ function renderShop() {
         const canAfford = game.credits >= item.price;
         
         const div = document.createElement('div');
-        div.className = `shop-item rarity-${item.rarity.name.toLowerCase()}${!canAfford ? ' disabled' : ''}${isLocked ? ' locked' : ''}`;
+        div.className = `shop-item rarity-${item.rarity.name.toLowerCase()}${item.isCursed ? ' cursed-item' : ''}${!canAfford ? ' disabled' : ''}${isLocked ? ' locked' : ''}`;
         div.dataset.index = index;
         
         // Create effects display
@@ -3890,7 +4727,43 @@ function renderShop() {
     });
     
     shopContainer.appendChild(itemsGrid);
-    
+
+    // Sell equipped items section
+    if (game.passivesChosen.length > 0) {
+        const sellSection = document.createElement('div');
+        sellSection.className = 'shop-sell-section';
+        sellSection.innerHTML = `
+            <h4 style="color: #f59e0b; margin: 10px 0 5px;">♻️ Sell Passives (50% value)</h4>
+            <div class="sell-items" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                ${game.passivesChosen.map((id, i) => {
+                    const passive = PASSIVE_ABILITIES.find(p => p.id === id);
+                    if (!passive) return '';
+                    const sellPrice = Math.floor(5 + game.wave * 2);
+                    return `<button class="sell-btn" data-index="${i}" style="
+                        padding: 4px 10px; background: rgba(50,20,0,0.8); border: 1px solid #f59e0b;
+                        color: #fbbf24; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        ${passive.name} → ${sellPrice}💰
+                    </button>`;
+                }).join('')}
+            </div>
+        `;
+        shopContainer.appendChild(sellSection);
+        
+        // Add sell handlers
+        sellSection.querySelectorAll('.sell-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.index);
+                const sellPrice = Math.floor(5 + game.wave * 2);
+                game.credits += sellPrice;
+                game.passivesChosen.splice(idx, 1);
+                showNotification(`Sold for ${sellPrice} credits`, '#f59e0b', 1500);
+                Sound.play('pickup');
+                updateUI();
+                renderShop();
+            });
+        });
+    }
+
     // Add reroll button event listener
     const rerollBtn = document.getElementById('reroll-btn');
     if (rerollBtn) {
@@ -3910,6 +4783,20 @@ function toggleItemLock(index) {
 function purchaseItem(item, index) {
     game.credits -= item.price;
     item.apply(game.player);
+
+    // Track corruption from cursed items
+    if (item.isCursed && item.corruption) {
+        game.corruption += item.corruption;
+        showNotification(`Corruption: ${game.corruption}`, '#7c3aed', 2000);
+        
+        // Corruption effects
+        if (game.corruption >= 10) {
+            showNotification('⚠️ MAX CORRUPTION! The Cosmic Devourer stirs...', '#ff0000', 4000);
+        } else if (game.corruption >= 5) {
+            showNotification('⚠️ High corruption! Enemies are stronger but drop better loot', '#fbbf24', 3000);
+        }
+    }
+
     game.persistentStats.upgradesPurchased++;
     savePersistentStats();
     Sound.play('powerup');
@@ -3942,7 +4829,7 @@ function rerollShop() {
     
     game.credits -= shopState.rerollCost;
     shopState.rerollCount++;
-    shopState.rerollCost = Math.ceil(3 * (1 + shopState.rerollCount * 0.5)); // Increase reroll cost
+    shopState.rerollCost = Math.ceil(5 + shopState.rerollCount * 5); // 0, 5, 10, 15, 20...
     
     // Generate new offerings, keeping locked items
     const newOfferings = [];
@@ -3959,6 +4846,37 @@ function rerollShop() {
     updateUI();
     renderShop();
 }
+
+// Wave modifiers - one random modifier per wave starting wave 3
+const WAVE_MODIFIERS = {
+    speed_surge: { name: '⚡ Speed Surge', desc: 'All enemies +30% speed', color: '#fbbf24',
+        apply: () => { game.enemies.forEach(e => { e.speed *= 1.3; }); },
+        onSpawn: e => { e.speed *= 1.3; } },
+    armored_horde: { name: '🛡️ Armored Horde', desc: 'All enemies +50% HP', color: '#60a5fa',
+        apply: () => { game.enemies.forEach(e => { e.maxHealth *= 1.5; e.health = e.maxHealth; }); },
+        onSpawn: e => { e.maxHealth *= 1.5; e.health = e.maxHealth; } },
+    bullet_hell: { name: '🎯 Bullet Hell', desc: 'Shooter enemies appear more', color: '#ec4899',
+        apply: () => {},
+        onSpawn: null,
+        spawnBias: 'shooter' },
+    the_swarm: { name: '🐝 The Swarm', desc: '3x enemies, 0.5x HP each', color: '#f59e0b',
+        apply: () => { game.enemies.forEach(e => { if (!e.isBoss) { e.maxHealth *= 0.5; e.health = e.maxHealth; } }); },
+        onSpawn: e => { if (!e.isBoss) { e.maxHealth *= 0.5; e.health = e.maxHealth; } },
+        enemyCountMult: 3 },
+    fog_of_war: { name: '🌫️ Fog of War', desc: 'Reduced vision radius', color: '#94a3b8',
+        apply: () => { game.fogOfWar = true; },
+        onSpawn: null },
+    jackpot: { name: '🎰 Jackpot', desc: '2x credit drops this wave', color: '#ffd93d',
+        apply: () => { game.creditMultiplier = 2; },
+        onSpawn: null },
+    regenerating: { name: '💚 Regenerating', desc: 'Enemies slowly heal', color: '#22c55e',
+        apply: () => {},
+        onSpawn: e => { e.regens = true; } },
+    giant: { name: '🗿 Giant', desc: 'Fewer but much larger enemies', color: '#a78bfa',
+        apply: () => { game.enemies.forEach(e => { if (!e.isBoss) { e.size *= 1.5; e.maxHealth *= 2; e.health = e.maxHealth; e.speed *= 0.7; } }); },
+        onSpawn: e => { if (!e.isBoss) { e.size *= 1.5; e.maxHealth *= 2; e.health = e.maxHealth; e.speed *= 0.7; } },
+        enemyCountMult: 0.5 },
+};
 
 // ==================== ARENA SYSTEM ====================
 const ARENA_THEMES = {
@@ -4002,9 +4920,9 @@ function generateArenaObstacles() {
     const count = Math.min(3 + Math.floor(game.wave / 3), 12);
     const margin = 80;
     for (let i = 0; i < count; i++) {
-        const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
-        const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
-        if (Math.hypot(x - CONFIG.CANVAS_WIDTH / 2, y - CONFIG.CANVAS_HEIGHT / 2) < 120) continue;
+        const x = margin + Math.random() * (CONFIG.WORLD_WIDTH - margin * 2);
+        const y = margin + Math.random() * (CONFIG.WORLD_HEIGHT - margin * 2);
+        if (Math.hypot(x - CONFIG.WORLD_WIDTH / 2, y - CONFIG.WORLD_HEIGHT / 2) < 120) continue;
         const types = ['rock', 'crater', 'pillar'];
         const type = types[Math.floor(Math.random() * types.length)];
         const radius = 20 + Math.random() * 25;
@@ -4014,9 +4932,9 @@ function generateArenaObstacles() {
     if (theme.hazardColor) {
         const hzCount = Math.min(2 + Math.floor(game.wave / 5), 6);
         for (let i = 0; i < hzCount; i++) {
-            const x = margin + Math.random() * (CONFIG.CANVAS_WIDTH - margin * 2);
-            const y = margin + Math.random() * (CONFIG.CANVAS_HEIGHT - margin * 2);
-            if (Math.hypot(x - CONFIG.CANVAS_WIDTH / 2, y - CONFIG.CANVAS_HEIGHT / 2) < 150) continue;
+            const x = margin + Math.random() * (CONFIG.WORLD_WIDTH - margin * 2);
+            const y = margin + Math.random() * (CONFIG.WORLD_HEIGHT - margin * 2);
+            if (Math.hypot(x - CONFIG.WORLD_WIDTH / 2, y - CONFIG.WORLD_HEIGHT / 2) < 150) continue;
             const htype = theme.key === 'ice' ? 'ice_patch' : theme.key === 'lava' ? 'lava_pool' : 'void_zone';
             game.hazards.push({ x, y, radius: 40 + Math.random() * 30, type: htype, color: theme.hazardColor, damage: 1 + game.wave * 0.2 });
         }
@@ -4065,30 +4983,64 @@ function drawArenaObstacles(ctx) {
 // ==================== WAVE SYSTEM ====================
 function spawnWave() {
     generateArenaObstacles();
-    showWaveAnnouncement();
+    
+    // Variable wave duration
+    let waveDuration;
+    if (game.wave <= 3) waveDuration = 35;
+    else if (game.wave <= 8) waveDuration = 45;
+    else if (game.wave <= 15) waveDuration = 55;
+    else if (game.wave <= 20) waveDuration = 70;
+    else waveDuration = 80;
+    
+    // Boss waves are always 90 seconds
     const isBoss = game.wave % CONFIG.BOSS_WAVE_INTERVAL === 0;
+    if (isBoss) waveDuration = 90;
+    
+    game.timeLeft = waveDuration;
+    
+    // Reset wave-specific state
+    game.fogOfWar = false;
+    game.creditMultiplier = 1;
+    game.waveModifier = null;
+    
+    // Apply wave modifier (starting wave 3, not on boss waves)
+    if (game.wave >= 3 && !isBoss) {
+        const modKeys = Object.keys(WAVE_MODIFIERS);
+        const modKey = modKeys[Math.floor(Math.random() * modKeys.length)];
+        game.waveModifier = { key: modKey, ...WAVE_MODIFIERS[modKey] };
+        showNotification(`${game.waveModifier.name}: ${game.waveModifier.desc}`, game.waveModifier.color, 3000);
+    }
+    
+    showWaveAnnouncement();
     
     if (isBoss) {
         Sound.play('boss');
         const bossTypes = Object.keys(BOSS_TYPES);
         const bossType = bossTypes[Math.floor(game.wave / CONFIG.BOSS_WAVE_INTERVAL) % bossTypes.length];
-        const boss = new Enemy(CONFIG.CANVAS_WIDTH / 2, -100, game.wave, bossType, true);
+        const boss = new Enemy(game.player.x + 300, game.player.y - 300, game.wave, bossType, true);
         game.enemies.push(boss);
         showNotification(`BOSS WAVE: ${boss.name}`);
     } else {
-        const enemyCount = 5 + game.wave * 3;
+        // Better enemy count scaling: starts at 8, exponential feel in later waves
+        let enemyCount = Math.floor(8 + game.wave * 2 + Math.pow(game.wave, 1.2));
+        
+        // Apply wave modifier to enemy count
+        if (game.waveModifier && game.waveModifier.enemyCountMult) {
+            enemyCount = Math.floor(enemyCount * game.waveModifier.enemyCountMult);
+        }
+        
         for (let i = 0; i < enemyCount; i++) {
             setTimeout(() => {
-                const side = Math.floor(Math.random() * 4);
-                let x, y;
-                switch(side) {
-                    case 0: x = Math.random() * CONFIG.CANVAS_WIDTH; y = -50; break;
-                    case 1: x = CONFIG.CANVAS_WIDTH + 50; y = Math.random() * CONFIG.CANVAS_HEIGHT; break;
-                    case 2: x = Math.random() * CONFIG.CANVAS_WIDTH; y = CONFIG.CANVAS_HEIGHT + 50; break;
-                    case 3: x = -50; y = Math.random() * CONFIG.CANVAS_HEIGHT; break;
-                }
+                const px = game.player ? game.player.x : CONFIG.WORLD_WIDTH / 2;
+                const py = game.player ? game.player.y : CONFIG.WORLD_HEIGHT / 2;
+                const spawnDist = 500 + Math.random() * 200;
+                const spawnAngle = Math.random() * Math.PI * 2;
+                let x = px + Math.cos(spawnAngle) * spawnDist;
+                let y = py + Math.sin(spawnAngle) * spawnDist;
+                x = Math.max(50, Math.min(CONFIG.WORLD_WIDTH - 50, x));
+                y = Math.max(50, Math.min(CONFIG.WORLD_HEIGHT - 50, y));
                 
-                const typeKeys = Object.keys(ENEMY_TYPES).filter(t => {
+                let typeKeys = Object.keys(ENEMY_TYPES).filter(t => {
                     if (t === 'tank') return game.wave >= 3;
                     if (t === 'swarm') return game.wave >= 5;
                     if (t === 'teleporter') return game.wave >= 7;
@@ -4103,10 +5055,30 @@ function spawnWave() {
                     if (t === 'necro') return game.wave >= 22;
                     return true;
                 });
+                
+                // Wave modifier spawn bias
+                if (game.waveModifier && game.waveModifier.spawnBias && typeKeys.includes(game.waveModifier.spawnBias)) {
+                    if (Math.random() < 0.4) {
+                        typeKeys = [game.waveModifier.spawnBias];
+                    }
+                }
+                
                 const type = typeKeys[Math.floor(Math.random() * typeKeys.length)];
-                game.enemies.push(new Enemy(x, y, game.wave, type, false));
-            }, i * 200);
+                const enemy = new Enemy(x, y, game.wave, type, false);
+                
+                // Apply wave modifier to spawned enemy
+                if (game.waveModifier && game.waveModifier.onSpawn) {
+                    game.waveModifier.onSpawn(enemy);
+                }
+                
+                game.enemies.push(enemy);
+            }, i * 150); // Slightly faster spawn interval
         }
+    }
+    
+    // Apply wave modifier to existing enemies
+    if (game.waveModifier && game.waveModifier.apply) {
+        setTimeout(() => game.waveModifier.apply(), 500);
     }
     
     game.stats.waveStartDamage = game.stats.damageTaken;
@@ -4119,14 +5091,13 @@ function nextWave() {
         game.stats.maxWave = game.wave;
         savePersistentStats();
     }
-    game.timeLeft = CONFIG.WAVE_DURATION;
     game.state = 'playing';
     document.getElementById('shop-modal').classList.add('hidden');
     
     // Reset shop state for next wave
     shopState.currentOfferings = [];
     shopState.lockedItems.clear();
-    shopState.rerollCost = 3;
+    shopState.rerollCost = 0;
     shopState.rerollCount = 0;
     
     spawnWave();
@@ -4213,7 +5184,18 @@ function restartGame() {
     game.levelUpChoices = [];
     game.passivesChosen = [];
     game.playerDPS = { damage: 0, timer: 0, history: [] };
+    game.waveModifier = null;
+    game.fogOfWar = false;
+    game.creditMultiplier = 1;
+    game.corruption = 0;
+    game.devilDealActive = false;
     game.eliteKills = 0;
+    game.xpOrbs = [];
+    game.blackHoles = [];
+    game.camera.x = 0;
+    game.camera.y = 0;
+    game.camera.targetX = 0;
+    game.camera.targetY = 0;
     
     game.state = 'characterSelect';
     showDifficultySelect();
@@ -4425,6 +5407,8 @@ function drawComboMeter(ctx) {
 // Draw pause menu
 function drawPauseMenu(ctx) {
     ctx.save();
+    // Undo camera transform so pause menu is screen-relative
+    ctx.translate(game.camera.x, game.camera.y);
     
     // Semi-transparent overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
@@ -4513,59 +5497,114 @@ function drawWeaponIndicator(ctx) {
         ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.textAlign = 'left';
         ctx.fillText(`S${i + 1}`, sx + 3, y + 12);
         ctx.fillStyle = weapon ? weapon.color : '#fff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
-        ctx.fillText(weapon ? weapon.name.split(' ').pop() : '???', sx + slotWidth / 2, y + 28);
+        const displayName = slot.evolved && slot.evolvedData ? slot.evolvedData.name.split(' ').pop() : (weapon ? weapon.name.split(' ').pop() : '???');
+        const displayColor = slot.evolved && slot.evolvedData ? slot.evolvedData.color : (weapon ? weapon.color : '#fff');
+        ctx.fillStyle = displayColor;
+        ctx.fillText(displayName, sx + slotWidth / 2, y + 28);
+        // Level indicator
+        if (slot.level > 1 || slot.evolved) {
+            ctx.fillStyle = slot.evolved ? '#ffd700' : '#fff';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'right';
+            ctx.fillText(slot.evolved ? '★EVO' : `Lv${slot.level}`, sx + slotWidth - 3, y + 12);
+        }
     });
     ctx.restore();
 }
 
 function drawMinimap(ctx) {
-    const size = CONFIG.MINIMAP_SIZE;
-    const margin = CONFIG.MINIMAP_MARGIN;
-    const x = CONFIG.CANVAS_WIDTH - size - margin;
-    const y = CONFIG.CANVAS_HEIGHT - size - margin;
-    const scaleX = size / CONFIG.CANVAS_WIDTH;
-    const scaleY = size / CONFIG.CANVAS_HEIGHT;
+    if (game.state !== 'playing') return;
+    
+    const mapW = 150;
+    const mapH = 100;
+    const mapX = CONFIG.CANVAS_WIDTH - mapW - 10;
+    const mapY = CONFIG.CANVAS_HEIGHT - mapH - 10;
+    const scaleX = mapW / CONFIG.WORLD_WIDTH;
+    const scaleY = mapH / CONFIG.WORLD_HEIGHT;
+    
+    ctx.save();
     
     // Background
-    ctx.save();
     ctx.globalAlpha = 0.6;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(x, y, size, size);
-    ctx.strokeStyle = '#00ff88';
+    ctx.fillStyle = '#0a0a1e';
+    ctx.fillRect(mapX, mapY, mapW, mapH);
+    ctx.strokeStyle = '#334155';
     ctx.lineWidth = 1;
-    ctx.strokeRect(x, y, size, size);
+    ctx.strokeRect(mapX, mapY, mapW, mapH);
+    
+    // Camera view rectangle
+    ctx.strokeStyle = '#4ecdc4';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+        mapX + game.camera.x * scaleX,
+        mapY + game.camera.y * scaleY,
+        CONFIG.CANVAS_WIDTH * scaleX,
+        CONFIG.CANVAS_HEIGHT * scaleY
+    );
     
     // Player dot
-    ctx.fillStyle = '#4ecdc4';
-    ctx.beginPath();
-    ctx.arc(x + game.player.x * scaleX, y + game.player.y * scaleY, 3, 0, Math.PI * 2);
-    ctx.fill();
+    if (game.player) {
+        ctx.fillStyle = '#00ff88';
+        ctx.beginPath();
+        ctx.arc(mapX + game.player.x * scaleX, mapY + game.player.y * scaleY, 3, 0, Math.PI * 2);
+        ctx.fill();
+    }
     
     // Enemy dots
+    ctx.fillStyle = '#ff6b6b';
     game.enemies.forEach(e => {
-        if (e.isBoss) {
-            ctx.fillStyle = '#ff0000';
-            ctx.beginPath();
-            ctx.arc(x + e.x * scaleX, y + e.y * scaleY, 3, 0, Math.PI * 2);
-            ctx.fill();
-        } else if (e.isElite) {
-            ctx.fillStyle = e.eliteModifier?.color || '#ffd93d';
-            ctx.beginPath();
-            ctx.arc(x + e.x * scaleX, y + e.y * scaleY, 2, 0, Math.PI * 2);
-            ctx.fill();
-        } else {
-            ctx.fillStyle = '#ff6b6b';
-            ctx.fillRect(x + e.x * scaleX - 1, y + e.y * scaleY - 1, 2, 2);
-        }
-    });
-    
-    // Powerup dots
-    game.powerups.forEach(p => {
-        ctx.fillStyle = p.data.color;
+        const dotSize = e.isBoss ? 3 : 1;
         ctx.beginPath();
-        ctx.arc(x + p.x * scaleX, y + p.y * scaleY, 2, 0, Math.PI * 2);
+        ctx.arc(mapX + e.x * scaleX, mapY + e.y * scaleY, dotSize, 0, Math.PI * 2);
         ctx.fill();
     });
+    
+    // XP orb clusters (draw every 5th for performance)
+    if (game.xpOrbs) {
+        ctx.fillStyle = '#a855f7';
+        game.xpOrbs.forEach((orb, i) => {
+            if (i % 5 === 0) {
+                ctx.fillRect(mapX + orb.x * scaleX - 0.5, mapY + orb.y * scaleY - 0.5, 1, 1);
+            }
+        });
+    }
+    
+    ctx.restore();
+}
+
+function drawComboCounter(ctx) {
+    if (game.state !== 'playing' || game.stats.comboKills < 3) return;
+    
+    const combo = game.stats.comboKills;
+    const timerPercent = game.stats.comboTimer / msToFrames(CONFIG.COMBO_TIMEOUT);
+    
+    ctx.save();
+    
+    // Position on screen (not in world space)
+    const x = CONFIG.CANVAS_WIDTH - 100;
+    const y = 100;
+    
+    // Combo number with size scaling
+    const fontSize = Math.min(48, 24 + combo * 0.5);
+    const pulse = Math.sin(Date.now() * 0.01) * 2;
+    
+    ctx.font = `bold ${fontSize}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = combo >= 20 ? '#ff0000' : combo >= 10 ? '#ffd93d' : '#fff';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 10;
+    ctx.fillText(`${combo}x`, x, y + pulse);
+    
+    ctx.font = '12px monospace';
+    ctx.fillStyle = '#94a3b8';
+    ctx.shadowBlur = 0;
+    ctx.fillText('COMBO', x, y + 18);
+    
+    // Timer bar
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(x - 30, y + 22, 60, 4);
+    ctx.fillStyle = timerPercent > 0.5 ? '#00ff88' : timerPercent > 0.25 ? '#ffd93d' : '#ff6b6b';
+    ctx.fillRect(x - 30, y + 22, 60 * timerPercent, 4);
     
     ctx.restore();
 }
@@ -4600,6 +5639,54 @@ function drawXPBar(ctx) {
     ctx.globalAlpha = 1;
     ctx.fillText(`Lv.${game.stats.level}`, x + barWidth / 2, y - 5);
     
+    // Glow when close to level up
+    if (xpPercent > 0.8) {
+        const glowPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.5;
+        ctx.save();
+        ctx.globalAlpha = glowPulse * 0.4;
+        ctx.fillStyle = '#ffd93d';
+        ctx.fillRect(x, y, barWidth * xpPercent, barHeight);
+        ctx.restore();
+    }
+
+    ctx.restore();
+}
+
+function drawWaveModifier(ctx) {
+    if (!game.waveModifier || game.state !== 'playing') return;
+    
+    ctx.save();
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(10, 80, 200, 28);
+    ctx.fillStyle = game.waveModifier.color;
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(game.waveModifier.name, 15, 99);
+    ctx.restore();
+}
+
+function drawCorruptionIndicator(ctx) {
+    if (game.corruption <= 0) return;
+    
+    ctx.save();
+    const x = 10;
+    const y = 115;
+    
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(x, y, 130, 22);
+    
+    // Corruption bar
+    const fillPercent = Math.min(game.corruption / 10, 1);
+    const barColor = game.corruption >= 10 ? '#dc2626' : game.corruption >= 5 ? '#f59e0b' : '#7c3aed';
+    ctx.fillStyle = barColor;
+    ctx.fillRect(x, y, 130 * fillPercent, 22);
+    
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(`☠️ Corruption: ${game.corruption}`, x + 5, y + 15);
     ctx.restore();
 }
 
@@ -4675,6 +5762,77 @@ function drawDPSMeter(ctx) {
     ctx.restore();
 }
 
+function drawBossHealthBar(ctx) {
+    const boss = game.enemies.find(e => e.isBoss);
+    if (!boss || game.state !== 'playing') return;
+    
+    const barWidth = 500;
+    const barHeight = 20;
+    const x = CONFIG.CANVAS_WIDTH / 2 - barWidth / 2;
+    const y = 15;
+    
+    ctx.save();
+    
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(x - 5, y - 5, barWidth + 10, barHeight + 30);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x - 5, y - 5, barWidth + 10, barHeight + 30);
+    
+    // Boss name
+    ctx.fillStyle = '#fca5a5';
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${boss.name}`, CONFIG.CANVAS_WIDTH / 2, y + 8);
+    
+    // Health bar background
+    ctx.fillStyle = 'rgba(50, 0, 0, 0.8)';
+    ctx.fillRect(x, y + 12, barWidth, barHeight);
+    
+    // Health fill
+    const healthPercent = boss.health / boss.maxHealth;
+    const healthColor = boss.phase >= 3 ? '#dc2626' : boss.phase >= 2 ? '#f59e0b' : '#ef4444';
+    ctx.fillStyle = healthColor;
+    ctx.fillRect(x, y + 12, barWidth * healthPercent, barHeight);
+    
+    // Phase markers
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + barWidth * 0.6, y + 12);
+    ctx.lineTo(x + barWidth * 0.6, y + 12 + barHeight);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + barWidth * 0.3, y + 12);
+    ctx.lineTo(x + barWidth * 0.3, y + 12 + barHeight);
+    ctx.stroke();
+    
+    // Phase indicator
+    ctx.fillStyle = '#fff';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`Phase ${boss.phase}/3`, x + barWidth, y + 8);
+    
+    // HP text
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${Math.ceil(boss.health)} / ${Math.ceil(boss.maxHealth)}`, CONFIG.CANVAS_WIDTH / 2, y + 27);
+    
+    // Charging shockwave telegraph
+    if (boss.isChargingShockwave) {
+        const chargeProgress = 1 - (boss.shockwaveChargeTimer / 45);
+        ctx.fillStyle = '#ff0000';
+        ctx.font = 'bold 14px monospace';
+        ctx.globalAlpha = 0.5 + Math.sin(Date.now() * 0.02) * 0.5;
+        ctx.fillText('⚠️ INCOMING ATTACK ⚠️', CONFIG.CANVAS_WIDTH / 2, y + barHeight + 35);
+        ctx.globalAlpha = 1;
+    }
+    
+    ctx.restore();
+}
+
 function showWaveAnnouncement() {
     const waveTheme = getCurrentTheme();
     if (waveTheme.waves[0] === game.wave) showNotification(`🌍 ${waveTheme.name}`, '#ffd93d', 3000);
@@ -4685,6 +5843,13 @@ function showWaveAnnouncement() {
         const bossType = bossTypes[Math.floor(game.wave / CONFIG.BOSS_WAVE_INTERVAL) % bossTypes.length];
         const boss = BOSS_TYPES[bossType];
         showNotification(`⚠️ BOSS WAVE ${game.wave}: ${boss.name} ⚠️`, '#ff0000', 3000);
+        // Boss wave dramatic intro
+        setTimeout(() => {
+            showNotification('⚠️ BOSS INCOMING ⚠️', '#dc2626', 3000);
+            screenShake(8);
+        }, 500);
+    } else if (game.waveModifier) {
+        showNotification(`Wave ${game.wave} — ${game.waveModifier.name}`, game.waveModifier.color, 2500);
     } else {
         const enemyCount = 5 + game.wave * 3;
         const availableTypes = Object.keys(ENEMY_TYPES).filter(t => {
@@ -4710,6 +5875,8 @@ function showWaveAnnouncement() {
         }
         showNotification(msg, '#00ff88', 2500);
     }
+    
+    Sound.play('boss');
 }
 
 // ==================== GAME LOOP ====================
@@ -4721,8 +5888,8 @@ function initStarfield() {
     game.stars = [];
     for (let i = 0; i < 150; i++) {
         game.stars.push({
-            x: Math.random() * CONFIG.CANVAS_WIDTH,
-            y: Math.random() * CONFIG.CANVAS_HEIGHT,
+            x: Math.random() * CONFIG.WORLD_WIDTH,
+            y: Math.random() * CONFIG.WORLD_HEIGHT,
             size: Math.random() * 2,
             speed: 0.1 + Math.random() * 0.5,
             twinkle: Math.random() * Math.PI * 2,
@@ -4734,9 +5901,9 @@ function updateStarfield() {
     game.stars.forEach(star => {
         star.y += star.speed;
         star.twinkle += 0.05;
-        if (star.y > CONFIG.CANVAS_HEIGHT) {
+        if (star.y > CONFIG.WORLD_HEIGHT) {
             star.y = 0;
-            star.x = Math.random() * CONFIG.CANVAS_WIDTH;
+            star.x = Math.random() * CONFIG.WORLD_WIDTH;
         }
     });
 }
@@ -4775,12 +5942,12 @@ function gameLoop(timestamp) {
     
     // Apply camera offset
     ctx.save();
-    ctx.translate(game.camera.offsetX, game.camera.offsetY);
+    ctx.translate(-game.camera.x + game.camera.offsetX, -game.camera.y + game.camera.offsetY);
     
     // Background
     const theme = game.arenaTheme || getCurrentTheme();
     ctx.fillStyle = theme.bgColor;
-    ctx.fillRect(0, 0, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+    ctx.fillRect(0, 0, CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
     
     // Animated starfield
     updateStarfield();
@@ -4792,22 +5959,75 @@ function gameLoop(timestamp) {
         const gridPulse = Math.sin(timestamp * 0.0005) * 0.02 + 0.05;
         ctx.strokeStyle = theme.gridColor || `rgba(78, 205, 196, ${gridPulse})`;
         ctx.lineWidth = 1;
-        for (let x = 0; x < CONFIG.CANVAS_WIDTH; x += 50) {
+        const camX = Math.floor(game.camera.x);
+        const camY = Math.floor(game.camera.y);
+        const gridStartX = Math.floor(camX / 50) * 50;
+        const gridStartY = Math.floor(camY / 50) * 50;
+        for (let x = gridStartX; x < camX + CONFIG.CANVAS_WIDTH + 50; x += 50) {
             ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, CONFIG.CANVAS_HEIGHT);
+            ctx.moveTo(x, camY);
+            ctx.lineTo(x, camY + CONFIG.CANVAS_HEIGHT);
             ctx.stroke();
         }
-        for (let y = 0; y < CONFIG.CANVAS_HEIGHT; y += 50) {
+        for (let y = gridStartY; y < camY + CONFIG.CANVAS_HEIGHT + 50; y += 50) {
             ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(CONFIG.CANVAS_WIDTH, y);
+            ctx.moveTo(camX, y);
+            ctx.lineTo(camX + CONFIG.CANVAS_WIDTH, y);
             ctx.stroke();
         }
     }
     
     // Draw arena obstacles
     drawArenaObstacles(ctx);
+    
+    // Boss shockwave telegraph
+    game.enemies.forEach(e => {
+        if (e.isBoss && e.isChargingShockwave) {
+            ctx.save();
+            const progress = 1 - (e.shockwaveChargeTimer / 45);
+            ctx.globalAlpha = 0.2 + progress * 0.3;
+            ctx.strokeStyle = '#ff0000';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([8, 8]);
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, 200 * progress, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+            ctx.fill();
+            ctx.restore();
+        }
+    });
+    
+    // Draw black holes
+    if (game.blackHoles) {
+        game.blackHoles.forEach(bh => {
+            const alpha = bh.life / bh.maxLife;
+            const pulse = Math.sin(Date.now() * 0.01) * 0.2 + 0.8;
+            ctx.save();
+            ctx.globalAlpha = alpha * 0.5;
+            // Outer swirl
+            for (let i = 0; i < 3; i++) {
+                const angle = Date.now() * 0.003 + (i / 3) * Math.PI * 2;
+                const r = bh.radius * (0.3 + i * 0.25) * pulse;
+                ctx.strokeStyle = `rgba(139, 92, 246, ${alpha * 0.3})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(bh.x, bh.y, r, angle, angle + Math.PI * 1.5);
+                ctx.stroke();
+            }
+            // Core
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#1e1b4b';
+            ctx.beginPath();
+            ctx.arc(bh.x, bh.y, 15 * pulse, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#8b5cf6';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        });
+    }
     
     if (game.state === 'playing' && !game.paused) {
         timer += deltaTime;
@@ -4854,7 +6074,7 @@ function gameLoop(timestamp) {
                     }
                 }
                 
-                return b.x >= 0 && b.x <= CONFIG.CANVAS_WIDTH && b.y >= 0 && b.y <= CONFIG.CANVAS_HEIGHT;
+                return b.x >= 0 && b.x <= CONFIG.WORLD_WIDTH && b.y >= 0 && b.y <= CONFIG.WORLD_HEIGHT;
             }
             return b.update();
         });
@@ -4862,32 +6082,92 @@ function gameLoop(timestamp) {
         updateNotifications();
         updatePowerups();
         collectPowerups();
+        // Update black holes
+        if (game.blackHoles) {
+            game.blackHoles = game.blackHoles.filter(bh => {
+                bh.life--;
+                // Pull enemies toward center
+                game.enemies.forEach(e => {
+                    const dist = Math.hypot(e.x - bh.x, e.y - bh.y);
+                    if (dist < bh.radius && dist > 5) {
+                        const pull = bh.pullStrength * (1 - dist / bh.radius);
+                        e.x += (bh.x - e.x) / dist * pull;
+                        e.y += (bh.y - e.y) / dist * pull;
+                        // Damage enemies at center
+                        if (dist < 30 && bh.life % 10 === 0) {
+                            e.takeDamage(game.player.damage * 0.2, false);
+                        }
+                    }
+                });
+                return bh.life > 0;
+            });
+        }
+        // Update XP orbs
+        game.xpOrbs = game.xpOrbs.filter(orb => orb.update());
         
         game.pickups.forEach(p => p.draw(ctx));
+        game.xpOrbs.forEach(orb => orb.draw(ctx));
         game.powerups.forEach(p => p.draw(ctx));
         game.enemies.forEach(e => e.draw(ctx));
         game.bullets.forEach(b => b.draw(ctx));
         game.player.draw(ctx);
         drawParticles(ctx);
+        
+        updateUI();
+        
+        // Fog of war overlay
+        if (game.fogOfWar && game.player) {
+            ctx.save();
+            const fogGradient = ctx.createRadialGradient(
+                game.player.x, game.player.y, 100,
+                game.player.x, game.player.y, 350
+            );
+            fogGradient.addColorStop(0, 'rgba(0,0,0,0)');
+            fogGradient.addColorStop(0.7, 'rgba(0,0,0,0.6)');
+            fogGradient.addColorStop(1, 'rgba(0,0,0,0.85)');
+            ctx.fillStyle = fogGradient;
+            ctx.fillRect(game.camera.x, game.camera.y, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+            ctx.restore();
+        }
+        
+        // Low HP warning - screen edge vignette
+        if (game.player && game.player.health <= game.player.maxHealth * 0.3 && game.player.health > 0) {
+            ctx.save();
+            const vx = game.camera.x;
+            const vy = game.camera.y;
+            const pulse = Math.sin(Date.now() * 0.004) * 0.15 + 0.25;
+            const vignette = ctx.createRadialGradient(
+                game.player.x, game.player.y, CONFIG.CANVAS_WIDTH * 0.3,
+                game.player.x, game.player.y, CONFIG.CANVAS_WIDTH * 0.7
+            );
+            vignette.addColorStop(0, 'rgba(200, 0, 0, 0)');
+            vignette.addColorStop(1, `rgba(200, 0, 0, ${pulse})`);
+            ctx.fillStyle = vignette;
+            ctx.fillRect(vx, vy, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+            ctx.restore();
+        }
+        
+        // Draw HUD elements (outside camera transform)
+        ctx.restore();
+        ctx.save();
         drawNotifications(ctx);
         drawJoystick(ctx);
         drawActivePowerups(ctx);
         drawComboMeter(ctx);
-        
-        updateUI();
-        
-        // Draw weapon indicator (outside camera transform)
-        ctx.restore();
-        ctx.save();
         drawWeaponIndicator(ctx);
         drawMinimap(game.ctx);
         drawXPBar(game.ctx);
         drawDashIndicator(game.ctx);
         drawDPSMeter(game.ctx);
+        drawWaveModifier(game.ctx);
+        drawCorruptionIndicator(game.ctx);
+        drawBossHealthBar(game.ctx);
+        drawComboCounter(game.ctx);
         updateDPS();
     } else if (game.paused) {
         // Still draw everything when paused
         game.pickups.forEach(p => p.draw(ctx));
+        game.xpOrbs.forEach(orb => orb.draw(ctx));
         game.powerups.forEach(p => p.draw(ctx));
         game.enemies.forEach(e => e.draw(ctx));
         game.bullets.forEach(b => b.draw(ctx));
