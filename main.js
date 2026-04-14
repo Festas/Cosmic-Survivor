@@ -825,6 +825,7 @@ function showLevelUpModal() {
             
             showNotification(`${chosen.name} acquired!`, '#ffd93d', 2000);
             Sound.play('powerup');
+            createExplosion(game.player.x, game.player.y, '#ffd93d', 25);
             
             modal.remove();
             game.paused = false;
@@ -876,11 +877,29 @@ function showNotification(text, color = '#ffd93d', duration = 2000) {
 }
 
 function checkWaveClear() {
-    // Check if wave is cleared (all enemies defeated)
     if (game.enemies.length === 0 && game.state === 'playing' && game.timeLeft > CONFIG.WAVE_CLEAR_COUNTDOWN) {
         game.timeLeft = CONFIG.WAVE_CLEAR_COUNTDOWN;
-        showNotification(`Wave Cleared! Shop opening in ${CONFIG.WAVE_CLEAR_COUNTDOWN}s...`, '#00ff88');
+        
+        // Wave complete celebration
+        const waveDamageThisWave = game.stats.damageTaken - (game.stats.waveStartDamage || 0);
+        const perfectWave = waveDamageThisWave === 0;
+        
+        if (perfectWave) {
+            showNotification('⭐ PERFECT WAVE! No damage taken! +10 bonus credits ⭐', '#ffd93d', 3000);
+            game.credits += 10;
+            screenShake(5);
+        } else {
+            showNotification(`Wave Cleared! Shop opening soon...`, '#00ff88');
+        }
+        
         Sound.play('powerup');
+        
+        // Celebration particles
+        for (let i = 0; i < 20; i++) {
+            const px = game.player.x + (Math.random() - 0.5) * 200;
+            const py = game.player.y + (Math.random() - 0.5) * 200;
+            createParticles(px, py, perfectWave ? '#ffd93d' : '#00ff88', 3);
+        }
     }
 }
 
@@ -1115,6 +1134,7 @@ class Player {
         // Dash update
         if (this.dashCooldown > 0) this.dashCooldown--;
         if (this.dashInvulnerable > 0) this.dashInvulnerable--;
+        if (this.phaseShiftCooldown > 0) this.phaseShiftCooldown--;
         
         if (this.isDashing) {
             this.x += this.dashVx;
@@ -1478,6 +1498,12 @@ class Player {
             return;
         }
         
+        // Phase Shift - invulnerability after damage
+        if (this.phaseShift && this.phaseShiftCooldown > 0) {
+            createTextParticle(this.x, this.y, '👻 PHASE!', '#8b5cf6', 16);
+            return;
+        }
+        
         // Tank shield block
         if (this.shieldActive && this.characterId === 'tank') {
             this.shieldActive = false;
@@ -1545,6 +1571,12 @@ class Player {
             }
         }
         
+        // Trigger Phase Shift cooldown
+        if (this.phaseShift && this.phaseShiftCooldown <= 0) {
+            this.dashInvulnerable = Math.max(this.dashInvulnerable, 60);
+            this.phaseShiftCooldown = 300;
+        }
+
         Sound.play('hit');
         if (this.health <= 0) {
             if (this.secondWind) {
@@ -1951,6 +1983,10 @@ class Enemy {
             this.shieldMaxHealth = this.maxHealth * 0.4;
         }
         
+        // Speed cap - prevents oppressively fast enemies
+        const maxSpeed = this.isBoss ? 3 : 4;
+        this.speed = Math.min(this.speed, maxSpeed);
+
         this.attackCooldown = 0;
     }
 
@@ -2687,12 +2723,23 @@ class Enemy {
         
         if (this.isBoss) {
             game.stats.bossesDefeated++;
-            showNotification(`${this.name} Defeated!`, '#ffd93d');
-            screenShake(20);
-            createExplosion(this.x, this.y, this.color, 60);
+            showNotification(`🏆 ${this.name} Defeated! 🏆`, '#ffd93d', 4000);
+            screenShake(25);
+            // Massive multi-stage explosion
+            createExplosion(this.x, this.y, this.color, 80);
+            setTimeout(() => createExplosion(this.x + 30, this.y - 20, '#ffd93d', 50), 100);
+            setTimeout(() => createExplosion(this.x - 20, this.y + 30, '#ff6b6b', 60), 200);
+            setTimeout(() => createExplosion(this.x, this.y, '#fff', 40), 300);
         } else {
-            screenShake(3);
-            createExplosion(this.x, this.y, this.color, 20);
+            // Bigger death for elites
+            if (this.isElite) {
+                screenShake(6);
+                createExplosion(this.x, this.y, this.color, 35);
+                createExplosion(this.x, this.y, this.eliteModifier?.color || '#fff', 20);
+            } else {
+                screenShake(3);
+                createExplosion(this.x, this.y, this.color, 20);
+            }
         }
         
         // Chance to spawn powerup (higher for bosses)
@@ -3903,6 +3950,19 @@ class Bullet {
                     checkWaveClear();
                 }
                 
+                // Chain lightning
+                if (game.player.chainLightningChance > 0 && Math.random() < game.player.chainLightningChance) {
+                    const nearby = game.enemies.filter(ne => ne !== enemy && Math.hypot(ne.x - enemy.x, ne.y - enemy.y) < 150);
+                    if (nearby.length > 0) {
+                        const target = nearby[Math.floor(Math.random() * nearby.length)];
+                        target.takeDamage(this.damage * 0.5, false);
+                        game.particles.push({
+                            x: enemy.x, y: enemy.y, x2: target.x, y2: target.y,
+                            type: 'lightning_arc', color: '#00d4ff', life: 10, maxLife: 10
+                        });
+                    }
+                }
+                
                 // Visual feedback for crits
                 if (isCrit) {
                     createExplosion(enemy.x, enemy.y, '#ffd93d', 10);
@@ -4208,6 +4268,20 @@ function drawParticles(ctx) {
             ctx.fillStyle = p.color;
             ctx.shadowColor = '#ff4500'; ctx.shadowBlur = 8;
             ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (p.life / p.maxLife), 0, Math.PI * 2); ctx.fill();
+            ctx.restore();
+        } else if (p.type === 'lightning_arc') {
+            ctx.save();
+            ctx.globalAlpha = p.life / p.maxLife;
+            ctx.strokeStyle = p.color;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = p.color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            const midX = (p.x + p.x2) / 2 + (Math.random() - 0.5) * 30;
+            const midY = (p.y + p.y2) / 2 + (Math.random() - 0.5) * 30;
+            ctx.quadraticCurveTo(midX, midY, p.x2, p.y2);
+            ctx.stroke();
             ctx.restore();
         } else {
             ctx.save();
@@ -5498,6 +5572,43 @@ function drawMinimap(ctx) {
     ctx.restore();
 }
 
+function drawComboCounter(ctx) {
+    if (game.state !== 'playing' || game.stats.comboKills < 3) return;
+    
+    const combo = game.stats.comboKills;
+    const timerPercent = game.stats.comboTimer / msToFrames(CONFIG.COMBO_TIMEOUT);
+    
+    ctx.save();
+    
+    // Position on screen (not in world space)
+    const x = CONFIG.CANVAS_WIDTH - 100;
+    const y = 100;
+    
+    // Combo number with size scaling
+    const fontSize = Math.min(48, 24 + combo * 0.5);
+    const pulse = Math.sin(Date.now() * 0.01) * 2;
+    
+    ctx.font = `bold ${fontSize}px monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = combo >= 20 ? '#ff0000' : combo >= 10 ? '#ffd93d' : '#fff';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 10;
+    ctx.fillText(`${combo}x`, x, y + pulse);
+    
+    ctx.font = '12px monospace';
+    ctx.fillStyle = '#94a3b8';
+    ctx.shadowBlur = 0;
+    ctx.fillText('COMBO', x, y + 18);
+    
+    // Timer bar
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(x - 30, y + 22, 60, 4);
+    ctx.fillStyle = timerPercent > 0.5 ? '#00ff88' : timerPercent > 0.25 ? '#ffd93d' : '#ff6b6b';
+    ctx.fillRect(x - 30, y + 22, 60 * timerPercent, 4);
+    
+    ctx.restore();
+}
+
 function drawXPBar(ctx) {
     const barWidth = 300;
     const barHeight = 8;
@@ -5528,10 +5639,19 @@ function drawXPBar(ctx) {
     ctx.globalAlpha = 1;
     ctx.fillText(`Lv.${game.stats.level}`, x + barWidth / 2, y - 5);
     
+    // Glow when close to level up
+    const xpPercent = game.stats.xp / game.stats.xpToNext;
+    if (xpPercent > 0.8) {
+        const glowPulse = Math.sin(Date.now() * 0.008) * 0.3 + 0.5;
+        ctx.save();
+        ctx.globalAlpha = glowPulse * 0.4;
+        ctx.fillStyle = '#ffd93d';
+        ctx.fillRect(x, y, barWidth * xpPercent, barHeight);
+        ctx.restore();
+    }
+
     ctx.restore();
 }
-
-function drawWaveModifier(ctx) {
     if (!game.waveModifier || game.state !== 'playing') return;
     
     ctx.save();
@@ -5722,6 +5842,13 @@ function showWaveAnnouncement() {
         const bossType = bossTypes[Math.floor(game.wave / CONFIG.BOSS_WAVE_INTERVAL) % bossTypes.length];
         const boss = BOSS_TYPES[bossType];
         showNotification(`⚠️ BOSS WAVE ${game.wave}: ${boss.name} ⚠️`, '#ff0000', 3000);
+        // Boss wave dramatic intro
+        setTimeout(() => {
+            showNotification('⚠️ BOSS INCOMING ⚠️', '#dc2626', 3000);
+            screenShake(8);
+        }, 500);
+    } else if (game.waveModifier) {
+        showNotification(`Wave ${game.wave} — ${game.waveModifier.name}`, game.waveModifier.color, 2500);
     } else {
         const enemyCount = 5 + game.wave * 3;
         const availableTypes = Object.keys(ENEMY_TYPES).filter(t => {
@@ -5747,6 +5874,8 @@ function showWaveAnnouncement() {
         }
         showNotification(msg, '#00ff88', 2500);
     }
+    
+    Sound.play('boss');
 }
 
 // ==================== GAME LOOP ====================
@@ -6000,6 +6129,23 @@ function gameLoop(timestamp) {
             ctx.restore();
         }
         
+        // Low HP warning - screen edge vignette
+        if (game.player && game.player.health <= game.player.maxHealth * 0.3 && game.player.health > 0) {
+            ctx.save();
+            const vx = game.camera.x;
+            const vy = game.camera.y;
+            const pulse = Math.sin(Date.now() * 0.004) * 0.15 + 0.25;
+            const vignette = ctx.createRadialGradient(
+                game.player.x, game.player.y, CONFIG.CANVAS_WIDTH * 0.3,
+                game.player.x, game.player.y, CONFIG.CANVAS_WIDTH * 0.7
+            );
+            vignette.addColorStop(0, 'rgba(200, 0, 0, 0)');
+            vignette.addColorStop(1, `rgba(200, 0, 0, ${pulse})`);
+            ctx.fillStyle = vignette;
+            ctx.fillRect(vx, vy, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+            ctx.restore();
+        }
+        
         // Draw HUD elements (outside camera transform)
         ctx.restore();
         ctx.save();
@@ -6015,6 +6161,7 @@ function gameLoop(timestamp) {
         drawWaveModifier(game.ctx);
         drawCorruptionIndicator(game.ctx);
         drawBossHealthBar(game.ctx);
+        drawComboCounter(game.ctx);
         updateDPS();
     } else if (game.paused) {
         // Still draw everything when paused
