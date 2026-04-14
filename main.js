@@ -1493,7 +1493,7 @@ class Player {
             createParticles(this.x, this.y, '#4ecdc4', 8);
             return;
         }
-        const finalDamage = Math.max(1, amount - this.armor);
+        const finalDamage = Math.max(1, Math.floor(amount * (100 / (100 + this.armor))));
         this.health -= finalDamage;
         game.stats.damageTaken += finalDamage;
         
@@ -2685,7 +2685,13 @@ class Enemy {
             spawnPowerup(this.x, this.y);
         }
         
-        const creditDrop = Math.floor(this.creditValue * (game.creditMultiplier || 1) * (1 + (game.player?.creditBonus || 0)));
+        // Kill streak credit bonus
+        let streakBonus = 1;
+        if (game.stats.comboKills >= 20) streakBonus = 2.5;
+        else if (game.stats.comboKills >= 10) streakBonus = 2.0;
+        else if (game.stats.comboKills >= 5) streakBonus = 1.5;
+
+        const creditDrop = Math.floor(this.creditValue * (game.creditMultiplier || 1) * (1 + (game.player?.creditBonus || 0)) * streakBonus);
         game.pickups.push(new Pickup(this.x, this.y, creditDrop));
         // Vampire blood pools
         if (game.player && game.player.characterId === 'vampire') {
@@ -4377,7 +4383,7 @@ const SHOP_ITEMS = [
 let shopState = {
     currentOfferings: [],
     lockedItems: new Set(),
-    rerollCost: 3,
+    rerollCost: 0,
     rerollCount: 0
 };
 
@@ -4392,7 +4398,7 @@ function generateShopOfferings() {
         { rarity: RARITY.LEGENDARY, weight: 2 }
     ];
     
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 8; i++) {
         // Skip if item is locked from previous reroll
         if (shopState.currentOfferings[i] && shopState.lockedItems.has(i)) {
             offerings.push(shopState.currentOfferings[i]);
@@ -4459,8 +4465,22 @@ function openShop() {
     game.devilDealActive = false;
 
     game.state = 'shop';
+
+    // Interest mechanic - earn 10% of unspent credits
+    const interest = Math.floor(game.credits * 0.1);
+    if (interest > 0) {
+        game.credits += interest;
+        showNotification(`💰 Interest: +${interest} credits (10% of savings)`, '#ffd93d', 3000);
+    }
+
     document.getElementById('shop-modal').classList.remove('hidden');
     document.getElementById('completed-wave').textContent = game.wave - 1;
+
+    // Show credits with interest info in shop
+    const interestDisplay = document.getElementById('shop-credits');
+    if (interestDisplay) {
+        interestDisplay.textContent = game.credits;
+    }
     
     // Check for perfect wave or low health survival
     if (game.stats.damageTaken === game.stats.waveStartDamage) {
@@ -4474,7 +4494,7 @@ function openShop() {
     if (shopState.currentOfferings.length === 0) {
         shopState.currentOfferings = generateShopOfferings();
         shopState.lockedItems.clear();
-        shopState.rerollCost = 3;
+        shopState.rerollCost = 0;
         shopState.rerollCount = 0;
     }
     
@@ -4617,7 +4637,43 @@ function renderShop() {
     });
     
     shopContainer.appendChild(itemsGrid);
-    
+
+    // Sell equipped items section
+    if (game.passivesChosen.length > 0) {
+        const sellSection = document.createElement('div');
+        sellSection.className = 'shop-sell-section';
+        sellSection.innerHTML = `
+            <h4 style="color: #f59e0b; margin: 10px 0 5px;">♻️ Sell Passives (50% value)</h4>
+            <div class="sell-items" style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+                ${game.passivesChosen.map((id, i) => {
+                    const passive = PASSIVE_ABILITIES.find(p => p.id === id);
+                    if (!passive) return '';
+                    const sellPrice = Math.floor(5 + game.wave * 2);
+                    return `<button class="sell-btn" data-index="${i}" style="
+                        padding: 4px 10px; background: rgba(50,20,0,0.8); border: 1px solid #f59e0b;
+                        color: #fbbf24; border-radius: 4px; cursor: pointer; font-size: 11px;">
+                        ${passive.name} → ${sellPrice}💰
+                    </button>`;
+                }).join('')}
+            </div>
+        `;
+        shopContainer.appendChild(sellSection);
+        
+        // Add sell handlers
+        sellSection.querySelectorAll('.sell-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.index);
+                const sellPrice = Math.floor(5 + game.wave * 2);
+                game.credits += sellPrice;
+                game.passivesChosen.splice(idx, 1);
+                showNotification(`Sold for ${sellPrice} credits`, '#f59e0b', 1500);
+                Sound.play('pickup');
+                updateUI();
+                renderShop();
+            });
+        });
+    }
+
     // Add reroll button event listener
     const rerollBtn = document.getElementById('reroll-btn');
     if (rerollBtn) {
@@ -4683,7 +4739,7 @@ function rerollShop() {
     
     game.credits -= shopState.rerollCost;
     shopState.rerollCount++;
-    shopState.rerollCost = Math.ceil(3 * (1 + shopState.rerollCount * 0.5)); // Increase reroll cost
+    shopState.rerollCost = Math.ceil(5 + shopState.rerollCount * 5); // 0, 5, 10, 15, 20...
     
     // Generate new offerings, keeping locked items
     const newOfferings = [];
@@ -4951,7 +5007,7 @@ function nextWave() {
     // Reset shop state for next wave
     shopState.currentOfferings = [];
     shopState.lockedItems.clear();
-    shopState.rerollCost = 3;
+    shopState.rerollCost = 0;
     shopState.rerollCount = 0;
     
     spawnWave();
