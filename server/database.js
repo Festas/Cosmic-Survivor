@@ -2,6 +2,7 @@
 import Database from 'better-sqlite3';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { randomInt } from 'crypto';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -114,7 +115,7 @@ export function loginUser(username, password) {
 // Guest account creation (no password required)
 export function createGuestUser() {
     const id = uuidv4();
-    const guestNum = Math.floor(Math.random() * 9000) + 1000;
+    const guestNum = randomInt(1000, 10000);
     const username = `guest_${guestNum}`;
     const displayName = `Guest ${guestNum}`;
     const passwordHash = bcrypt.hashSync(id, SALT_ROUNDS); // Use id as password for guest
@@ -138,19 +139,19 @@ export function updateUserStats(userId, newStats) {
 
     db.prepare(`
         UPDATE user_stats SET
-            total_kills = MAX(total_kills, ?),
-            total_credits = MAX(total_credits, ?),
+            total_kills = total_kills + ?,
+            total_credits = total_credits + ?,
             max_wave = MAX(max_wave, ?),
-            upgrades_purchased = MAX(upgrades_purchased, ?),
+            upgrades_purchased = upgrades_purchased + ?,
             weapons_unlocked = MAX(weapons_unlocked, ?),
             total_games = total_games + ?,
             total_playtime_seconds = total_playtime_seconds + ?
         WHERE user_id = ?
     `).run(
-        newStats.totalKills || existing.total_kills,
-        newStats.totalCredits || existing.total_credits,
-        newStats.maxWave || existing.max_wave,
-        newStats.upgradesPurchased || existing.upgrades_purchased,
+        newStats.totalKills || 0,
+        newStats.totalCredits || 0,
+        newStats.maxWave || 0,
+        newStats.upgradesPurchased || 0,
         newStats.weaponsUnlocked || existing.weapons_unlocked,
         newStats.gamesPlayed || 0,
         newStats.playtimeSeconds || 0,

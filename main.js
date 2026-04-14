@@ -527,6 +527,8 @@ const game = {
         sharedXP: true,
         friendlyFire: false,
         difficultyScale: 1.0,
+        sharedXPMultiplier: 0.5,
+        enemyScalePerPlayer: 0.3,
     },
 };
 
@@ -5272,10 +5274,10 @@ function spawnWave() {
         // Better enemy count scaling: starts at 8, exponential feel in later waves
         let enemyCount = Math.floor(8 + game.wave * 2 + Math.pow(game.wave, 1.2));
         
-        // Scale enemy count for multiplayer (30% more per extra player)
+        // Scale enemy count for multiplayer
         if (game.isMultiplayer) {
             const playerCount = 1 + game.remotePlayers.size;
-            enemyCount = Math.floor(enemyCount * (1 + (playerCount - 1) * 0.3));
+            enemyCount = Math.floor(enemyCount * (1 + (playerCount - 1) * game.coopSettings.enemyScalePerPlayer));
         }
         
         // Apply wave modifier to enemy count
@@ -6367,7 +6369,7 @@ function initMultiplayerCallbacks() {
         } else if (event === 'enemy_killed') {
             // Shared XP handling - broadcast kills
             if (data && data.xp && game.coopSettings.sharedXP) {
-                game.stats.xp += Math.floor(data.xp * 0.5); // 50% shared XP
+                game.stats.xp += Math.floor(data.xp * game.coopSettings.sharedXPMultiplier);
                 while (game.stats.xp >= game.stats.xpToNext) {
                     game.stats.xp -= game.stats.xpToNext;
                     game.stats.level++;
