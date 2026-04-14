@@ -224,6 +224,53 @@ const PASSIVE_ABILITIES = [
     { id: 'thorns', name: '🌵 Thorns', desc: 'Reflect 20% melee damage back', apply: p => { p.thorns = (p.thorns || 0) + 0.2; } },
 ];
 
+// Transformative items - game-changing abilities offered at level-up
+const TRANSFORMATIVE_ITEMS = [
+    // Offensive
+    { id: 'ricochet_rounds', name: '🏀 Ricochet Rounds', desc: 'Bullets bounce off walls 3 times', category: 'offensive',
+      apply: p => { p.bulletBounce = (p.bulletBounce || 0) + 3; } },
+    { id: 'homing_tears', name: '🎯 Homing Tears', desc: 'Projectiles curve toward enemies', category: 'offensive',
+      apply: p => { p.homingStrength = (p.homingStrength || 0) + 0.03; } },
+    { id: 'explosive_finale', name: '💥 Explosive Finale', desc: 'Kills cause 60px explosions', category: 'offensive',
+      apply: p => { p.explosiveFinale = true; p.explosionRadius = (p.explosionRadius || 0) + 60; } },
+    { id: 'chain_lightning', name: '⚡ Chain Lightning', desc: '20% chance hits arc to another enemy', category: 'offensive',
+      apply: p => { p.chainLightningChance = (p.chainLightningChance || 0) + 0.2; } },
+    { id: 'orbital_blades', name: '🔵 Orbital Blades', desc: '+2 orbiting blades deal contact damage', category: 'offensive',
+      apply: p => { p.orbitalCount = (p.orbitalCount || 0) + 2; } },
+    { id: 'toxic_trail', name: '☠️ Toxic Trail', desc: 'Leave poison clouds when moving', category: 'offensive',
+      apply: p => { p.fireTrail = true; p.poisonCloudDmg = (p.poisonCloudDmg || 0) + 3; } },
+    { id: 'mirror_shot', name: '🪞 Mirror Shot', desc: 'Bullets spawn a reverse copy', category: 'offensive',
+      apply: p => { p.mirrorShot = true; } },
+    { id: 'piercing_rounds', name: '🗡️ Piercing Rounds', desc: 'Bullets pierce +2 enemies', category: 'offensive',
+      apply: p => { p.extraPiercing = (p.extraPiercing || 0) + 2; } },
+    { id: 'berserker_soul', name: '🔥 Berserker Soul', desc: '+40% damage when below 40% HP', category: 'offensive',
+      apply: p => { p.berserkerSoul = (p.berserkerSoul || 0) + 0.4; } },
+    
+    // Defensive
+    { id: 'second_wind', name: '💨 Second Wind', desc: 'Revive once with 30% HP on death', category: 'defensive',
+      apply: p => { p.secondWind = true; } },
+    { id: 'thorns_aura', name: '🌵 Thorns Aura', desc: 'Nearby enemies take 5 DPS', category: 'defensive',
+      apply: p => { p.thornsAuraDmg = (p.thornsAuraDmg || 0) + 5; } },
+    { id: 'phase_shift', name: '👻 Phase Shift', desc: '1s invulnerability after taking damage (5s CD)', category: 'defensive',
+      apply: p => { p.phaseShift = true; p.phaseShiftCooldown = 0; } },
+    { id: 'blood_shield', name: '🩸 Blood Shield', desc: 'Overkill damage on enemies becomes temp shield', category: 'defensive',
+      apply: p => { p.bloodShield = true; p.tempShield = p.tempShield || 0; } },
+    { id: 'iron_skin', name: '🛡️ Iron Skin', desc: '+4 Armor, +20 Max HP', category: 'defensive',
+      apply: p => { p.armor += 4; p.maxHealth += 20; p.health += 20; } },
+    
+    // Utility
+    { id: 'black_hole', name: '🌀 Black Hole', desc: 'Every 25s, spawn a vortex pulling enemies', category: 'utility',
+      apply: p => { p.blackHoleCooldown = 0; p.hasBlackHole = true; } },
+    { id: 'chrono_field', name: '⏳ Chrono Field', desc: 'Enemies within 200px move 40% slower', category: 'utility',
+      apply: p => { p.timeDilation = (p.timeDilation || 0) + 0.4; } },
+    { id: 'treasure_hunter', name: '💎 Treasure Hunter', desc: '+25% credit drops, +20 pickup range', category: 'utility',
+      apply: p => { p.creditBonus = (p.creditBonus || 0) + 0.25; p.pickupRange += 20; } },
+    { id: 'xp_magnet', name: '🧲 XP Magnet', desc: 'Triple XP orb attraction range', category: 'utility',
+      apply: p => { p.xpMagnetMult = (p.xpMagnetMult || 1) + 2; } },
+    { id: 'decoy_master', name: '👥 Decoy Master', desc: 'Spawn a decoy that distracts enemies', category: 'utility',
+      apply: p => { p.hasDecoy = true; } },
+];
+
 // Powerup types
 const POWERUP_TYPES = {
     speed: { name: '⚡ Speed Boost', color: '#ffd93d', effect: 'speed', multiplier: 1.5 },
@@ -320,6 +367,7 @@ const game = {
     activeWeaponSlot: 0,
     obstacles: [],
     hazards: [],
+    blackHoles: [],
     arenaTheme: null,
     soundEnabled: (() => {
         try {
@@ -518,21 +566,85 @@ function checkAchievements() {
 }
 
 function triggerLevelUp() {
-    // Pause the game briefly for level-up choice
     game.paused = true;
     Sound.play('levelUp');
     screenShake(8);
     showNotification(`⬆️ LEVEL ${game.stats.level}!`, '#ffd93d', 3000);
     
-    // Pick 3 random passives
-    const available = PASSIVE_ABILITIES; // All available
     const choices = [];
-    const shuffled = [...available].sort(() => Math.random() - 0.5);
-    for (let i = 0; i < Math.min(3, shuffled.length); i++) {
-        choices.push(shuffled[i]);
+    
+    // Determine what types of choices to offer
+    // Always include at least 1 stat passive and 1 transformative item
+    const availablePassives = PASSIVE_ABILITIES.filter(p => true); // all available
+    const availableItems = TRANSFORMATIVE_ITEMS.filter(item => {
+        // Don't offer items player already has (for non-stackable ones)
+        if (item.id === 'second_wind' && game.player.secondWind) return false;
+        if (item.id === 'mirror_shot' && game.player.mirrorShot) return false;
+        if (item.id === 'phase_shift' && game.player.phaseShift) return false;
+        if (item.id === 'explosive_finale' && game.player.explosiveFinale) return false;
+        if (item.id === 'blood_shield' && game.player.bloodShield) return false;
+        if (item.id === 'black_hole' && game.player.hasBlackHole) return false;
+        if (item.id === 'decoy_master' && game.player.hasDecoy) return false;
+        return true;
+    });
+    
+    // Weapon choice (if player has fewer than maxWeaponSlots)
+    const availableWeapons = Object.keys(WEAPON_TYPES).filter(w => {
+        return !game.player.weaponSlots.some(s => s.type === w);
+    });
+    
+    // Build choices array - mix of types
+    const shuffledPassives = [...availablePassives].sort(() => Math.random() - 0.5);
+    const shuffledItems = [...availableItems].sort(() => Math.random() - 0.5);
+    const shuffledWeapons = [...availableWeapons].sort(() => Math.random() - 0.5);
+    
+    // Slot 1: Transformative item (60%) or weapon (40% if available)
+    if (shuffledWeapons.length > 0 && game.player.weaponSlots.length < game.player.maxWeaponSlots && Math.random() < 0.4) {
+        const weaponKey = shuffledWeapons[0];
+        const weapon = WEAPON_TYPES[weaponKey];
+        choices.push({
+            name: weapon.name,
+            desc: `New weapon: ${weapon.desc || 'Equip to a weapon slot'}`,
+            type: 'weapon',
+            apply: p => {
+                p.weaponSlots.push({ type: weaponKey, cooldown: 0 });
+                showNotification(`${weapon.name} equipped!`, weapon.color, 2000);
+            }
+        });
+    } else if (shuffledItems.length > 0) {
+        choices.push(shuffledItems[0]);
+    } else {
+        choices.push(shuffledPassives[0]);
     }
     
-    game.levelUpChoices = choices;
+    // Slot 2: Transformative item or passive
+    if (shuffledItems.length > (choices[0]?.type === undefined && shuffledItems[0] === choices[0] ? 1 : 0)) {
+        const idx = choices.some(c => c === shuffledItems[0]) ? 1 : 0;
+        if (shuffledItems[idx]) {
+            choices.push(shuffledItems[idx]);
+        } else {
+            choices.push(shuffledPassives[0]);
+        }
+    } else {
+        choices.push(shuffledPassives[0]);
+    }
+    
+    // Slot 3: Always a passive stat boost
+    const usedPassiveIdx = choices.findIndex(c => shuffledPassives.includes(c));
+    const passiveStart = usedPassiveIdx >= 0 ? 1 : 0;
+    choices.push(shuffledPassives[passiveStart] || shuffledPassives[0]);
+    
+    // Ensure exactly 3 unique choices
+    while (choices.length < 3) {
+        const fallback = shuffledPassives[choices.length] || shuffledPassives[0];
+        if (!choices.includes(fallback)) {
+            choices.push(fallback);
+        } else {
+            choices.push(shuffledPassives[Math.floor(Math.random() * shuffledPassives.length)]);
+        }
+    }
+    
+    game.levelUpChoices = choices.slice(0, 3);
     showLevelUpModal();
 }
 
@@ -550,9 +662,11 @@ function showLevelUpModal() {
             <p class="level-up-subtitle">Choose a passive ability:</p>
             <div class="level-up-choices">
                 ${game.levelUpChoices.map((choice, i) => `
-                    <div class="level-up-choice" data-index="${i}">
+                    <div class="level-up-choice${choice.type === 'weapon' ? ' weapon-choice' : choice.category ? ' item-choice' : ''}" data-index="${i}">
                         <h3>${choice.name}</h3>
                         <p>${choice.desc}</p>
+                        ${choice.category ? `<span class="choice-category">${choice.category}</span>` : ''}
+                        ${choice.type === 'weapon' ? '<span class="choice-category">weapon</span>' : ''}
                     </div>
                 `).join('')}
             </div>
@@ -931,6 +1045,33 @@ class Player {
         if (this.poisonCloudDmg > 0 && game.frameCount % 30 === 0) {
             game.enemies.forEach(e => { if (Math.hypot(e.x - this.x, e.y - this.y) < 100) e.takeDamage(this.poisonCloudDmg, false); });
         }
+        // Thorns aura - damage nearby enemies
+        if (this.thornsAuraDmg > 0 && game.frameCount % 30 === 0) {
+            game.enemies.forEach(e => {
+                if (Math.hypot(e.x - this.x, e.y - this.y) < 80) {
+                    e.takeDamage(this.thornsAuraDmg, false);
+                    createParticles(e.x, e.y, '#65a30d', 2);
+                }
+            });
+        }
+        // Black hole ability
+        if (this.hasBlackHole) {
+            if (this.blackHoleCooldown <= 0) {
+                this.blackHoleCooldown = 1500; // 25 seconds
+                game.blackHoles = game.blackHoles || [];
+                game.blackHoles.push({
+                    x: this.x,
+                    y: this.y,
+                    radius: 150,
+                    life: 300, // 5 seconds
+                    maxLife: 300,
+                    pullStrength: 3
+                });
+                createParticles(this.x, this.y, '#8b5cf6', 20);
+                showNotification('🌀 Black Hole!', '#8b5cf6', 1500);
+            }
+            this.blackHoleCooldown--;
+        }
         // Decoy management
         if (this.hasDecoy && this.decoy && this.decoy.health > 0) { /* Decoy alive, enemies target it */ }
         else if (this.hasDecoy) {
@@ -1108,8 +1249,22 @@ class Player {
                         const spreadAngle = angle + (i - 2) * 0.15;
                         game.bullets.push(new Bullet(this.x, this.y, spreadAngle, this, weapon));
                     }
+                    // Mirror shot - fire reverse copy
+                    if (this.mirrorShot && !weapon.continuous) {
+                        const mirrorAngle = angle + Math.PI;
+                        const mirrorBullet = new Bullet(this.x, this.y, mirrorAngle, this, weapon);
+                        mirrorBullet.isMirror = true;
+                        game.bullets.push(mirrorBullet);
+                    }
                 } else {
                     game.bullets.push(new Bullet(this.x, this.y, angle, this, weapon));
+                    // Mirror shot - fire reverse copy
+                    if (this.mirrorShot && !weapon.continuous) {
+                        const mirrorAngle = angle + Math.PI;
+                        const mirrorBullet = new Bullet(this.x, this.y, mirrorAngle, this, weapon);
+                        mirrorBullet.isMirror = true;
+                        game.bullets.push(mirrorBullet);
+                    }
                 }
             });
             slot.cooldown = Math.floor(this.fireRate * (weapon.fireRate || 1));
@@ -1207,7 +1362,21 @@ class Player {
         }
         
         Sound.play('hit');
-        if (this.health <= 0) gameOver();
+        if (this.health <= 0) {
+            if (this.secondWind) {
+                this.secondWind = false;
+                this.health = Math.floor(this.maxHealth * 0.3);
+                createTextParticle(this.x, this.y, '💨 SECOND WIND!', '#ffd93d', 24);
+                createParticles(this.x, this.y, '#ffd93d', 30);
+                screenShake(15);
+                showNotification('💨 Second Wind! Revived with 30% HP!', '#ffd93d', 3000);
+                Sound.play('levelUp');
+                // Brief invulnerability
+                this.dashInvulnerable = 60;
+            } else {
+                gameOver();
+            }
+        }
     }
 
     heal(amount) {
@@ -4311,6 +4480,7 @@ function restartGame() {
     game.playerDPS = { damage: 0, timer: 0, history: [] };
     game.eliteKills = 0;
     game.xpOrbs = [];
+    game.blackHoles = [];
     
     game.state = 'characterSelect';
     showDifficultySelect();
@@ -4906,6 +5076,36 @@ function gameLoop(timestamp) {
     // Draw arena obstacles
     drawArenaObstacles(ctx);
     
+    // Draw black holes
+    if (game.blackHoles) {
+        game.blackHoles.forEach(bh => {
+            const alpha = bh.life / bh.maxLife;
+            const pulse = Math.sin(Date.now() * 0.01) * 0.2 + 0.8;
+            ctx.save();
+            ctx.globalAlpha = alpha * 0.5;
+            // Outer swirl
+            for (let i = 0; i < 3; i++) {
+                const angle = Date.now() * 0.003 + (i / 3) * Math.PI * 2;
+                const r = bh.radius * (0.3 + i * 0.25) * pulse;
+                ctx.strokeStyle = `rgba(139, 92, 246, ${alpha * 0.3})`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(bh.x, bh.y, r, angle, angle + Math.PI * 1.5);
+                ctx.stroke();
+            }
+            // Core
+            ctx.globalAlpha = alpha;
+            ctx.fillStyle = '#1e1b4b';
+            ctx.beginPath();
+            ctx.arc(bh.x, bh.y, 15 * pulse, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#8b5cf6';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        });
+    }
+    
     if (game.state === 'playing' && !game.paused) {
         timer += deltaTime;
         if (timer >= 1000) {
@@ -4959,6 +5159,26 @@ function gameLoop(timestamp) {
         updateNotifications();
         updatePowerups();
         collectPowerups();
+        // Update black holes
+        if (game.blackHoles) {
+            game.blackHoles = game.blackHoles.filter(bh => {
+                bh.life--;
+                // Pull enemies toward center
+                game.enemies.forEach(e => {
+                    const dist = Math.hypot(e.x - bh.x, e.y - bh.y);
+                    if (dist < bh.radius && dist > 5) {
+                        const pull = bh.pullStrength * (1 - dist / bh.radius);
+                        e.x += (bh.x - e.x) / dist * pull;
+                        e.y += (bh.y - e.y) / dist * pull;
+                        // Damage enemies at center
+                        if (dist < 30 && bh.life % 10 === 0) {
+                            e.takeDamage(game.player.damage * 0.2, false);
+                        }
+                    }
+                });
+                return bh.life > 0;
+            });
+        }
         // Update XP orbs
         game.xpOrbs = game.xpOrbs.filter(orb => orb.update());
         
