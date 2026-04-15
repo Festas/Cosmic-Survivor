@@ -58,6 +58,7 @@ wss.on('connection', (ws, req) => {
 
     ws.on('error', (err) => {
         console.error('[WS] Client error:', err.message);
+        handleDisconnect(ws);
     });
 });
 

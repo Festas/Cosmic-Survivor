@@ -79,6 +79,7 @@ const MultiplayerClient = {
         this.ws.onclose = () => {
             console.log('[MP] Disconnected from server');
             this.connected = false;
+            this.authenticated = false;
             this.room = null;
             if (this.onDisconnected) this.onDisconnected();
             
@@ -108,6 +109,7 @@ const MultiplayerClient = {
             this.ws = null;
         }
         this.connected = false;
+        this.authenticated = false;
         this.room = null;
     },
 
@@ -149,6 +151,12 @@ const MultiplayerClient = {
                 if (this.onAuthSuccess) this.onAuthSuccess(msg.profile);
                 break;
             case 'auth_error':
+                // Clear stale session data on auth failure to prevent repeated failed restores
+                this.authenticated = false;
+                this.sessionToken = null;
+                this.userId = null;
+                this.profile = null;
+                try { localStorage.removeItem('cosmicSurvivor_mpToken'); } catch {}
                 if (this.onAuthError) this.onAuthError(msg.message);
                 break;
 
@@ -233,9 +241,10 @@ const MultiplayerClient = {
             const token = localStorage.getItem('cosmicSurvivor_mpToken');
             if (token) {
                 this.sessionToken = token;
-                if (this.connected) {
+                if (this.connected && this.ws && this.ws.readyState === WebSocket.OPEN) {
                     this.send({ type: 'restore_session', token });
                 }
+                // If not connected yet, the token is stored and will be sent on ws.onopen
                 return true;
             }
         } catch {}

@@ -486,9 +486,11 @@ function handleGameEvent(ws, client, msg) {
     // Handle specific events server-side
     if (msg.event === 'game_over') {
         room.state = 'lobby';
-        // Reset ready states
+        room.gameState = null; // Clear stale game state for next game
+        // Reset ready states and player alive status
         for (const [, player] of room.players) {
             player.ready = player.isHost;
+            player.isAlive = true;
         }
     }
 }

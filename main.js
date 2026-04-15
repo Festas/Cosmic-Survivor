@@ -6421,15 +6421,26 @@ function initMultiplayerCallbacks() {
         showNotification(`Auth error: ${message}`, '#ff6b6b', 3000);
         const errorEl = document.getElementById('auth-error');
         if (errorEl) errorEl.textContent = message;
+        // Re-enable submit buttons so user can retry
+        const loginBtn = document.getElementById('login-submit-btn');
+        if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Login'; }
+        const registerBtn = document.getElementById('register-submit-btn');
+        if (registerBtn) { registerBtn.disabled = false; registerBtn.textContent = 'Register'; }
     };
 
     mp.onRoomCreated = (roomCode, lobby) => {
         showNotification(`Room created: ${roomCode}`, '#00ff88', 3000);
+        // Hide multiplayer modal if still visible
+        const mpModal = document.getElementById('multiplayer-modal');
+        if (mpModal) mpModal.classList.add('hidden');
         showLobbyUI(lobby);
     };
 
     mp.onRoomJoined = (roomCode, lobby) => {
         showNotification(`Joined room: ${roomCode}`, '#00ff88', 3000);
+        // Hide multiplayer modal on successful join
+        const mpModal = document.getElementById('multiplayer-modal');
+        if (mpModal) mpModal.classList.add('hidden');
         showLobbyUI(lobby);
     };
 
@@ -6437,6 +6448,12 @@ function initMultiplayerCallbacks() {
         showNotification(`Join error: ${message}`, '#ff6b6b', 3000);
         const errorEl = document.getElementById('join-error');
         if (errorEl) errorEl.textContent = message;
+        // Re-enable join button
+        const joinBtn = document.getElementById('mp-join-btn');
+        if (joinBtn) {
+            joinBtn.disabled = false;
+            joinBtn.textContent = 'Join Room';
+        }
     };
 
     mp.onDisconnected = () => {
@@ -7349,7 +7366,13 @@ function initMultiplayerUI() {
     // Try auto-connect and restore session
     if (window.MultiplayerClient) {
         window.MultiplayerClient.connect();
-        window.MultiplayerClient.restoreSession();
+        // Load saved token so it's sent automatically in ws.onopen handler
+        try {
+            const token = localStorage.getItem('cosmicSurvivor_mpToken');
+            if (token) {
+                window.MultiplayerClient.sessionToken = token;
+            }
+        } catch {}
     }
 }
 
@@ -7438,6 +7461,10 @@ function showAccountModal() {
             const username = document.getElementById('login-username').value.trim();
             const password = document.getElementById('login-password').value;
             if (!username || !password) return;
+            const btn = document.getElementById('login-submit-btn');
+            btn.disabled = true;
+            btn.textContent = 'Logging in...';
+            document.getElementById('auth-error').textContent = '';
             mp.login(username, password);
         });
         
@@ -7448,6 +7475,10 @@ function showAccountModal() {
             const display = document.getElementById('register-display').value.trim();
             const password = document.getElementById('register-password').value;
             if (!username || !password) return;
+            const btn = document.getElementById('register-submit-btn');
+            btn.disabled = true;
+            btn.textContent = 'Registering...';
+            document.getElementById('auth-error').textContent = '';
             mp.register(username, password, display || username);
         });
         
@@ -7457,18 +7488,21 @@ function showAccountModal() {
             mp.loginAsGuest();
         });
         
-        // Close modal on auth success — wrap the original callback properly
-        const origOnAuth = mp.onAuthSuccess;
+        // Close modal on auth success — use a dedicated wrapped callback
+        // Store the base callback so we don't wrap endlessly on repeated opens
+        if (!mp._baseOnAuthSuccess) {
+            mp._baseOnAuthSuccess = mp.onAuthSuccess;
+        }
         mp.onAuthSuccess = (profile) => {
             modal.classList.add('hidden');
-            if (origOnAuth) {
-                origOnAuth(profile);
+            if (mp._baseOnAuthSuccess) {
+                mp._baseOnAuthSuccess(profile);
             } else {
                 showNotification(`Welcome, ${profile.displayName}!`, '#00ff88', 2000);
                 updateAccountUI(profile);
             }
-            // Restore the original callback after use so future auth flows work correctly
-            mp.onAuthSuccess = origOnAuth;
+            // Restore the base callback after use
+            mp.onAuthSuccess = mp._baseOnAuthSuccess;
         };
     }
     
@@ -7559,8 +7593,11 @@ function showMultiplayerModal() {
             document.getElementById('join-error').textContent = 'Room code must be 6 characters';
             return;
         }
+        document.getElementById('join-error').textContent = '';
+        document.getElementById('mp-join-btn').disabled = true;
+        document.getElementById('mp-join-btn').textContent = 'Joining...';
         mp.joinRoom(code);
-        modal.classList.add('hidden');
+        // Don't hide modal yet - wait for server response
     });
     
     // Allow Enter key to join

@@ -61,7 +61,8 @@ export function initDatabase() {
         CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,
             user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            created_at TEXT DEFAULT (datetime('now'))
+            created_at TEXT DEFAULT (datetime('now')),
+            expires_at TEXT DEFAULT (datetime('now', '+7 days'))
         );
 
         CREATE INDEX IF NOT EXISTS idx_high_scores_user ON high_scores(user_id);
@@ -93,8 +94,16 @@ export function createUser(username, password, displayName) {
     const passwordHash = bcrypt.hashSync(password, SALT_ROUNDS);
     const name = displayName || username;
 
-    db.prepare('INSERT INTO users (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)').run(id, username, passwordHash, name);
-    db.prepare('INSERT INTO user_stats (user_id) VALUES (?)').run(id);
+    const insertUser = db.transaction(() => {
+        db.prepare('INSERT INTO users (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)').run(id, username, passwordHash, name);
+        db.prepare('INSERT INTO user_stats (user_id) VALUES (?)').run(id);
+    });
+
+    try {
+        insertUser();
+    } catch (e) {
+        return { error: 'Failed to create account. Please try again.' };
+    }
 
     return { success: true, userId: id, username, displayName: name };
 }
@@ -131,8 +140,11 @@ export function createGuestUser() {
         const passwordHash = bcrypt.hashSync(id, SALT_ROUNDS);
 
         try {
-            db.prepare('INSERT INTO users (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)').run(id, username, passwordHash, displayName);
-            db.prepare('INSERT INTO user_stats (user_id) VALUES (?)').run(id);
+            const insertGuest = db.transaction(() => {
+                db.prepare('INSERT INTO users (id, username, password_hash, display_name) VALUES (?, ?, ?, ?)').run(id, username, passwordHash, displayName);
+                db.prepare('INSERT INTO user_stats (user_id) VALUES (?)').run(id);
+            });
+            insertGuest();
             return { success: true, userId: id, username, displayName, isGuest: true };
         } catch (e) {
             // UNIQUE constraint failure — try another number
@@ -250,11 +262,13 @@ export function storeSession(token, userId) {
             SELECT token FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 4
         )
     `).run(userId, userId);
-    db.prepare('INSERT OR REPLACE INTO sessions (token, user_id) VALUES (?, ?)').run(token, userId);
+    // Also clean up expired sessions for this user
+    db.prepare("DELETE FROM sessions WHERE user_id = ? AND expires_at <= datetime('now')").run(userId);
+    db.prepare("INSERT OR REPLACE INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+7 days'))").run(token, userId);
 }
 
 export function getSession(token) {
-    const row = db.prepare('SELECT user_id FROM sessions WHERE token = ?').get(token);
+    const row = db.prepare("SELECT user_id FROM sessions WHERE token = ? AND expires_at > datetime('now')").get(token);
     return row ? row.user_id : null;
 }
 
