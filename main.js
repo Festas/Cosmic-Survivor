@@ -7366,8 +7366,7 @@ function initMultiplayerUI() {
     // Try auto-connect and restore session
     if (window.MultiplayerClient) {
         window.MultiplayerClient.connect();
-        // Session restore is handled automatically on connect via ws.onopen
-        // so we just load the token into memory here
+        // Load saved token so it's sent automatically in ws.onopen handler
         try {
             const token = localStorage.getItem('cosmicSurvivor_mpToken');
             if (token) {

@@ -63,8 +63,11 @@ export class Room {
             usedIndices.add(p.playerIndex);
         }
         let playerIndex = 0;
-        while (usedIndices.has(playerIndex)) {
+        while (usedIndices.has(playerIndex) && playerIndex < this.settings.maxPlayers) {
             playerIndex++;
+        }
+        if (playerIndex >= this.settings.maxPlayers) {
+            return { error: 'Room is full' };
         }
         
         this.players.set(playerId, {
