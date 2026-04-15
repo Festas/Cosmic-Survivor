@@ -43,6 +43,12 @@ export class Room {
     }
 
     addPlayer(playerId, displayName, ws, isHost = false) {
+        if (this.players.has(playerId)) {
+            // Player already in room - update their ws reference and return success
+            const existing = this.players.get(playerId);
+            existing.ws = ws;
+            return { success: true, playerIndex: existing.playerIndex, color: existing.color };
+        }
         if (this.players.size >= this.settings.maxPlayers) {
             return { error: 'Room is full' };
         }
@@ -50,8 +56,16 @@ export class Room {
             return { error: 'Game already in progress' };
         }
 
-        const playerIndex = this.players.size;
+        // Find first unused player index to avoid color collisions after leave/rejoin
         const playerColors = ['#00ff88', '#ff6b6b', '#4ecdc4', '#ffd93d'];
+        const usedIndices = new Set();
+        for (const p of this.players.values()) {
+            usedIndices.add(p.playerIndex);
+        }
+        let playerIndex = 0;
+        while (usedIndices.has(playerIndex)) {
+            playerIndex++;
+        }
         
         this.players.set(playerId, {
             id: playerId,
