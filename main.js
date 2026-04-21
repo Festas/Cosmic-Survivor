@@ -7953,7 +7953,9 @@ window.startDailyChallenge = function startDailyChallenge() {
     
     const tt = (k, f, v) => (window.t ? window.t(k, f, v) : f);
     setTimeout(() => {
-        showNotification(tt('daily.modifierFmt', "Today's modifier: {mod}", { mod: challenge.mutator.nameEn }), '#ffd93d', 5000);
+        const lang = window.i18n ? window.i18n.getLanguage() : 'en';
+        const mutName = lang === 'de' ? challenge.mutator.nameDe : challenge.mutator.nameEn;
+        showNotification(tt('daily.modifierFmt', "Today's modifier: {mod}", { mod: mutName }), '#ffd93d', 5000);
     }, 200);
 };
 

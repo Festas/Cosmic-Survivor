@@ -29,7 +29,7 @@ const MUTATORS = [
     { id: 'doubleTrouble',  nameEn: 'Double Trouble',   nameDe: 'Doppelte Gefahr',   desc: '2× enemies, 1.5× XP' },
     { id: 'glassCannon',    nameEn: 'Glass Cannon',     nameDe: 'Glaskanone',        desc: '+100% damage dealt, -50% max HP' },
     { id: 'speedDemon',     nameEn: 'Speed Demon',      nameDe: 'Geschwindigkeitsteufel', desc: 'All enemies +30% speed, you +20% speed' },
-    { id: 'gold rush',      nameEn: 'Gold Rush',        nameDe: 'Goldrausch',        desc: 'Triple credits, half XP' },
+    { id: 'goldRush',       nameEn: 'Gold Rush',        nameDe: 'Goldrausch',        desc: 'Triple credits, half XP' },
     { id: 'bossfest',       nameEn: 'Boss Fest',        nameDe: 'Bossfest',          desc: 'A boss every 3 waves' },
     { id: 'ironman',        nameEn: 'Iron Man',         nameDe: 'Eisenmann',         desc: 'No healing pickups, +50% max HP' },
     { id: 'fogBound',       nameEn: 'Fog Bound',        nameDe: 'Im Nebel',          desc: 'Permanent fog of war' },

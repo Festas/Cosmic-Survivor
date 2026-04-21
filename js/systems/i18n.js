@@ -436,7 +436,7 @@ const STRINGS = {
 
         'mvp.title': '🏆 Match-Auswertung',
         'mvp.kills': 'Meiste Kills',
-        'mvp.damage': 'Meister Schaden',
+        'mvp.damage': 'Höchster Schaden',
         'mvp.revives': 'Meiste Revives',
         'mvp.bosses': 'Boss-Schlächter',
         'mvp.continue': 'Weiter',
