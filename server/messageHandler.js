@@ -466,19 +466,58 @@ function handlePlayerState(ws, client, msg) {
     }, client.playerId);
 }
 
+// Allow-list of relayed game events. Unknown events are dropped to prevent
+// clients from spamming arbitrary types. Each entry is the max JSON-serialized
+// length (in chars) accepted for the `data` payload — small for cheap chatter,
+// larger for genuine gameplay events.
+const GAME_EVENT_LIMITS = {
+    // Existing core events
+    'enemy_killed': 256,
+    'player_damaged': 256,
+    'wave_complete': 128,
+    'wave_start': 128,
+    'game_over': 256,
+    'player_died': 128,
+    'enemy_spawned': 512,
+    'pickup_collected': 256,
+    'xp_collected': 128,
+    'level_up': 256,
+    // New additive events for emote/ping/quickchat/revive/MVP
+    'emote': 64,
+    'ping': 128,
+    'quickchat': 64,
+    'downed': 128,
+    'revive_complete': 128,
+    'boss_down': 128,
+    'match_stats': 256,
+};
+
 function handleGameEvent(ws, client, msg) {
     if (!client.roomCode) return;
 
     const room = getRoom(client.roomCode);
     if (!room) return;
 
+    // Validate event type against whitelist
+    if (typeof msg.event !== 'string' || !(msg.event in GAME_EVENT_LIMITS)) {
+        return; // silently drop unknown events
+    }
+
+    // Validate payload size to stop spam / oversized broadcasts
+    let dataPayload = msg.data;
+    if (dataPayload !== undefined && dataPayload !== null) {
+        let serialized;
+        try { serialized = JSON.stringify(dataPayload); } catch { return; }
+        if (serialized.length > GAME_EVENT_LIMITS[msg.event]) {
+            return; // drop oversized payloads
+        }
+    }
+
     // Relay game events to all players
-    // Events: enemy_killed, player_damaged, wave_complete, game_over, 
-    //         enemy_spawned, pickup_collected, xp_collected, level_up, etc.
     room.broadcast({
         type: 'game_event',
         event: msg.event,
-        data: msg.data,
+        data: dataPayload,
         playerId: client.playerId,
         timestamp: Date.now()
     }, client.playerId);

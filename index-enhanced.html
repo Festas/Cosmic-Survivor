@@ -27,9 +27,9 @@
     <!-- Loading Screen -->
     <div id="loading-screen">
         <div class="loading-content">
-            <h1 class="loading-title">🚀 Cosmic Survivor 🚀</h1>
+            <h1 class="loading-title" data-i18n="loading.title">🚀 Cosmic Survivor 🚀</h1>
             <div class="loading-spinner"></div>
-            <p class="loading-text">Initializing...</p>
+            <p class="loading-text" data-i18n="loading.text">Initializing...</p>
             <div class="loading-bar-container">
                 <div class="loading-bar" id="loading-bar"></div>
             </div>
@@ -40,7 +40,7 @@
     <div id="rotate-message" class="hidden">
         <div class="rotate-content">
             <div class="phone-icon">📱</div>
-            <p>Please rotate your device to landscape mode</p>
+            <p data-i18n="rotate.text">Please rotate your device to landscape mode</p>
             <div class="rotate-icon">🔄</div>
         </div>
     </div>
@@ -49,9 +49,9 @@
         <canvas id="gameCanvas" width="1200" height="800"></canvas>
         <div id="ui-overlay">
             <div id="top-bar">
-                <div id="wave-info">Wave: <span id="wave-number">1</span></div>
-                <div id="timer">Time: <span id="time-left">60</span>s</div>
-                <div id="credits">Credits: <span id="credit-amount">0</span></div>
+                <div id="wave-info"><span data-i18n="hud.wave">Wave</span>: <span id="wave-number">1</span></div>
+                <div id="timer"><span data-i18n="hud.time">Time</span>: <span id="time-left">60</span>s</div>
+                <div id="credits"><span data-i18n="hud.credits">Credits</span>: <span id="credit-amount">0</span></div>
             </div>
             <div id="stats-bar">
                 <div id="health-bar-container">
@@ -64,8 +64,8 @@
         <!-- Character Selection Modal -->
         <div id="character-select-modal" class="modal hidden">
             <div class="modal-content">
-                <h2>🚀 Select Your Character 🚀</h2>
-                <p class="intro-text">Choose your astronaut for this mission</p>
+                <h2 data-i18n="character.title">🚀 Select Your Character 🚀</h2>
+                <p class="intro-text" data-i18n="character.intro">Choose your astronaut for this mission</p>
                 <div id="character-list"></div>
             </div>
         </div>
@@ -73,31 +73,31 @@
         <!-- Shop Modal -->
         <div id="shop-modal" class="modal hidden">
             <div class="modal-content">
-                <h2>Upgrade Station</h2>
-                <p class="wave-complete">Wave <span id="completed-wave">1</span> Complete!</p>
+                <h2 data-i18n="shop.title">Upgrade Station</h2>
+                <p class="wave-complete"><span data-i18n="hud.wave">Wave</span> <span id="completed-wave">1</span> Complete!</p>
                 <div id="shop-items"></div>
-                <button id="next-wave-btn" class="btn-primary">Start Next Wave</button>
+                <button id="next-wave-btn" class="btn-primary" data-i18n="shop.next">Start Next Wave</button>
             </div>
         </div>
         
         <!-- Game Over Modal -->
         <div id="game-over-modal" class="modal hidden">
             <div class="modal-content">
-                <h2 id="game-over-title">Mission Failed</h2>
+                <h2 id="game-over-title" data-i18n="gameover.fail">Mission Failed</h2>
                 <p id="game-over-message">You survived <span id="final-wave">0</span> waves</p>
                 <div id="final-stats"></div>
-                <button id="restart-btn" class="btn-primary">Try Again</button>
+                <button id="restart-btn" class="btn-primary" data-i18n="gameover.retry">Try Again</button>
             </div>
         </div>
         
         <!-- Start Modal -->
         <div id="start-modal" class="modal">
             <div class="modal-content">
-                <h1>🚀 Cosmic Survivor 🚀</h1>
-                <h3 style="color: #ffd93d;">Reworked Edition</h3>
-                <p class="intro-text">Survive waves of alien creatures in a perfectly balanced arena!</p>
+                <h1 data-i18n="menu.title">🚀 Cosmic Survivor 🚀</h1>
+                <h3 style="color: #ffd93d;" data-i18n="menu.subtitle">Reworked Edition</h3>
+                <p class="intro-text" data-i18n="menu.intro">Survive waves of alien creatures in a perfectly balanced arena!</p>
                 <div class="controls-info">
-                    <h3>✨ Features:</h3>
+                    <h3 data-i18n="menu.features">✨ Features:</h3>
                     <p>🎭 12 Unique Characters with distinct playstyles</p>
                     <p>⚙️ 4 Difficulty modes: Easy → Nightmare</p>
                     <p>⬆️ XP & Level-up system with passive abilities</p>
@@ -111,25 +111,29 @@
                     <p>🏆 Achievements & High Scores</p>
                 </div>
                 <div class="controls-info">
-                    <h3>Controls:</h3>
-                    <p>🎮 WASD / Arrow Keys - Move</p>
-                    <p>SPACE - Dash (1.5s cooldown)</p>
-                    <p>1-8 Keys - Switch Weapons</p>
-                    <p>ESC - Pause/Resume</p>
-                    <p>📱 Touch & Drag - Virtual Joystick</p>
-                    <p>🔫 Auto-aim & Auto-shoot</p>
+                    <h3 data-i18n="menu.controls">Controls:</h3>
+                    <p data-i18n="menu.controlMove">🎮 WASD / Arrow Keys - Move</p>
+                    <p data-i18n="menu.controlDash">SPACE - Dash (1.5s cooldown)</p>
+                    <p data-i18n="menu.controlWeapons">1-8 Keys - Switch Weapons</p>
+                    <p data-i18n="menu.controlPause">ESC - Pause/Resume</p>
+                    <p data-i18n="menu.controlTouch">📱 Touch & Drag - Virtual Joystick</p>
+                    <p data-i18n="menu.controlAuto">🔫 Auto-aim & Auto-shoot</p>
+                    <p data-i18n="menu.controlEmote">T - Emote Wheel (multiplayer)</p>
+                    <p data-i18n="menu.controlPing">Q - Drop Ping (multiplayer)</p>
+                    <p data-i18n="menu.controlRevive">F - Revive Teammate</p>
                 </div>
-                <button id="start-btn" class="btn-primary">Begin Mission</button>
-                <button id="settings-btn" class="btn-secondary">⚙️ Settings</button>
+                <button id="start-btn" class="btn-primary" data-i18n="menu.beginMission">Begin Mission</button>
+                <button id="settings-btn" class="btn-secondary" data-i18n="menu.settings">⚙️ Settings</button>
             </div>
         </div>
         
         <!-- Pause Overlay -->
         <div id="pause-overlay">
             <div class="pause-menu">
-                <h2>⏸️ PAUSED</h2>
-                <p>Press ESC or click Resume to continue</p>
-                <button id="resume-btn" class="btn-primary">Resume</button>
+                <h2 data-i18n="pause.title">⏸️ PAUSED</h2>
+                <p data-i18n="pause.help">Press ESC or click Resume to continue</p>
+                <button id="resume-btn" class="btn-primary" data-i18n="pause.resume">Resume</button>
+                <button id="pause-settings-btn" class="btn-secondary" data-i18n="pause.openSettings">⚙️ Settings</button>
             </div>
         </div>
         
