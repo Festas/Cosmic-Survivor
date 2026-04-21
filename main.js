@@ -530,6 +530,12 @@ const game = {
         sharedXPMultiplier: 0.5,
         enemyScalePerPlayer: 0.3,
     },
+    // ===== Game mode (classic | story | daily | multiplayer) =====
+    gameMode: 'classic',
+    activeStoryChapter: null,   // chapter object when gameMode === 'story'
+    activeDailyChallenge: null, // {seed, mutator, difficulty} when gameMode === 'daily'
+    storyChapterFinalBossSpawned: false,
+    isLocalPlayerDowned: false, // multiplayer: local player downed (waiting for revive)
 };
 
 function loadPersistentStats() {
@@ -2879,6 +2885,18 @@ class Enemy {
                 isBoss: this.isBoss,
                 isElite: this.isElite,
             });
+            // Track local MVP stats
+            if (window.MultiplayerExtras) {
+                const localId = window.MultiplayerClient.localPlayerId;
+                window.MultiplayerExtras.bumpStat(localId, 'kills', 1);
+                if (this.isBoss) {
+                    window.MultiplayerExtras.bumpStat(localId, 'bosses', 1);
+                    // Friendly boss-kill banner for the team
+                    window.MultiplayerClient.sendGameEvent('boss_down', { type: this.type });
+                    const tt = (k, f) => (window.t ? window.t(k, f) : f);
+                    showNotification(tt('mp.bossDownFmt', '🏆 Boss defeated! Team strikes again!'), '#ffd93d', 4000);
+                }
+            }
         }
 
         // Split large XP into multiple orbs
@@ -5244,6 +5262,10 @@ function drawArenaObstacles(ctx) {
 function spawnWave() {
     generateArenaObstacles();
     
+    // ===== Story Mode: override wave behavior =====
+    const storyChapter = game.gameMode === 'story' ? game.activeStoryChapter : null;
+    const isStoryFinalWave = !!(storyChapter && game.wave >= storyChapter.waves);
+    
     // Variable wave duration
     let waveDuration;
     if (game.wave <= 3) waveDuration = 35;
@@ -5253,7 +5275,11 @@ function spawnWave() {
     else waveDuration = 80;
     
     // Boss waves are always 90 seconds
-    const isBoss = game.wave % CONFIG.BOSS_WAVE_INTERVAL === 0;
+    let isBoss = game.wave % CONFIG.BOSS_WAVE_INTERVAL === 0;
+    // In story mode, the chapter's last wave is always a boss wave with the chapter's final boss
+    if (isStoryFinalWave) {
+        isBoss = true;
+    }
     if (isBoss) waveDuration = 90;
     
     game.timeLeft = waveDuration;
@@ -5263,8 +5289,8 @@ function spawnWave() {
     game.creditMultiplier = 1;
     game.waveModifier = null;
     
-    // Apply wave modifier (starting wave 3, not on boss waves)
-    if (game.wave >= 3 && !isBoss) {
+    // Apply wave modifier (starting wave 3, not on boss waves, not in story mode)
+    if (game.wave >= 3 && !isBoss && !storyChapter) {
         const modKeys = Object.keys(WAVE_MODIFIERS);
         const modKey = modKeys[Math.floor(Math.random() * modKeys.length)];
         game.waveModifier = { key: modKey, ...WAVE_MODIFIERS[modKey] };
@@ -5275,8 +5301,14 @@ function spawnWave() {
     
     if (isBoss) {
         Sound.play('boss');
-        const bossTypes = Object.keys(BOSS_TYPES);
-        const bossType = bossTypes[Math.floor(game.wave / CONFIG.BOSS_WAVE_INTERVAL) % bossTypes.length];
+        let bossType;
+        if (isStoryFinalWave && storyChapter.finalBoss && BOSS_TYPES[storyChapter.finalBoss]) {
+            bossType = storyChapter.finalBoss;
+            game.storyChapterFinalBossSpawned = true;
+        } else {
+            const bossTypes = Object.keys(BOSS_TYPES);
+            bossType = bossTypes[Math.floor(game.wave / CONFIG.BOSS_WAVE_INTERVAL) % bossTypes.length];
+        }
         const spawnTarget = getRandomAlivePlayer();
         const boss = new Enemy(spawnTarget.x + 300, spawnTarget.y - 300, game.wave, bossType, true);
         game.enemies.push(boss);
@@ -5325,6 +5357,13 @@ function spawnWave() {
                     return true;
                 });
                 
+                // Story mode: restrict to chapter's enemy pool (intersected with currently-unlocked types)
+                if (storyChapter && Array.isArray(storyChapter.enemyPool) && storyChapter.enemyPool.length > 0) {
+                    const allowed = typeKeys.filter(t => storyChapter.enemyPool.includes(t));
+                    if (allowed.length > 0) typeKeys = allowed;
+                    else typeKeys = storyChapter.enemyPool.filter(t => ENEMY_TYPES[t]);
+                }
+                
                 // Wave modifier spawn bias
                 if (game.waveModifier && game.waveModifier.spawnBias && typeKeys.includes(game.waveModifier.spawnBias)) {
                     if (Math.random() < 0.4) {
@@ -5354,6 +5393,41 @@ function spawnWave() {
 }
 
 function nextWave() {
+    // ===== Story Mode: did we just complete the final wave (boss killed)? =====
+    if (game.gameMode === 'story' && game.activeStoryChapter) {
+        const ch = game.activeStoryChapter;
+        if (game.wave >= ch.waves) {
+            // Chapter complete!
+            const completedChapter = ch;
+            const wasMultiplayer = game.isMultiplayer;
+            // Mark progress
+            if (window.StoryMode) {
+                try { window.StoryMode.markCompleted(ch.id); } catch {}
+            }
+            game.state = 'gameOver'; // suspend gameplay
+            document.getElementById('shop-modal').classList.add('hidden');
+            // Outro cinematic, then return to story menu (or main menu)
+            if (window.StoryMode && window.StoryMode.showChapterVictory) {
+                window.StoryMode.showChapterVictory(completedChapter, () => {
+                    // Reset & return to start menu
+                    game.activeStoryChapter = null;
+                    game.gameMode = 'classic';
+                    game.storyChapterFinalBossSpawned = false;
+                    if (window.StoryMode.clearActiveChapter) window.StoryMode.clearActiveChapter();
+                    // Soft restart of overall state
+                    softResetForMenu();
+                    // Show story menu so the player can pick the next chapter
+                    if (!wasMultiplayer) {
+                        window.StoryMode.showMenu();
+                    } else {
+                        document.getElementById('start-modal')?.classList.remove('hidden');
+                    }
+                });
+            }
+            return;
+        }
+    }
+    
     game.wave++;
     if (game.wave > game.persistentStats.maxWave) {
         game.persistentStats.maxWave = game.wave;
@@ -5378,6 +5452,38 @@ function nextWave() {
     checkAchievements();
 }
 
+// Soft reset of game state to return to menu (without showing difficulty select)
+function softResetForMenu() {
+    game.state = 'menu';
+    game.paused = false;
+    game.enemies = [];
+    game.bullets = [];
+    game.particles = [];
+    game.pickups = [];
+    game.powerups = [];
+    game.xpOrbs = [];
+    game.blackHoles = [];
+    game.hazards = [];
+    game.wave = 1;
+    game.timeLeft = 60;
+    game.stats = {
+        enemiesKilled: 0, damageDealt: 0, damageTaken: 0,
+        bossesDefeated: 0, waveStartDamage: 0, comboKills: 0, comboTimer: 0,
+        xp: 0, level: 1, xpToNext: CONFIG.XP_BASE, totalXpEarned: 0,
+    };
+    game.passivesChosen = [];
+    game.levelUpChoices = [];
+    game.eliteKills = 0;
+    game.player = null;
+    game.isLocalPlayerDowned = false;
+    if (window.MultiplayerExtras) {
+        window.MultiplayerExtras.activeEmotes.clear();
+        window.MultiplayerExtras.activePings = [];
+        window.MultiplayerExtras.downed.clear();
+        window.MultiplayerExtras.resetMatchStats();
+    }
+}
+
 // ==================== GAME OVER & RESTART ====================
 function gameOver() {
     game.state = 'gameOver';
@@ -5390,6 +5496,11 @@ function gameOver() {
     game.highScores.sort((a, b) => b.score - a.score);
     game.highScores = game.highScores.slice(0, 10);
     saveHighScores();
+    
+    // Daily Challenge: record progress
+    if (game.gameMode === 'daily' && window.DailyChallenge) {
+        try { window.DailyChallenge.markPlayed(game.wave); } catch {}
+    }
     
     // Sync stats to server in multiplayer
     if (window.MultiplayerClient && window.MultiplayerClient.authenticated) {
@@ -5449,14 +5560,39 @@ function gameOver() {
     `;
     
     const title = document.getElementById('game-over-title');
-    if (game.wave >= 20) {
-        title.textContent = '🌟 LEGENDARY SURVIVOR! 🌟';
+    const tt = (k, f, v) => (window.t ? window.t(k, f, v) : f);
+    if (game.gameMode === 'story' && game.activeStoryChapter) {
+        title.textContent = tt('story.defeat', 'Chapter failed — try again, survivor.');
+    } else if (game.wave >= 20) {
+        title.textContent = tt('gameover.legendary', '🌟 LEGENDARY SURVIVOR! 🌟');
     } else if (game.wave >= 10) {
-        title.textContent = '🏆 Mission Success! 🏆';
+        title.textContent = tt('gameover.success', '🏆 Mission Success! 🏆');
     } else if (game.wave >= 5) {
-        title.textContent = '⚔️ Valiant Effort ⚔️';
+        title.textContent = tt('gameover.valiant', '⚔️ Valiant Effort ⚔️');
     } else {
-        title.textContent = '💀 Mission Failed 💀';
+        title.textContent = tt('gameover.fail', '💀 Mission Failed 💀');
+    }
+    
+    // Multiplayer MVP screen
+    if (game.isMultiplayer && window.MultiplayerExtras) {
+        try {
+            // Build playerInfoById from local + remote players
+            const info = new Map();
+            const mp = window.MultiplayerClient;
+            if (mp && mp.localPlayerId) {
+                info.set(mp.localPlayerId, {
+                    name: (mp.profile && mp.profile.displayName) || 'You',
+                    color: '#00ff88',
+                });
+            }
+            for (const rp of game.remotePlayers.values()) {
+                info.set(rp.id, { name: rp.displayName || 'Player', color: rp.color || '#ff6b6b' });
+            }
+            // Show after a short delay so the player sees the game-over screen first
+            setTimeout(() => {
+                window.MultiplayerExtras.showMVPScreen(info, () => {});
+            }, 600);
+        } catch (e) { console.warn('[MVP] failed to show', e); }
     }
 }
 
@@ -5465,6 +5601,9 @@ function restartGame() {
     // Remove level up modal if present
     const levelUpModal = document.getElementById('level-up-modal');
     if (levelUpModal) levelUpModal.remove();
+    // Remove any leftover MVP overlay
+    const mvp = document.getElementById('mvp-overlay');
+    if (mvp) mvp.remove();
     
     // Reset new systems
     game.stats.xp = 0;
@@ -5486,12 +5625,39 @@ function restartGame() {
     game.camera.y = 0;
     game.camera.targetX = 0;
     game.camera.targetY = 0;
+    game.isLocalPlayerDowned = false;
+    if (window.MultiplayerExtras) {
+        window.MultiplayerExtras.activeEmotes.clear();
+        window.MultiplayerExtras.activePings = [];
+        window.MultiplayerExtras.downed.clear();
+        window.MultiplayerExtras.resetMatchStats();
+    }
     
     // Reset multiplayer state
     game.isMultiplayer = false;
     game.remotePlayers.clear();
     game.multiplayerPlayerCount = 1;
     
+    // Honor active game mode for retry
+    const mode = game.gameMode || 'classic';
+    if (mode === 'story' && game.activeStoryChapter) {
+        const ch = game.activeStoryChapter;
+        game.wave = 1;
+        game.storyChapterFinalBossSpawned = false;
+        game.state = 'characterSelect';
+        document.getElementById('character-select-modal').classList.remove('hidden');
+        return;
+    }
+    if (mode === 'daily' && game.activeDailyChallenge) {
+        game.wave = 1;
+        game.state = 'characterSelect';
+        document.getElementById('character-select-modal').classList.remove('hidden');
+        return;
+    }
+    
+    game.gameMode = 'classic';
+    game.activeStoryChapter = null;
+    game.activeDailyChallenge = null;
     game.state = 'characterSelect';
     showDifficultySelect();
 }
@@ -6252,22 +6418,41 @@ function showWaveAnnouncement() {
 // Handle player death - multiplayer aware
 function handlePlayerDeath() {
     if (game.isMultiplayer) {
-        // In multiplayer, notify other players
-        if (window.MultiplayerClient && window.MultiplayerClient.connected) {
-            window.MultiplayerClient.sendGameEvent('player_died', {
-                playerId: game.localPlayerId,
-            });
+        const mp = window.MultiplayerClient;
+        const localId = mp ? mp.localPlayerId : null;
+        const extras = window.MultiplayerExtras;
+        
+        // Enter "downed" state instead of dying immediately, giving teammates a chance to revive.
+        // Only if not already downed (prevent re-trigger), and at least one teammate is alive.
+        let anyTeammateAlive = false;
+        for (const rp of game.remotePlayers.values()) {
+            if (rp.isAlive) { anyTeammateAlive = true; break; }
         }
-        // Check if ANY remote player is still alive
+        
+        if (extras && localId && anyTeammateAlive && !game.isLocalPlayerDowned) {
+            game.isLocalPlayerDowned = true;
+            extras.markDowned(localId);
+            // Stay alive but disabled: prevent further damage / shooting
+            game.player.health = 1; // Keep alive but at 1 HP visually
+            if (mp && mp.connected) {
+                mp.sendGameEvent('downed', { playerId: localId });
+            }
+            const tt = (k, f, v) => (window.t ? window.t(k, f, v) : f);
+            showNotification(tt('revive.downedYou', '💔 You are down! Hold on!'), '#ff6b6b', 4000);
+            return;
+        }
+        
+        // No teammates left to revive - permanent death
+        if (mp && mp.connected) {
+            mp.sendGameEvent('player_died', { playerId: localId });
+        }
         let anyAlive = false;
         for (const rp of game.remotePlayers.values()) {
             if (rp.isAlive) { anyAlive = true; break; }
         }
         if (!anyAlive) {
-            // All players dead - game over
             gameOver();
         } else {
-            // Local player dead, but others still alive - spectate
             showNotification('💀 You have been eliminated! Spectating...', '#ff6b6b', 5000);
             game.player.health = 0;
         }
@@ -6302,6 +6487,37 @@ function sendLocalPlayerState() {
 function initMultiplayerCallbacks() {
     const mp = window.MultiplayerClient;
     if (!mp) return;
+    
+    // Wire MultiplayerExtras hooks
+    if (window.MultiplayerExtras) {
+        window.MultiplayerExtras.onLocalPermanentDeath(() => {
+            // Local player downed timer expired — convert to permanent death
+            game.isLocalPlayerDowned = false;
+            if (game.player) game.player.health = 0;
+            const mp2 = window.MultiplayerClient;
+            if (mp2 && mp2.connected) {
+                mp2.sendGameEvent('player_died', { playerId: mp2.localPlayerId });
+            }
+            const tt = (k, f) => (window.t ? window.t(k, f) : f);
+            showNotification(tt('revive.youDied', '💀 You could not be saved.'), '#ff6b6b', 4000);
+            // Trigger game over check
+            let anyAlive = false;
+            for (const r of game.remotePlayers.values()) {
+                if (r.isAlive) { anyAlive = true; break; }
+            }
+            if (!anyAlive) gameOver();
+        });
+        window.MultiplayerExtras.onRevived((targetId) => {
+            // We just revived someone
+            const rp = game.remotePlayers.get(targetId);
+            if (rp) {
+                rp.isAlive = true;
+                rp.health = Math.max(rp.health, Math.floor(rp.maxHealth * 0.5));
+            }
+            const tt = (k, f, v) => (window.t ? window.t(k, f, v) : f);
+            showNotification(tt('revive.revived', '💚 {name} is back in the fight!', { name: rp ? rp.displayName : 'Player' }), '#00ff88', 3000);
+        });
+    }
 
     mp.onPlayerStateUpdate = (playerId, state) => {
         const rp = game.remotePlayers.get(playerId);
@@ -6312,8 +6528,11 @@ function initMultiplayerCallbacks() {
 
     mp.onGameStart = (data) => {
         game.isMultiplayer = true;
+        game.gameMode = 'multiplayer';
         game.multiplayerPlayerCount = data.playerCount;
         game.remotePlayers.clear();
+        if (window.MultiplayerExtras) window.MultiplayerExtras.resetMatchStats();
+        game.isLocalPlayerDowned = false;
         
         // Create remote players for all non-local players
         data.players.forEach(p => {
@@ -6370,6 +6589,8 @@ function initMultiplayerCallbacks() {
                 rp.isAlive = false;
                 showNotification(`💀 ${rp.displayName} has been eliminated!`, '#ff6b6b', 3000);
             }
+            // Clear any downed state for this player
+            if (window.MultiplayerExtras) window.MultiplayerExtras.clearDowned(playerId);
             // Check if all players are dead
             if (game.player.health <= 0) {
                 let anyAlive = false;
@@ -6403,6 +6624,53 @@ function initMultiplayerCallbacks() {
                     triggerLevelUp();
                 }
             }
+            // Track MVP stats per remote player
+            if (window.MultiplayerExtras && data) {
+                window.MultiplayerExtras.bumpStat(playerId, 'kills', 1);
+                if (data.isBoss) window.MultiplayerExtras.bumpStat(playerId, 'bosses', 1);
+            }
+        } else if (event === 'emote') {
+            if (window.MultiplayerExtras) window.MultiplayerExtras.receiveEmote(playerId, data);
+        } else if (event === 'ping') {
+            if (window.MultiplayerExtras) window.MultiplayerExtras.receivePing(playerId, data);
+        } else if (event === 'quickchat') {
+            // Localize on receive
+            const rp = game.remotePlayers.get(playerId);
+            const name = rp ? rp.displayName : 'Player';
+            const tt = (k, f) => (window.t ? window.t(k, f) : f);
+            const allowedKeys = { 'help': 'quickchat.help', 'push': 'quickchat.push', 'defend': 'quickchat.defend', 'gg': 'quickchat.gg' };
+            const key = data && allowedKeys[data.key] ? allowedKeys[data.key] : null;
+            if (key) {
+                showNotification(`${name}: ${tt(key)}`, '#4ecdc4', 3000);
+            }
+        } else if (event === 'downed') {
+            const rp = game.remotePlayers.get(playerId);
+            if (rp && window.MultiplayerExtras) {
+                window.MultiplayerExtras.markDowned(playerId);
+                const tt = (k, f, v) => (window.t ? window.t(k, f, v) : f);
+                showNotification(tt('revive.downed', '💔 {name} is down! Revive them!', { name: rp.displayName }), '#ffd93d', 3000);
+            }
+        } else if (event === 'revive_complete') {
+            if (data && data.targetId && window.MultiplayerExtras) {
+                window.MultiplayerExtras.clearDowned(data.targetId);
+                const mp2 = window.MultiplayerClient;
+                const tt = (k, f, v) => (window.t ? window.t(k, f, v) : f);
+                if (mp2 && data.targetId === mp2.localPlayerId) {
+                    // I was just revived
+                    game.isLocalPlayerDowned = false;
+                    if (game.player) game.player.health = Math.max(game.player.health, Math.floor(game.player.maxHealth * 0.5));
+                    showNotification(tt('revive.revivedYou', '💚 You are back in the fight!'), '#00ff88', 3000);
+                } else {
+                    const rp = game.remotePlayers.get(data.targetId);
+                    if (rp) {
+                        rp.isAlive = true;
+                        showNotification(tt('revive.revived', '💚 {name} is back in the fight!', { name: rp.displayName }), '#00ff88', 3000);
+                    }
+                }
+            }
+        } else if (event === 'boss_down') {
+            const tt = (k, f) => (window.t ? window.t(k, f) : f);
+            showNotification(tt('mp.bossDownFmt', '🏆 Boss defeated! Team strikes again!'), '#ffd93d', 4000);
         }
     };
 
@@ -6527,31 +6795,43 @@ function showLobbyUI(lobby) {
     
     modal.innerHTML = `
         <div class="modal-content multiplayer-lobby">
-            <h2>🎮 Co-op Lobby</h2>
+            <h2 data-i18n="mp.lobby">🎮 Co-op Lobby</h2>
             <div class="lobby-room-code-display">
-                <span>Room Code:</span>
+                <span data-i18n="mp.roomCode">Room Code:</span>
                 <span id="lobby-room-code" class="room-code-value">${lobby.code}</span>
-                <button class="btn-small" onclick="navigator.clipboard.writeText('${lobby.code}').then(() => showNotification('Code copied!', '#00ff88', 1500))">📋 Copy</button>
+                <button class="btn-small" id="lobby-copy-btn" data-i18n="mp.copy">📋 Copy</button>
             </div>
             <div class="lobby-settings">
-                <span>Difficulty: <strong>${lobby.settings.difficulty}</strong></span>
-                <span>Max Players: <strong>${lobby.settings.maxPlayers}</strong></span>
-                <span>Shared XP: <strong>${lobby.settings.sharedXP ? 'Yes' : 'No'}</strong></span>
+                <span><span data-i18n="mp.difficulty">Difficulty:</span> <strong>${lobby.settings.difficulty}</strong></span>
+                <span><span data-i18n="mp.maxPlayers">Max Players:</span> <strong>${lobby.settings.maxPlayers}</strong></span>
+                <span><span data-i18n="mp.sharedXp">Shared XP</span>: <strong>${lobby.settings.sharedXP ? '✔' : '✗'}</strong></span>
             </div>
-            <h3>Players (${lobby.players.length}/${lobby.settings.maxPlayers})</h3>
+            <h3><span data-i18n="mp.players">Players</span> (${lobby.players.length}/${lobby.settings.maxPlayers})</h3>
             <div id="lobby-player-list"></div>
             <div class="lobby-character-select">
-                <h3>Select Character</h3>
+                <h3 data-i18n="mp.selectChar">Select Character</h3>
                 <div id="lobby-character-list" class="lobby-char-grid"></div>
             </div>
             <div class="lobby-actions">
-                <button id="lobby-ready-btn" class="btn-primary">Ready Up</button>
-                <button id="lobby-start-btn" class="btn-primary" style="display:none">Start Game</button>
-                <button id="lobby-leave-btn" class="btn-secondary">Leave Room</button>
+                <button id="lobby-ready-btn" class="btn-primary" data-i18n="mp.ready">Ready Up</button>
+                <button id="lobby-start-btn" class="btn-primary" style="display:none" data-i18n="mp.startGame">Start Game</button>
+                <button id="lobby-leave-btn" class="btn-secondary" data-i18n="mp.leave">Leave Room</button>
             </div>
         </div>
     `;
     modal.classList.remove('hidden');
+    if (window.translateDOM) window.translateDOM(modal);
+    
+    // Wire copy button (replaces inline onclick to keep CSP-friendly behavior)
+    const copyBtn = modal.querySelector('#lobby-copy-btn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            const tt = (k, f) => (window.t ? window.t(k, f) : f);
+            try {
+                navigator.clipboard.writeText(lobby.code).then(() => showNotification(tt('mp.copied', 'Code copied!'), '#00ff88', 1500));
+            } catch {}
+        });
+    }
 
     // Populate character selection
     const charList = document.getElementById('lobby-character-list');
@@ -6866,6 +7146,26 @@ function gameLoop(timestamp) {
             }
         }
         drawParticles(ctx);
+        
+        // Multiplayer extras: emotes, pings, downed indicators (in-world, with camera)
+        if (game.isMultiplayer && window.MultiplayerExtras) {
+            const ex = window.MultiplayerExtras;
+            ex.updatePings();
+            ex.drawPings(ctx);
+            ex.drawEmotes(ctx, (pid) => {
+                const mp = window.MultiplayerClient;
+                if (mp && pid === mp.localPlayerId) return game.player;
+                return game.remotePlayers.get(pid) || null;
+            });
+            ex.drawDownedIndicator(ctx, (pid) => {
+                const mp = window.MultiplayerClient;
+                if (mp && pid === mp.localPlayerId) return game.player;
+                return game.remotePlayers.get(pid) || null;
+            });
+            // Drive the revive update each frame
+            const fHeld = !!(game.keys['f'] || game.keys['F']);
+            ex.updateRevive(game.player, game.remotePlayers, fHeld);
+        }
         
         updateUI();
         
@@ -7609,3 +7909,332 @@ function showMultiplayerModal() {
 }
 
 window.addEventListener('load', init);
+
+// ==================== REWORK: GAME MODES, STORY, DAILY, MP UX ====================
+// All additions below are additive; they wire the new i18n / story / multiplayer-extras systems
+// into the existing game without modifying core gameplay.
+
+/**
+ * Launch a story chapter. Wired into window so the StoryMode module can call it
+ * after the intro cinematic finishes.
+ */
+window.startStoryChapter = function startStoryChapter(chapter) {
+    if (!chapter) return;
+    game.gameMode = 'story';
+    game.activeStoryChapter = chapter;
+    game.storyChapterFinalBossSpawned = false;
+    if (window.StoryMode) window.StoryMode.setActiveChapter(chapter);
+    
+    // Apply chapter difficulty
+    game.difficulty = chapter.difficulty || 'normal';
+    game.difficultySettings = CONFIG.DIFFICULTY[game.difficulty];
+    
+    // Hide menus, show character select
+    document.getElementById('start-modal')?.classList.add('hidden');
+    const charSel = document.getElementById('character-select-modal');
+    if (charSel) charSel.classList.remove('hidden');
+};
+
+/**
+ * Launch the daily challenge: applies seeded difficulty and shows mutator banner.
+ */
+window.startDailyChallenge = function startDailyChallenge() {
+    if (!window.DailyChallenge) return;
+    const challenge = window.DailyChallenge.getTodayChallenge();
+    game.gameMode = 'daily';
+    game.activeDailyChallenge = challenge;
+    game.activeStoryChapter = null;
+    game.difficulty = challenge.difficulty;
+    game.difficultySettings = CONFIG.DIFFICULTY[game.difficulty];
+    
+    document.getElementById('start-modal')?.classList.add('hidden');
+    const charSel = document.getElementById('character-select-modal');
+    if (charSel) charSel.classList.remove('hidden');
+    
+    const tt = (k, f, v) => (window.t ? window.t(k, f, v) : f);
+    setTimeout(() => {
+        const lang = window.i18n ? window.i18n.getLanguage() : 'en';
+        const mutName = lang === 'de' ? challenge.mutator.nameDe : challenge.mutator.nameEn;
+        showNotification(tt('daily.modifierFmt', "Today's modifier: {mod}", { mod: mutName }), '#ffd93d', 5000);
+    }, 200);
+};
+
+/**
+ * Show the game-mode picker: Classic, Story, Daily, Multiplayer.
+ * Replaces the old "Begin Mission → difficulty" flow with a richer hub.
+ */
+function showGameModeMenu() {
+    const tt = (k, f) => (window.t ? window.t(k, f) : f);
+    let modal = document.getElementById('gamemode-modal');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'gamemode-modal';
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content gamemode-content">
+            <h2>${tt('menu.gameMode', 'Choose Your Mission')}</h2>
+            <div class="gamemode-grid">
+                <div class="gamemode-card" data-mode="classic">
+                    <h3>${tt('menu.classic', '🎯 Classic Survival')}</h3>
+                    <p>${tt('menu.classicDesc', 'Endless waves. How long can you last?')}</p>
+                </div>
+                <div class="gamemode-card" data-mode="story">
+                    <h3>${tt('menu.story', '📖 Story Mode')}</h3>
+                    <p>${tt('menu.storyDesc', 'Five themed chapters with their own bosses.')}</p>
+                </div>
+                <div class="gamemode-card" data-mode="daily">
+                    <h3>${tt('menu.daily', '☀️ Daily Challenge')}</h3>
+                    <p>${tt('menu.dailyDesc', 'A new shared challenge every day. Same seed for everyone!')}</p>
+                </div>
+                <div class="gamemode-card" data-mode="multiplayer">
+                    <h3>${tt('menu.multiplayer', '🎮 Co-op Multiplayer')}</h3>
+                    <p>${tt('menu.multiplayerDesc', 'Up to 4 players online. Share XP, share glory.')}</p>
+                </div>
+            </div>
+            <button class="btn-secondary gamemode-back">${tt('common.back', 'Back')}</button>
+        </div>
+    `;
+    document.getElementById('game-container').appendChild(modal);
+    
+    const close = () => {
+        modal.remove();
+        document.getElementById('start-modal')?.classList.remove('hidden');
+    };
+    modal.querySelector('.gamemode-back').addEventListener('click', close);
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    
+    modal.querySelectorAll('.gamemode-card').forEach(card => {
+        card.addEventListener('click', () => {
+            const mode = card.getAttribute('data-mode');
+            modal.remove();
+            if (mode === 'classic') {
+                game.gameMode = 'classic';
+                game.activeStoryChapter = null;
+                game.activeDailyChallenge = null;
+                if (window.StoryMode) window.StoryMode.clearActiveChapter();
+                showDifficultySelect();
+            } else if (mode === 'story') {
+                if (window.StoryMode) window.StoryMode.showMenu();
+            } else if (mode === 'daily') {
+                showDailyChallengeMenu();
+            } else if (mode === 'multiplayer') {
+                if (typeof showMultiplayerModal === 'function') showMultiplayerModal();
+            }
+        });
+    });
+}
+
+function showDailyChallengeMenu() {
+    const tt = (k, f, v) => (window.t ? window.t(k, f, v) : f);
+    if (!window.DailyChallenge) return;
+    const challenge = window.DailyChallenge.getTodayChallenge();
+    let modal = document.getElementById('daily-modal');
+    if (modal) modal.remove();
+    modal = document.createElement('div');
+    modal.id = 'daily-modal';
+    modal.className = 'modal';
+    const lang = window.i18n ? window.i18n.getLanguage() : 'en';
+    const mutName = lang === 'de' ? challenge.mutator.nameDe : challenge.mutator.nameEn;
+    const best = window.DailyChallenge.bestToday();
+    modal.innerHTML = `
+        <div class="modal-content daily-content">
+            <h2>${tt('daily.title', '☀️ Daily Challenge')}</h2>
+            <p>${tt('daily.intro', "Same loadout, same modifiers, same enemies — for everyone, every day. How far can you push?")}</p>
+            <div class="daily-info">
+                <p><strong>${tt('daily.seedFmt', "Today's seed: {seed}", { seed: challenge.seed })}</strong></p>
+                <p>${tt('daily.modifierFmt', "Today's modifier: {mod}", { mod: mutName })}</p>
+                <p style="opacity:.8">${challenge.mutator.desc}</p>
+                <p>⚙️ ${tt('difficulty.' + challenge.difficulty, challenge.difficulty)}</p>
+                ${best > 0 ? `<p>🏆 Best today: ${tt('hud.wave', 'Wave')} ${best}</p>` : ''}
+            </div>
+            <button class="btn-primary daily-start">${tt('daily.start', 'Start Daily Run')}</button>
+            <button class="btn-secondary daily-back">${tt('common.back', 'Back')}</button>
+        </div>
+    `;
+    document.getElementById('game-container').appendChild(modal);
+    const close = () => {
+        modal.remove();
+        document.getElementById('start-modal')?.classList.remove('hidden');
+    };
+    modal.querySelector('.daily-back').addEventListener('click', close);
+    modal.addEventListener('click', e => { if (e.target === modal) close(); });
+    modal.querySelector('.daily-start').addEventListener('click', () => {
+        modal.remove();
+        window.startDailyChallenge();
+    });
+}
+
+// ===== Replace start-button to open the mode picker instead of going straight to difficulty =====
+document.addEventListener('DOMContentLoaded', () => {
+    const startBtn = document.getElementById('start-btn');
+    if (startBtn) {
+        // Remove any existing click handlers by cloning. The original handler set up in init()
+        // also runs; we wrap it to open our menu instead. Detected via a flag.
+        startBtn.addEventListener('click', (e) => {
+            // The original click handler hides start-modal and calls showDifficultySelect.
+            // We let it run, then immediately replace the difficulty modal with our game-mode picker.
+            // showDifficultySelect appends a #difficulty-modal — remove it and show our picker.
+            setTimeout(() => {
+                const diff = document.getElementById('difficulty-modal');
+                if (diff) diff.remove();
+                showGameModeMenu();
+            }, 0);
+        }, false);
+    }
+});
+
+// ===== Translate dynamic modals after they appear =====
+// Many modals build their HTML dynamically and don't include data-i18n by default.
+// We re-translate on language change for any data-i18n attributes, and on
+// MutationObserver-detected modal additions.
+(function setupAutoTranslate() {
+    if (!window.i18n) return;
+    const apply = () => { try { window.translateDOM(document); } catch {} };
+    window.i18n.onChange(apply);
+    // Translate after DOM mutations (modals being injected)
+    try {
+        const obs = new MutationObserver((muts) => {
+            let needs = false;
+            for (const m of muts) {
+                m.addedNodes && m.addedNodes.forEach(n => {
+                    if (n.nodeType === 1 && (n.matches?.('[data-i18n], [data-i18n-html], [data-i18n-placeholder], [data-i18n-title]') || n.querySelector?.('[data-i18n], [data-i18n-html], [data-i18n-placeholder], [data-i18n-title]'))) {
+                        needs = true;
+                    }
+                });
+            }
+            if (needs) apply();
+        });
+        obs.observe(document.body, { childList: true, subtree: true });
+    } catch {}
+})();
+
+// ===== Inject Story / Daily buttons into the start-modal next to Multiplayer =====
+function injectExtraStartButtons() {
+    const tt = (k, f) => (window.t ? window.t(k, f) : f);
+    const startModal = document.getElementById('start-modal');
+    if (!startModal) return;
+    const modalContent = startModal.querySelector('.modal-content');
+    if (!modalContent) return;
+    if (modalContent.querySelector('#story-mode-btn')) return; // already injected
+    
+    const settingsBtn = document.getElementById('settings-btn');
+    
+    const storyBtn = document.createElement('button');
+    storyBtn.id = 'story-mode-btn';
+    storyBtn.className = 'btn-primary story-mode-btn';
+    storyBtn.textContent = tt('menu.story', '📖 Story Mode');
+    storyBtn.addEventListener('click', () => {
+        startModal.classList.add('hidden');
+        if (window.StoryMode) window.StoryMode.showMenu();
+    });
+    
+    const dailyBtn = document.createElement('button');
+    dailyBtn.id = 'daily-mode-btn';
+    dailyBtn.className = 'btn-primary daily-mode-btn';
+    dailyBtn.textContent = tt('menu.daily', '☀️ Daily Challenge');
+    dailyBtn.addEventListener('click', () => {
+        startModal.classList.add('hidden');
+        showDailyChallengeMenu();
+    });
+    
+    if (settingsBtn) {
+        modalContent.insertBefore(storyBtn, settingsBtn);
+        modalContent.insertBefore(dailyBtn, settingsBtn);
+    } else {
+        modalContent.appendChild(storyBtn);
+        modalContent.appendChild(dailyBtn);
+    }
+    
+    // Re-translate to keep label localized on language switch
+    if (window.i18n) {
+        window.i18n.onChange(() => {
+            storyBtn.textContent = tt('menu.story', '📖 Story Mode');
+            dailyBtn.textContent = tt('menu.daily', '☀️ Daily Challenge');
+        });
+    }
+}
+window.addEventListener('load', () => setTimeout(injectExtraStartButtons, 50));
+
+// ===== Multiplayer keys: T (emote wheel), Q (drop danger ping), E (rally ping) =====
+window.addEventListener('keydown', (e) => {
+    if (game.state !== 'playing' || game.paused) return;
+    if (!game.isMultiplayer) return;
+    // Don't interfere when typing in inputs
+    if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable)) return;
+    
+    const ex = window.MultiplayerExtras;
+    if (!ex) return;
+    
+    if (e.key === 't' || e.key === 'T') {
+        if (!ex.emoteWheelOpen) {
+            ex.openEmoteWheel();
+            e.preventDefault();
+        }
+    } else if (e.key === 'q' || e.key === 'Q') {
+        if (game.player) {
+            ex.sendPing(Math.round(game.player.x), Math.round(game.player.y), 'danger');
+            const tt = (k, f) => (window.t ? window.t(k, f) : f);
+            showNotification(tt('ping.placed', 'Ping placed'), '#ff4d4d', 1200);
+            e.preventDefault();
+        }
+    } else if (e.key === 'e' || e.key === 'E') {
+        if (game.player) {
+            ex.sendPing(Math.round(game.player.x), Math.round(game.player.y), 'rally');
+            const tt = (k, f) => (window.t ? window.t(k, f) : f);
+            showNotification(tt('ping.placed', 'Ping placed'), '#4ecdc4', 1200);
+            e.preventDefault();
+        }
+    }
+});
+
+// ===== Multiplayer HUD: quick-chat strip + emote wheel button =====
+function ensureMpQuickChatHud() {
+    let hud = document.getElementById('mp-quickchat-hud');
+    const tt = (k, f) => (window.t ? window.t(k, f) : f);
+    if (!hud) {
+        hud = document.createElement('div');
+        hud.id = 'mp-quickchat-hud';
+        hud.className = 'mp-quickchat-hud';
+        hud.innerHTML = `
+            <button class="qc-btn" data-key="help">${tt('quickchat.help', 'Help!')}</button>
+            <button class="qc-btn" data-key="push">${tt('quickchat.push', 'Push!')}</button>
+            <button class="qc-btn" data-key="defend">${tt('quickchat.defend', 'Defend!')}</button>
+            <button class="qc-btn" data-key="gg">${tt('quickchat.gg', 'GG!')}</button>
+            <button class="qc-btn emote-open" title="${tt('mp.openEmote', 'Open Emote Wheel (T)')}" aria-label="emote">😀</button>
+        `;
+        document.body.appendChild(hud);
+        hud.querySelectorAll('.qc-btn[data-key]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (window.MultiplayerExtras) window.MultiplayerExtras.sendQuickChat(btn.getAttribute('data-key'));
+            });
+        });
+        hud.querySelector('.emote-open').addEventListener('click', () => {
+            if (window.MultiplayerExtras && !window.MultiplayerExtras.emoteWheelOpen) {
+                window.MultiplayerExtras.openEmoteWheel();
+            }
+        });
+        if (window.i18n) {
+            window.i18n.onChange(() => {
+                hud.querySelectorAll('.qc-btn[data-key]').forEach(btn => {
+                    const k = btn.getAttribute('data-key');
+                    btn.textContent = tt('quickchat.' + k, btn.textContent);
+                });
+                const eb = hud.querySelector('.emote-open');
+                if (eb) eb.title = tt('mp.openEmote', 'Open Emote Wheel (T)');
+            });
+        }
+    }
+    hud.style.display = (game.isMultiplayer && game.state === 'playing') ? 'flex' : 'none';
+}
+setInterval(ensureMpQuickChatHud, 500);
+
+// ===== Pause-menu Settings button: open the settings modal =====
+document.addEventListener('DOMContentLoaded', () => {
+    const psb = document.getElementById('pause-settings-btn');
+    if (psb) {
+        psb.addEventListener('click', () => {
+            const sm = document.getElementById('settings-modal');
+            if (sm) sm.classList.remove('hidden');
+        });
+    }
+});

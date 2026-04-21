@@ -8,6 +8,11 @@ import { MusicSystem } from './js/systems/musicSystem.js';
 import { VisualEffectsSystem } from './js/systems/visualEffects.js';
 import { SettingsSystem } from './js/systems/settingsSystem.js';
 import { PowerupSystem } from './js/systems/powerupSystem.js';
+// New systems for the rework: i18n, story mode, multiplayer extras, daily challenge
+import './js/systems/i18n.js';
+import './js/systems/storyMode.js';
+import './js/systems/multiplayerExtras.js';
+import './js/systems/dailyChallenge.js';
 
 // Flag to indicate enhanced mode
 window.ENHANCED_MODE = true;
@@ -43,6 +48,9 @@ function initEnhancedSystems() {
     
     // Apply settings
     applySettings();
+    
+    // Translate any static markup that uses data-i18n
+    if (window.translateDOM) window.translateDOM(document);
     
     // Create UI elements for new features
     createEnhancedUI();
@@ -160,85 +168,116 @@ function createSettingsModal() {
     const modal = document.createElement('div');
     modal.id = 'settings-modal';
     modal.className = 'modal hidden';
-    modal.innerHTML = `
-        <div class="modal-content settings-content">
-            <h2>⚙️ Settings</h2>
-            
-            <div class="setting-group">
-                <label>🔊 Sound Volume</label>
-                <input type="range" id="sound-volume" min="0" max="100" value="50">
-                <span id="sound-volume-value">50%</span>
-            </div>
-            
-            <div class="setting-group">
-                <label>🎵 Music Volume</label>
-                <input type="range" id="music-volume" min="0" max="100" value="30">
-                <span id="music-volume-value">30%</span>
-            </div>
-            
-            <div class="setting-group">
-                <label>
-                    <input type="checkbox" id="screen-shake" checked>
-                    📳 Screen Shake
-                </label>
-            </div>
-            
-            <div class="setting-group">
-                <label>
-                    <input type="checkbox" id="reduced-motion">
-                    ♿ Reduced Motion
-                </label>
-            </div>
-            
-            <div class="setting-group">
-                <label>
-                    <input type="checkbox" id="damage-numbers" checked>
-                    💢 Show Damage Numbers
-                </label>
-            </div>
-            
-            <div class="setting-group">
-                <label>
-                    <input type="checkbox" id="show-fps">
-                    📊 Show FPS
-                </label>
-            </div>
-            
-            <div class="setting-group">
-                <label>🎨 Colorblind Mode</label>
-                <select id="colorblind-mode">
-                    <option value="none">None</option>
-                    <option value="protanopia">Protanopia (Red-Blind)</option>
-                    <option value="deuteranopia">Deuteranopia (Green-Blind)</option>
-                    <option value="tritanopia">Tritanopia (Blue-Blind)</option>
-                </select>
-            </div>
-            
-            <div class="setting-group">
-                <label>📏 UI Scale</label>
-                <input type="range" id="ui-scale" min="50" max="200" value="100">
-                <span id="ui-scale-value">100%</span>
-            </div>
-            
-            <button class="btn-primary save-settings">Save & Close</button>
-        </div>
-    `;
     document.body.appendChild(modal);
-    
-    // Load current settings
-    loadSettingsUI();
-    
-    // Save button
-    modal.querySelector('.save-settings').addEventListener('click', () => {
-        saveSettingsFromUI();
-        modal.classList.add('hidden');
-    });
-    
+
+    const renderModal = () => {
+        const tt = (k, f) => (window.t ? window.t(k, f) : f);
+        modal.innerHTML = `
+            <div class="modal-content settings-content">
+                <h2>${tt('settings.title', '⚙️ Settings')}</h2>
+
+                <div class="setting-group">
+                    <label>${tt('settings.language', '🌐 Language')}</label>
+                    <select id="ui-language">
+                        <option value="en">${tt('settings.langEn', 'English')}</option>
+                        <option value="de">${tt('settings.langDe', 'Deutsch')}</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label>${tt('settings.soundVol', '🔊 Sound Volume')}</label>
+                    <input type="range" id="sound-volume" min="0" max="100" value="50">
+                    <span id="sound-volume-value">50%</span>
+                </div>
+
+                <div class="setting-group">
+                    <label>${tt('settings.musicVol', '🎵 Music Volume')}</label>
+                    <input type="range" id="music-volume" min="0" max="100" value="30">
+                    <span id="music-volume-value">30%</span>
+                </div>
+
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="screen-shake" checked>
+                        ${tt('settings.screenShake', '📳 Screen Shake')}
+                    </label>
+                </div>
+
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="reduced-motion">
+                        ${tt('settings.reducedMotion', '♿ Reduced Motion')}
+                    </label>
+                </div>
+
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="damage-numbers" checked>
+                        ${tt('settings.damageNumbers', '💢 Show Damage Numbers')}
+                    </label>
+                </div>
+
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="show-fps">
+                        ${tt('settings.showFps', '📊 Show FPS')}
+                    </label>
+                </div>
+
+                <div class="setting-group">
+                    <label>${tt('settings.colorblind', '🎨 Colorblind Mode')}</label>
+                    <select id="colorblind-mode">
+                        <option value="none">${tt('settings.colorblindNone', 'None')}</option>
+                        <option value="protanopia">${tt('settings.colorblindProt', 'Protanopia (Red-Blind)')}</option>
+                        <option value="deuteranopia">${tt('settings.colorblindDeut', 'Deuteranopia (Green-Blind)')}</option>
+                        <option value="tritanopia">${tt('settings.colorblindTrit', 'Tritanopia (Blue-Blind)')}</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label>${tt('settings.uiScale', '📏 UI Scale')}</label>
+                    <input type="range" id="ui-scale" min="50" max="200" value="100">
+                    <span id="ui-scale-value">100%</span>
+                </div>
+
+                <button class="btn-primary save-settings">${tt('settings.saveClose', 'Save & Close')}</button>
+            </div>
+        `;
+
+        // Load current settings into UI
+        loadSettingsUI();
+
+        // Language change is applied immediately and the modal re-renders so labels switch.
+        const langSel = modal.querySelector('#ui-language');
+        if (langSel && window.i18n) {
+            langSel.value = window.i18n.getLanguage();
+            langSel.addEventListener('change', () => {
+                window.i18n.setLanguage(langSel.value);
+                renderModal();
+            });
+        }
+
+        // Save button
+        modal.querySelector('.save-settings').addEventListener('click', () => {
+            saveSettingsFromUI();
+            modal.classList.add('hidden');
+        });
+    };
+
+    renderModal();
+
     modal.addEventListener('click', (e) => {
         if (e.target === modal) {
             modal.classList.add('hidden');
         }
     });
+
+    // Re-render labels when language changes from elsewhere
+    if (window.i18n) {
+        window.i18n.onChange(() => {
+            if (!modal.classList.contains('hidden')) renderModal();
+        });
+    }
 }
 
 function createPowerupDisplay() {
