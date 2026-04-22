@@ -19,10 +19,13 @@ const urlsToCache = [
   '/js/entities/enemyTypes.js',
   '/js/entities/bossTypes.js',
   '/js/weapons/weaponSystem.js',
+  '/js/weapons/weaponBase.js',
+  '/js/weapons/evolutions/meteorStrike.js',
   '/js/systems/highscore.js',
   '/js/systems/sound.js',
   '/js/systems/touchControls.js',
-  '/js/systems/achievements.js'
+  '/js/systems/achievements.js',
+  '/js/systems/weaponEvolutionSystem.js'
 ];
 
 // Install event - cache resources
