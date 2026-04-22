@@ -1,5 +1,11 @@
 // Weapon System
 import { CONFIG } from '../config.js';
+import { Weapon } from './weaponBase.js';
+import { METEOR_STRIKE_TYPE, MeteorStrikeWeapon } from './evolutions/meteorStrike.js';
+
+// Re-export the base class so existing imports (`import { Weapon } from
+// './weapons/weaponSystem.js'`) keep working.
+export { Weapon };
 
 export const WEAPON_TYPES = {
     basic: {
@@ -90,40 +96,27 @@ export const WEAPON_TYPES = {
         color: '#9d00ff',
         pierceCount: 5,
     },
+
+    // ---- Evolved weapons (registered from js/weapons/evolutions/*) ----
+    meteorStrike: METEOR_STRIKE_TYPE,
 };
 
-export class Weapon {
-    constructor(type = 'basic') {
-        this.type = type;
-        this.config = WEAPON_TYPES[type];
+// Map of evolved weapon id -> custom Weapon subclass. The factory below
+// uses this so callers can stay agnostic of which class implements a weapon.
+// Add a new entry here whenever a new evolved weapon class is created.
+export const EVOLVED_WEAPON_CLASSES = {
+    meteorStrike: MeteorStrikeWeapon,
+};
+
+/**
+ * Factory that returns the right Weapon subclass for a given type id.
+ * Evolved weapons may have bespoke `createProjectiles` logic; standard
+ * weapons fall back to the base `Weapon` class.
+ */
+export function createWeapon(type) {
+    const EvolvedClass = EVOLVED_WEAPON_CLASSES[type];
+    if (EvolvedClass) {
+        return new EvolvedClass();
     }
-    
-    createProjectiles(x, y, targetAngle, player) {
-        const projectiles = [];
-        const config = this.config;
-        
-        if (this.type === 'spread') {
-            // Create spread pattern
-            const spreadAngle = config.spreadAngle;
-            const angleStep = (spreadAngle * 2) / (config.projectileCount - 1);
-            
-            for (let i = 0; i < config.projectileCount; i++) {
-                const angle = targetAngle - spreadAngle + (i * angleStep);
-                projectiles.push({
-                    angle,
-                    type: config.projectileType,
-                    config,
-                });
-            }
-        } else {
-            // Single projectile (or will target multiple enemies)
-            projectiles.push({
-                angle: targetAngle,
-                type: config.projectileType,
-                config,
-            });
-        }
-        
-        return projectiles;
-    }
+    return new Weapon(type, WEAPON_TYPES);
 }

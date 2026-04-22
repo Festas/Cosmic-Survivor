@@ -9,6 +9,46 @@ export const CONFIG = {
     BULLET_SPEED: 8,
     PICKUP_SIZE: 15,
     BOSS_WAVE_INTERVAL: 5, // Boss every 5 waves
+    WEAPON_MAX_LEVEL: 5,   // Standard weapons must reach this level to be eligible for evolution
+};
+
+// Passive items the player can pick up. They are required ingredients
+// for Weapon Evolutions (see EVOLUTION_RECIPES below).
+export const PASSIVE_ITEMS = {
+    piercing_rounds: {
+        id: 'piercing_rounds',
+        name: '🎯 Piercing Rounds',
+        description: 'Projectiles pierce one additional enemy.',
+    },
+    ember_core: {
+        id: 'ember_core',
+        name: '🔥 Ember Core',
+        description: 'Fire-based weapons burn 25% hotter.',
+    },
+    overcharger: {
+        id: 'overcharger',
+        name: '⚡ Overcharger',
+        description: 'Energy weapons fire 15% faster.',
+    },
+};
+
+// Weapon Evolution recipes. Each recipe says:
+//   "When the player has weapon `baseWeapon` at maxLevel AND owns `requiredItem`,
+//    the next level-up choice may offer `evolvedWeapon` which replaces the base."
+//
+// To add a new evolution:
+//   1. Define the evolved weapon (class + WEAPON_TYPES entry) under js/weapons/.
+//   2. Add a new entry to this map keyed by a unique recipe id.
+// The evolution system reads this map dynamically, so no other code needs to change.
+export const EVOLUTION_RECIPES = {
+    meteor_strike: {
+        id: 'meteor_strike',
+        baseWeapon: 'rocket',
+        requiredItem: 'ember_core',
+        evolvedWeapon: 'meteorStrike',
+        name: '☄️ Meteor Strike',
+        description: 'Rocket Launcher + Ember Core → Meteor Strike',
+    },
 };
 
 // Character presets
