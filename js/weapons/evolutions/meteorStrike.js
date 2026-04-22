@@ -20,7 +20,7 @@ export const METEOR_STRIKE_TYPE = {
     range: 600,
     projectileCount: 3,
     color: '#ff8c1a',
-    explosionRadius: 160,   // Much bigger than rocket's 80
+    explosionRadius: 160,   // Massive area-of-effect (much larger than the base Rocket)
     pierceCount: 999,       // Meteors plow through every enemy in their path
     spreadAngle: 0.25,
     isEvolved: true,

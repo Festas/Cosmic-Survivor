@@ -100,7 +100,7 @@ export class WeaponEvolutionSystem {
         return {
             id: `evolution_${recipe.id}`,
             name: `🌟 ${evolvedConfig.name}`,
-            desc: `EVOLUTION! ${baseLabel} + ${passiveLabel} → ${evolvedConfig.name}. ${evolvedConfig.description}`,
+            desc: `EVOLUTION! ${baseLabel} + ${passiveLabel}. ${evolvedConfig.description}`,
             type: 'evolution',
             recipeId: recipe.id,
             apply: (p) => this.evolveWeapon(p, recipe),

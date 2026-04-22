@@ -15,7 +15,6 @@ export class Weapon {
         this.config = configLookup ? configLookup[type] : undefined;
         this.maxLevel = CONFIG.WEAPON_MAX_LEVEL;
         this.level = 1;
-        this.xp = 0;
     }
 
     /** True when this weapon has reached max level and may be eligible for evolution. */
