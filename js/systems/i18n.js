@@ -22,6 +22,7 @@ const STRINGS = {
         'common.locked': 'Locked',
         'common.unlocked': 'Unlocked',
         'common.next': 'Next',
+        'common.prev': 'Prev',
         'common.start': 'Start',
         'common.retry': 'Try Again',
 
@@ -40,6 +41,7 @@ const STRINGS = {
         'menu.subtitle': 'Reworked Edition',
         'menu.intro': 'Survive waves of alien creatures in a perfectly balanced arena!',
         'menu.beginMission': 'Begin Mission',
+        'menu.howToPlay': '❔ How to Play / Features',
         'menu.classic': '🎯 Classic Survival',
         'menu.story': '📖 Story Mode',
         'menu.daily': '☀️ Daily Challenge',
@@ -90,6 +92,8 @@ const STRINGS = {
         'shop.title': 'Upgrade Station',
         'shop.waveComplete': 'Wave {wave} Complete!',
         'shop.next': 'Start Next Wave',
+        'shop.complete': 'complete',
+        'shop.pageFmt': 'Page {page} of {total}',
 
         // Game over
         'gameover.fail': 'Mission Failed',
@@ -276,6 +280,7 @@ const STRINGS = {
         'common.locked': 'Gesperrt',
         'common.unlocked': 'Freigeschaltet',
         'common.next': 'Weiter',
+        'common.prev': 'Zurück',
         'common.start': 'Start',
         'common.retry': 'Nochmal versuchen',
 
@@ -291,6 +296,7 @@ const STRINGS = {
         'menu.subtitle': 'Überarbeitete Edition',
         'menu.intro': 'Überlebe Wellen von Alien-Kreaturen in einer perfekt ausbalancierten Arena!',
         'menu.beginMission': 'Mission starten',
+        'menu.howToPlay': '❔ Spielanleitung / Features',
         'menu.classic': '🎯 Klassisches Survival',
         'menu.story': '📖 Story-Modus',
         'menu.daily': '☀️ Tägliche Challenge',
@@ -337,6 +343,8 @@ const STRINGS = {
         'shop.title': 'Upgrade-Station',
         'shop.waveComplete': 'Welle {wave} abgeschlossen!',
         'shop.next': 'Nächste Welle starten',
+        'shop.complete': 'abgeschlossen',
+        'shop.pageFmt': 'Seite {page} von {total}',
 
         'gameover.fail': 'Mission fehlgeschlagen',
         'gameover.legendary': '🌟 LEGENDÄRER ÜBERLEBENDER! 🌟',

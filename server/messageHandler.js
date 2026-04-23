@@ -15,8 +15,13 @@ import { v4 as uuidv4 } from 'uuid';
 const clients = new Map();
 
 // ========== RATE LIMITING ==========
+// Note on tuning: the client sends `player_state` at ~20 Hz (every 50 ms), and
+// during heavy combat each kill / pickup / level-up emits its own `game_event`.
+// The previous 30 msg/s ceiling was tight enough that intense moments tripped
+// the limiter and disconnected players, so it's lifted here. Authentication
+// messages still have their own much stricter bucket.
 const RATE_LIMIT_WINDOW = 1000; // 1 second window
-const RATE_LIMIT_MAX_MESSAGES = 30; // Max messages per window
+const RATE_LIMIT_MAX_MESSAGES = 120; // Max non-auth messages per window
 const AUTH_RATE_LIMIT_WINDOW = 60000; // 1 minute window for auth
 const AUTH_RATE_LIMIT_MAX = 5; // Max auth attempts per window
 const rateLimitState = new WeakMap(); // ws -> { messages: [], authAttempts: [] }
