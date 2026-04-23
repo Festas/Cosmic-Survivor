@@ -92,38 +92,41 @@
         
         <!-- Start Modal -->
         <div id="start-modal" class="modal">
-            <div class="modal-content">
+            <div class="modal-content start-modal-content">
                 <h1 data-i18n="menu.title">🚀 Cosmic Survivor 🚀</h1>
                 <h3 style="color: #ffd93d;" data-i18n="menu.subtitle">Reworked Edition</h3>
                 <p class="intro-text" data-i18n="menu.intro">Survive waves of alien creatures in a perfectly balanced arena!</p>
-                <div class="controls-info">
-                    <h3 data-i18n="menu.features">✨ Features:</h3>
-                    <p>🎭 12 Unique Characters with distinct playstyles</p>
-                    <p>⚙️ 4 Difficulty modes: Easy → Nightmare</p>
-                    <p>⬆️ XP & Level-up system with passive abilities</p>
-                    <p>⚡ Dash ability for tactical movement</p>
-                    <p>⭐ Elite enemies with special modifiers</p>
-                    <p>🔫 8 Different Weapon Types (keys 1-8)</p>
-                    <p>👹 5 Epic Boss Types every 5 waves</p>
-                    <p>👾 10 Enemy Types with unique abilities</p>
-                    <p>🗺️ Mini-map & DPS meter</p>
-                    <p>🛒 40+ shop items with reroll system</p>
-                    <p>🏆 Achievements & High Scores</p>
-                </div>
-                <div class="controls-info">
-                    <h3 data-i18n="menu.controls">Controls:</h3>
-                    <p data-i18n="menu.controlMove">🎮 WASD / Arrow Keys - Move</p>
-                    <p data-i18n="menu.controlDash">SPACE - Dash (1.5s cooldown)</p>
-                    <p data-i18n="menu.controlWeapons">1-8 Keys - Switch Weapons</p>
-                    <p data-i18n="menu.controlPause">ESC - Pause/Resume</p>
-                    <p data-i18n="menu.controlTouch">📱 Touch & Drag - Virtual Joystick</p>
-                    <p data-i18n="menu.controlAuto">🔫 Auto-aim & Auto-shoot</p>
-                    <p data-i18n="menu.controlEmote">T - Emote Wheel (multiplayer)</p>
-                    <p data-i18n="menu.controlPing">Q - Drop Ping (multiplayer)</p>
-                    <p data-i18n="menu.controlRevive">F - Revive Teammate</p>
-                </div>
                 <button id="start-btn" class="btn-primary" data-i18n="menu.beginMission">Begin Mission</button>
                 <button id="settings-btn" class="btn-secondary" data-i18n="menu.settings">⚙️ Settings</button>
+                <details class="how-to-play">
+                    <summary data-i18n="menu.howToPlay">❔ How to Play / Features</summary>
+                    <div class="controls-info">
+                        <h3 data-i18n="menu.features">✨ Features:</h3>
+                        <p>🎭 12 Unique Characters with distinct playstyles</p>
+                        <p>⚙️ 4 Difficulty modes: Easy → Nightmare</p>
+                        <p>⬆️ XP & Level-up system with passive abilities</p>
+                        <p>⚡ Dash ability for tactical movement</p>
+                        <p>⭐ Elite enemies with special modifiers</p>
+                        <p>🔫 8 Different Weapon Types (keys 1-8)</p>
+                        <p>👹 5 Epic Boss Types every 5 waves</p>
+                        <p>👾 10 Enemy Types with unique abilities</p>
+                        <p>🗺️ Mini-map & DPS meter</p>
+                        <p>🛒 40+ shop items with reroll system</p>
+                        <p>🏆 Achievements & High Scores</p>
+                    </div>
+                    <div class="controls-info">
+                        <h3 data-i18n="menu.controls">Controls:</h3>
+                        <p data-i18n="menu.controlMove">🎮 WASD / Arrow Keys - Move</p>
+                        <p data-i18n="menu.controlDash">SPACE - Dash (1.5s cooldown)</p>
+                        <p data-i18n="menu.controlWeapons">1-8 Keys - Switch Weapons</p>
+                        <p data-i18n="menu.controlPause">ESC - Pause/Resume</p>
+                        <p data-i18n="menu.controlTouch">📱 Touch & Drag - Virtual Joystick</p>
+                        <p data-i18n="menu.controlAuto">🔫 Auto-aim & Auto-shoot</p>
+                        <p data-i18n="menu.controlEmote">T - Emote Wheel (multiplayer)</p>
+                        <p data-i18n="menu.controlPing">Q - Drop Ping (multiplayer)</p>
+                        <p data-i18n="menu.controlRevive">F - Revive Teammate</p>
+                    </div>
+                </details>
             </div>
         </div>
         
@@ -148,45 +151,101 @@
     <!-- Service Worker Registration -->
     <script>
         if ('serviceWorker' in navigator) {
+            // Track whether this page already had a controller when it loaded.
+            // If it didn't, a `controllerchange` is just the very first SW
+            // taking control of an uncontrolled tab (no need to reload).
+            // If it did, a `controllerchange` means a NEW deployed version
+            // just activated and we should reload to pick it up.
+            const initiallyControlled = !!navigator.serviceWorker.controller;
+            let reloadingForUpdate = false;
+
+            // Reload as soon as the new SW takes control of this page.
+            // If the player is mid-run we hold off and reload once they're
+            // back in a menu / game-over state, so a deploy never wipes a
+            // run that's actively in progress.
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!initiallyControlled || reloadingForUpdate) return;
+                reloadingForUpdate = true;
+                const reloadNow = () => {
+                    console.log('[SW] New version active, reloading…');
+                    window.location.reload();
+                };
+                const isMidRun = () => {
+                    try {
+                        return !!(window.game && window.game.state === 'playing' && !window.game.paused);
+                    } catch { return false; }
+                };
+                if (!isMidRun()) {
+                    reloadNow();
+                    return;
+                }
+                // Mid-run: show a small notice and reload once the run ends.
+                try {
+                    const notice = document.createElement('div');
+                    notice.id = 'sw-update-notice';
+                    notice.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#00ff88;color:#000;padding:8px 16px;border-radius:8px;font-weight:bold;z-index:10000;font-family:monospace;box-shadow:0 4px 12px rgba(0,255,136,0.4);font-size:13px;';
+                    notice.textContent = '🚀 Update ready — will reload after this run';
+                    document.body.appendChild(notice);
+                    setTimeout(() => { notice.remove(); }, 6000);
+                } catch {}
+                const poll = setInterval(() => {
+                    if (!isMidRun()) {
+                        clearInterval(poll);
+                        reloadNow();
+                    }
+                }, 2000);
+            });
+
+            // Helper: whenever an updated worker has finished installing and
+            // is sitting in `waiting`, ask it to take over immediately.
+            function activateWaitingWorker(reg) {
+                if (reg && reg.waiting) {
+                    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+            }
+
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
                     .then(registration => {
                         console.log('SW registered:', registration);
-                        
-                        // Check for updates periodically
-                        setInterval(() => {
-                            registration.update();
-                        }, 60000); // Check every minute
+
+                        // If a worker is already waiting (e.g. from a previous
+                        // visit), activate it now so the user gets the latest.
+                        activateWaitingWorker(registration);
+
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            if (!newWorker) return;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    // A new SW is installed and waiting — activate it
+                                    // immediately. The `controllerchange` listener
+                                    // above will then reload the page.
+                                    activateWaitingWorker(registration);
+                                }
+                            });
+                        });
+
+                        // Check for updates periodically and whenever the tab
+                        // regains focus, so users on long-lived tabs pick up
+                        // new deployments quickly.
+                        setInterval(() => { registration.update().catch(() => {}); }, 60000);
+                        document.addEventListener('visibilitychange', () => {
+                            if (document.visibilityState === 'visible') {
+                                registration.update().catch(() => {});
+                            }
+                        });
                     })
                     .catch(error => {
                         console.log('SW registration failed:', error);
                     });
-                    
-                // Listen for service worker updates
+
+                // Optional notification: keep the message listener for
+                // diagnostics, but skip the manual "Refresh" prompt — the
+                // controllerchange handler reloads automatically.
                 navigator.serviceWorker.addEventListener('message', event => {
                     if (event.data && event.data.type === 'SW_UPDATED') {
-                        console.log('New version available:', event.data.version);
-                        // Show a subtle notification to user
-                        const notification = document.createElement('div');
-                        notification.id = 'update-notification';
-                        notification.innerHTML = `
-                            <div style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); 
-                                        background: #00ff88; color: #000; padding: 15px 25px; 
-                                        border-radius: 10px; box-shadow: 0 4px 12px rgba(0,255,136,0.3); 
-                                        z-index: 10000; font-weight: bold; text-align: center;">
-                                🚀 New version available! <button onclick="location.reload()" 
-                                   style="margin-left: 10px; padding: 5px 15px; background: #000; 
-                                          color: #00ff88; border: 2px solid #00ff88; border-radius: 5px; 
-                                          cursor: pointer; font-weight: bold;">Refresh</button>
-                            </div>
-                        `;
-                        document.body.appendChild(notification);
-                        
-                        // Auto-hide after 10 seconds
-                        setTimeout(() => {
-                            const notif = document.getElementById('update-notification');
-                            if (notif) notif.remove();
-                        }, 10000);
+                        console.log('[SW] New version available:', event.data.version);
                     }
                 });
             });

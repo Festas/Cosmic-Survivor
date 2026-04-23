@@ -538,6 +538,10 @@ const game = {
     isLocalPlayerDowned: false, // multiplayer: local player downed (waiting for revive)
 };
 
+// Expose game state on window so the service-worker reload handler (and other
+// integration scripts) can detect when the player is mid-run.
+try { window.game = game; } catch {}
+
 function loadPersistentStats() {
     const defaults = { totalKills: 0, totalCredits: 0, maxWave: 0, upgradesPurchased: 0, weaponsUnlocked: 1 };
     try {
@@ -4752,7 +4756,9 @@ let shopState = {
     currentOfferings: [],
     lockedItems: new Set(),
     rerollCost: 0,
-    rerollCount: 0
+    rerollCount: 0,
+    page: 0,                // current shop page (mobile pagination)
+    itemsPerPage: 4         // items shown per page on small screens
 };
 
 function generateShopOfferings() {
@@ -4865,6 +4871,7 @@ function openShop() {
         shopState.rerollCost = 0;
         shopState.rerollCount = 0;
     }
+    shopState.page = 0; // start each shop visit on the first page
     
     renderShop();
 }
@@ -4939,6 +4946,20 @@ function renderShop() {
     const shopContainer = document.getElementById('shop-items');
     shopContainer.innerHTML = '';
     
+    const tt = (k, f, v) => (window.t ? window.t(k, f, v) : f);
+    
+    // ===== Always-visible credits header (sticks to top of the modal) =====
+    const creditsHeader = document.createElement('div');
+    creditsHeader.className = 'shop-credits-header';
+    creditsHeader.innerHTML = `
+        <div>
+            <div class="shop-credits-label">💰 ${tt('hud.credits', 'Credits')}</div>
+            <div class="shop-wave-info">${tt('hud.wave', 'Wave')} ${game.wave - 1} ${tt('shop.complete', 'complete')}</div>
+        </div>
+        <div class="shop-credits-value" id="shop-credits-value">${game.credits}</div>
+    `;
+    shopContainer.appendChild(creditsHeader);
+    
     // Add reroll button at the top
     const rerollSection = document.createElement('div');
     rerollSection.className = 'shop-reroll-section';
@@ -4950,10 +4971,42 @@ function renderShop() {
     `;
     shopContainer.appendChild(rerollSection);
     
+    // ===== Pagination: limit visible items on small screens =====
+    // We always render the pager element; CSS only displays it on narrow
+    // viewports, so desktop users still see the full grid at once.
+    const isMobile = (typeof window !== 'undefined') && window.matchMedia
+        ? window.matchMedia('(max-width: 600px)').matches
+        : false;
+    const totalItems = shopState.currentOfferings.length;
+    const perPage = Math.max(1, shopState.itemsPerPage || 4);
+    const totalPages = Math.max(1, Math.ceil(totalItems / perPage));
+    if (shopState.page >= totalPages) shopState.page = totalPages - 1;
+    if (shopState.page < 0) shopState.page = 0;
+    
+    let visibleStart, visibleEnd;
+    if (isMobile) {
+        visibleStart = shopState.page * perPage;
+        visibleEnd = Math.min(totalItems, visibleStart + perPage);
+    } else {
+        visibleStart = 0;
+        visibleEnd = totalItems;
+    }
+    
+    const pager = document.createElement('div');
+    pager.className = 'shop-pager';
+    pager.innerHTML = `
+        <button class="pager-btn" id="shop-prev-btn" ${shopState.page === 0 ? 'disabled' : ''}>◀ ${tt('common.prev', 'Prev')}</button>
+        <div class="pager-info">${tt('shop.pageFmt', 'Page {page} of {total}', { page: shopState.page + 1, total: totalPages })}</div>
+        <button class="pager-btn" id="shop-next-btn" ${shopState.page >= totalPages - 1 ? 'disabled' : ''}>${tt('common.next', 'Next')} ▶</button>
+    `;
+    shopContainer.appendChild(pager);
+    
     const itemsGrid = document.createElement('div');
     itemsGrid.className = 'shop-items-grid';
     
     shopState.currentOfferings.forEach((item, index) => {
+        if (index < visibleStart || index >= visibleEnd) return;
+        
         const isLocked = shopState.lockedItems.has(index);
         const canAfford = game.credits >= item.price;
         
@@ -5047,6 +5100,16 @@ function renderShop() {
     if (rerollBtn) {
         rerollBtn.addEventListener('click', rerollShop);
     }
+    
+    // Pager handlers
+    const prevBtn = document.getElementById('shop-prev-btn');
+    const nextBtn = document.getElementById('shop-next-btn');
+    if (prevBtn) prevBtn.addEventListener('click', () => {
+        if (shopState.page > 0) { shopState.page--; renderShop(); }
+    });
+    if (nextBtn) nextBtn.addEventListener('click', () => {
+        if (shopState.page < totalPages - 1) { shopState.page++; renderShop(); }
+    });
 }
 
 function toggleItemLock(index) {
@@ -5689,6 +5752,10 @@ function updateUI() {
     // Only update credits if they changed
     if (lastUIValues.credits !== game.credits) {
         document.getElementById('credit-amount').textContent = game.credits;
+        // Keep the in-shop sticky credit counter in sync as well, so the
+        // player always sees their current balance while shopping.
+        const shopCredits = document.getElementById('shop-credits-value');
+        if (shopCredits) shopCredits.textContent = game.credits;
         lastUIValues.credits = game.credits;
     }
     
@@ -7643,25 +7710,10 @@ function initMultiplayerUI() {
     accountBtn.addEventListener('click', showAccountModal);
     document.body.appendChild(accountBtn);
     
-    // Multiplayer button on start screen
-    const startModal = document.getElementById('start-modal');
-    if (startModal) {
-        const modalContent = startModal.querySelector('.modal-content');
-        if (modalContent) {
-            const mpBtn = document.createElement('button');
-            mpBtn.id = 'multiplayer-btn';
-            mpBtn.className = 'btn-primary multiplayer-btn';
-            mpBtn.textContent = '🎮 Co-op Multiplayer';
-            mpBtn.addEventListener('click', showMultiplayerModal);
-            
-            const settingsBtn = document.getElementById('settings-btn');
-            if (settingsBtn) {
-                modalContent.insertBefore(mpBtn, settingsBtn);
-            } else {
-                modalContent.appendChild(mpBtn);
-            }
-        }
-    }
+    // Multiplayer is now reachable via the game-mode picker (opens after
+    // pressing "Begin Mission"), so we no longer inject a separate
+    // "Co-op Multiplayer" button into the start menu — that kept the menu
+    // cluttered with three duplicate buttons (Multiplayer / Story / Daily).
     
     // Try auto-connect and restore session
     if (window.MultiplayerClient) {
@@ -8109,49 +8161,10 @@ document.addEventListener('DOMContentLoaded', () => {
 })();
 
 // ===== Inject Story / Daily buttons into the start-modal next to Multiplayer =====
+// Disabled: Story Mode and Daily Challenge are reachable from the game-mode
+// picker that opens after "Begin Mission". Keeping the start menu lean.
 function injectExtraStartButtons() {
-    const tt = (k, f) => (window.t ? window.t(k, f) : f);
-    const startModal = document.getElementById('start-modal');
-    if (!startModal) return;
-    const modalContent = startModal.querySelector('.modal-content');
-    if (!modalContent) return;
-    if (modalContent.querySelector('#story-mode-btn')) return; // already injected
-    
-    const settingsBtn = document.getElementById('settings-btn');
-    
-    const storyBtn = document.createElement('button');
-    storyBtn.id = 'story-mode-btn';
-    storyBtn.className = 'btn-primary story-mode-btn';
-    storyBtn.textContent = tt('menu.story', '📖 Story Mode');
-    storyBtn.addEventListener('click', () => {
-        startModal.classList.add('hidden');
-        if (window.StoryMode) window.StoryMode.showMenu();
-    });
-    
-    const dailyBtn = document.createElement('button');
-    dailyBtn.id = 'daily-mode-btn';
-    dailyBtn.className = 'btn-primary daily-mode-btn';
-    dailyBtn.textContent = tt('menu.daily', '☀️ Daily Challenge');
-    dailyBtn.addEventListener('click', () => {
-        startModal.classList.add('hidden');
-        showDailyChallengeMenu();
-    });
-    
-    if (settingsBtn) {
-        modalContent.insertBefore(storyBtn, settingsBtn);
-        modalContent.insertBefore(dailyBtn, settingsBtn);
-    } else {
-        modalContent.appendChild(storyBtn);
-        modalContent.appendChild(dailyBtn);
-    }
-    
-    // Re-translate to keep label localized on language switch
-    if (window.i18n) {
-        window.i18n.onChange(() => {
-            storyBtn.textContent = tt('menu.story', '📖 Story Mode');
-            dailyBtn.textContent = tt('menu.daily', '☀️ Daily Challenge');
-        });
-    }
+    return; // Intentional no-op — see comment above.
 }
 window.addEventListener('load', () => setTimeout(injectExtraStartButtons, 50));
 

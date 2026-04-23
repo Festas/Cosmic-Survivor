@@ -2451,3 +2451,149 @@ body {
     .mp-quickchat-hud .qc-btn { font-size: 12px; padding: 4px 10px; }
     .emote-wheel-btn { width: 52px; height: 52px; margin-left: -26px; margin-top: -26px; font-size: 24px; }
 }
+
+/* ==================== STREAMLINED START MENU ==================== */
+.start-modal-content {
+    max-width: 540px;
+}
+.start-modal-content .btn-primary,
+.start-modal-content .btn-secondary {
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 14px;
+    min-width: 240px;
+}
+.how-to-play {
+    margin-top: 22px;
+    text-align: left;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 10px;
+    border: 1px solid rgba(78, 205, 196, 0.25);
+    overflow: hidden;
+}
+.how-to-play > summary {
+    cursor: pointer;
+    padding: 12px 18px;
+    font-weight: bold;
+    color: #4ecdc4;
+    list-style: none;
+    user-select: none;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    transition: background 0.2s ease;
+}
+.how-to-play > summary::-webkit-details-marker { display: none; }
+.how-to-play > summary::after {
+    content: '▾';
+    float: right;
+    transition: transform 0.2s ease;
+    color: #4ecdc4;
+}
+.how-to-play[open] > summary::after { transform: rotate(180deg); }
+.how-to-play > summary:hover {
+    background: rgba(78, 205, 196, 0.08);
+}
+.how-to-play .controls-info {
+    margin: 8px 14px 14px;
+    background: rgba(0, 0, 0, 0.35);
+}
+.how-to-play .controls-info p {
+    font-size: 14px;
+    margin: 6px 0;
+}
+
+/* ==================== MOBILE-FRIENDLY SHOP ==================== */
+.shop-credits-header {
+    position: sticky;
+    top: -35px; /* offset shop modal padding so it sits flush at the top */
+    z-index: 5;
+    margin: -10px -10px 14px;
+    padding: 12px 18px;
+    background: linear-gradient(135deg, rgba(255, 217, 61, 0.18) 0%, rgba(255, 184, 0, 0.18) 100%);
+    border: 2px solid rgba(255, 217, 61, 0.45);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+.shop-credits-header .shop-credits-label {
+    color: #ffd93d;
+    font-weight: bold;
+    font-size: 18px;
+    letter-spacing: 0.5px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+    white-space: nowrap;
+}
+.shop-credits-header .shop-credits-value {
+    font-size: 22px;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 0 0 8px rgba(255, 217, 61, 0.6);
+}
+.shop-credits-header .shop-wave-info {
+    font-size: 13px;
+    color: #cbd5e1;
+    opacity: 0.9;
+}
+
+/* Shop pagination controls — used on small viewports to avoid endless scrolling */
+.shop-pager {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin: 14px 0 4px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 8px;
+    border: 1px solid rgba(78, 205, 196, 0.25);
+}
+.shop-pager .pager-btn {
+    background: linear-gradient(135deg, #4ecdc4 0%, #38b2ac 100%);
+    color: #000;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    min-width: 92px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.shop-pager .pager-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(78, 205, 196, 0.4);
+}
+.shop-pager .pager-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.shop-pager .pager-info {
+    color: #cbd5e1;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    text-align: center;
+    flex: 1;
+}
+
+/* Show pager + force single-column items on mobile so the shop fits the
+   viewport without infinite scrolling */
+@media (max-width: 600px) {
+    .shop-pager { display: flex; }
+    .shop-items-grid { grid-template-columns: 1fr; gap: 12px; }
+    #shop-modal .modal-content { padding: 20px 14px; max-height: 95%; }
+    .shop-item { min-height: 0; padding: 14px; }
+    .shop-item .item-effects { min-height: 0; }
+    .shop-credits-header {
+        margin: -6px -6px 12px;
+        padding: 10px 14px;
+        top: -22px;
+    }
+    .shop-credits-header .shop-credits-label { font-size: 15px; }
+    .shop-credits-header .shop-credits-value { font-size: 19px; }
+}
