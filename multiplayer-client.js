@@ -147,7 +147,7 @@ const MultiplayerClient = {
             }
             if (this._reconnectAttempts >= this._maxReconnectAttempts) {
                 this._giveUpReconnect = true;
-                const giveUpMsg = `Cannot reach multiplayer server after ${this._reconnectAttempts} attempts. Please check your connection and click Connect to retry.`;
+                const giveUpMsg = `Cannot reach multiplayer server after ${this._reconnectAttempts} attempts. Please check your connection and use the Connect button to retry.`;
                 console.warn('[MP] ' + giveUpMsg);
                 this.lastError = giveUpMsg;
                 if (this.onError) this.onError(giveUpMsg);
@@ -162,7 +162,7 @@ const MultiplayerClient = {
             this._reconnectTimer = setTimeout(() => {
                 this._reconnectTimer = null;
                 if (!this.connected && !this._giveUpReconnect) {
-                    console.log(`[MP] Attempting reconnect (#${this._reconnectAttempts})...`);
+                    console.log(`[MP] Attempting reconnect (#${this._reconnectAttempts} of ${this._maxReconnectAttempts})...`);
                     this.connect(this.serverUrl);
                 }
             }, backoff);
