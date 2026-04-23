@@ -450,11 +450,14 @@
         
         const metaProg = window.enhancedSystems.metaProgression;
         
+        // Bail out BEFORE clearing if we can't actually rebuild the list.
+        // Otherwise we'd wipe the cards already populated by main.js's init()
+        // and leave an empty character-select modal. (Bug: "I can't choose
+        // a character anymore.")
+        if (!window.CHARACTERS || !window.Player) return;
+        
         // Clear existing characters (including those added by main.js)
         charContainer.innerHTML = '';
-        
-        // Get all characters from CHARACTERS array
-        if (!window.CHARACTERS) return;
         
         window.CHARACTERS.forEach(char => {
             const isUnlocked = metaProg.isCharacterUnlocked(char.id);
