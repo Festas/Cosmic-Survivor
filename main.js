@@ -36,10 +36,10 @@ const CONFIG = {
     MINIMAP_MARGIN: 10,
     // Difficulty presets
     DIFFICULTY: {
-        easy: { enemyHealthMult: 0.7, enemyDamageMult: 0.6, enemySpeedMult: 0.85, creditMult: 1.3, xpMult: 1.2 },
-        normal: { enemyHealthMult: 1.0, enemyDamageMult: 1.0, enemySpeedMult: 1.0, creditMult: 1.0, xpMult: 1.0 },
-        hard: { enemyHealthMult: 1.4, enemyDamageMult: 1.3, enemySpeedMult: 1.1, creditMult: 0.85, xpMult: 0.9 },
-        nightmare: { enemyHealthMult: 2.0, enemyDamageMult: 1.6, enemySpeedMult: 1.2, creditMult: 0.7, xpMult: 0.8 },
+        easy:      { enemyHealthMult: 0.7, enemyDamageMult: 0.6,  enemySpeedMult: 0.85, creditMult: 1.3,  xpMult: 1.2 },
+        normal:    { enemyHealthMult: 1.0, enemyDamageMult: 1.0,  enemySpeedMult: 1.0,  creditMult: 1.0,  xpMult: 1.0 },
+        hard:      { enemyHealthMult: 1.3, enemyDamageMult: 1.25, enemySpeedMult: 1.08, creditMult: 0.9,  xpMult: 0.95 },
+        nightmare: { enemyHealthMult: 1.7, enemyDamageMult: 1.45, enemySpeedMult: 1.18, creditMult: 0.75, xpMult: 0.85 },
     },
 };
 
@@ -54,13 +54,13 @@ const CHARACTERS = [
         id: 'balanced',
         name: '⚖️ Balanced',
         description: 'Well-rounded stats for all situations',
-        maxHealth: 100, speed: 3, damage: 10, fireRate: 30,
+        maxHealth: 100, speed: 3, damage: 10, fireRate: 32,
     },
     {
         id: 'tank',
         name: '🛡️ Tank',
         description: 'Heavy armor, solid damage',
-        maxHealth: 180, speed: 2.2, damage: 9, fireRate: 38, armor: 6,
+        maxHealth: 180, speed: 2.2, damage: 11, fireRate: 38, armor: 8,
     },
     {
         id: 'speedster',
@@ -72,7 +72,7 @@ const CHARACTERS = [
         id: 'sniper',
         name: '🎯 Sniper',
         description: 'Precision shots from afar',
-        maxHealth: 80, speed: 2.5, damage: 22, fireRate: 48, critChance: 0.2, critDamage: 2.2, range: 650,
+        maxHealth: 80, speed: 2.5, damage: 22, fireRate: 44, critChance: 0.2, critDamage: 2.2, range: 650,
     },
     {
         id: 'gunslinger',
@@ -90,19 +90,19 @@ const CHARACTERS = [
         id: 'berserker',
         name: '⚔️ Berserker',
         description: 'Aggressive glass cannon',
-        maxHealth: 75, speed: 3.8, damage: 16, fireRate: 24, critChance: 0.2, critDamage: 1.8, dodge: 0.1,
+        maxHealth: 75, speed: 3.8, damage: 14, fireRate: 24, critChance: 0.2, critDamage: 1.8, dodge: 0.1,
     },
     {
         id: 'engineer',
         name: '🔧 Engineer',
         description: 'Defensive specialist with range',
-        maxHealth: 130, speed: 2.3, damage: 9, fireRate: 36, armor: 7, range: 500, pickupRange: 65,
+        maxHealth: 130, speed: 2.3, damage: 10, fireRate: 36, armor: 8, range: 500, pickupRange: 65,
     },
     {
         id: 'medic',
         name: '💊 Medic',
         description: 'Regenerates health over time',
-        maxHealth: 120, speed: 2.6, damage: 8, fireRate: 34, armor: 3, lifeSteal: 0.1, healthRegen: 0.4,
+        maxHealth: 120, speed: 2.6, damage: 9, fireRate: 32, armor: 3, lifeSteal: 0.1, healthRegen: 0.8,
     },
     {
         id: 'assassin',
@@ -114,13 +114,13 @@ const CHARACTERS = [
         id: 'summoner',
         name: '🔮 Summoner',
         description: 'Commands powerful attack drones',
-        maxHealth: 100, speed: 2.6, damage: 8, fireRate: 42, armor: 2, dodge: 0.05, maxDrones: 2,
+        maxHealth: 100, speed: 2.6, damage: 9, fireRate: 38, armor: 2, dodge: 0.05, maxDrones: 2,
     },
     {
         id: 'juggernaut',
         name: '💪 Juggernaut',
         description: 'Unstoppable force, immovable object',
-        maxHealth: 200, speed: 1.8, damage: 12, fireRate: 45, armor: 10, lifeSteal: 0.08, knockbackImmune: true,
+        maxHealth: 200, speed: 1.8, damage: 13, fireRate: 45, armor: 14, lifeSteal: 0.08, knockbackImmune: true,
     },
 ];
 
@@ -316,20 +316,23 @@ const ENEMY_TYPES = {
 };
 
 // Boss types
+// Credits roughly doubled vs old values — bosses now actually feel like the
+// jackpot they're meant to be (was: 5 trash mobs > 1 boss in payout).
+// Health multipliers slightly trimmed so wave 25+ bosses aren't HP sponges.
 const BOSS_TYPES = {
-    destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 12, damage: 2.5, credits: 100, xp: 50,
+    destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 9, damage: 2.5, credits: 200, xp: 80,
         palette: { body: '#dc2626', core: '#fecaca', glow: '#ff0000', accent: '#991b1b', wing: '#7f1d1d' } },
-    broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 10, damage: 1.8, credits: 120, xp: 60, summons: true,
+    broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 8, damage: 1.8, credits: 240, xp: 100, summons: true,
         palette: { body: '#7c2d12', core: '#d97706', glow: '#f59e0b', accent: '#451a03', wing: '#a16207' } },
-    voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 8, damage: 2.2, credits: 150, xp: 70, teleports: true,
+    voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 7, damage: 2.2, credits: 280, xp: 120, teleports: true,
         palette: { body: '#581c87', core: '#a78bfa', glow: '#8b5cf6', accent: '#3b0764', wing: '#7c3aed' } },
-    necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 11, damage: 2.0, credits: 180, xp: 80, resurrects: true,
+    necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 8, damage: 2.0, credits: 320, xp: 140, resurrects: true,
         palette: { body: '#4c1d95', core: '#a78bfa', glow: '#8b5cf6', accent: '#2e1065', wing: '#6d28d9' } },
-    titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 16, damage: 3.5, credits: 200, xp: 100, earthquake: true,
+    titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 12, damage: 3.5, credits: 400, xp: 180, earthquake: true,
         palette: { body: '#b91c1c', core: '#fbbf24', glow: '#f59e0b', accent: '#7f1d1d', wing: '#92400e' } },
-    hivemind: { name: '🧠 Hivemind', color: '#7e22ce', size: 2.5, health: 14, damage: 1.5, credits: 220, xp: 90, commands: true,
+    hivemind: { name: '🧠 Hivemind', color: '#7e22ce', size: 2.5, health: 11, damage: 1.5, credits: 380, xp: 160, commands: true,
         palette: { body: '#7e22ce', core: '#d8b4fe', glow: '#c084fc', accent: '#581c87', wing: '#a855f7' } },
-    leviathan: { name: '🐉 Leviathan', color: '#0f766e', size: 3.5, health: 20, damage: 3.0, credits: 280, xp: 120, charges: true,
+    leviathan: { name: '🐉 Leviathan', color: '#0f766e', size: 3.5, health: 14, damage: 3.0, credits: 480, xp: 200, charges: true,
         palette: { body: '#0f766e', core: '#5eead4', glow: '#2dd4bf', accent: '#134e4a', wing: '#14b8a6' } },
 };
 
@@ -347,7 +350,7 @@ const ELITE_MODIFIERS = {
 // XP level-up passive abilities (pick 1 of 3)
 const PASSIVE_ABILITIES = [
     { id: 'glass_cannon', name: '🔥 Glass Cannon', desc: '+15% Damage, -10% Max HP', apply: p => { p.damage = Math.floor(p.damage * 1.15); p.maxHealth = Math.floor(p.maxHealth * 0.9); p.health = Math.min(p.health, p.maxHealth); } },
-    { id: 'fortify', name: '🛡️ Fortify', desc: '+2 Armor, +15 Max HP', apply: p => { p.armor += 2; p.maxHealth += 15; p.health = Math.min(p.health + 15, p.maxHealth); } },
+    { id: 'fortify', name: '🛡️ Fortify', desc: '+3 Armor, +15 Max HP', apply: p => { p.armor += 3; p.maxHealth += 15; p.health = Math.min(p.health + 15, p.maxHealth); } },
     { id: 'quick_hands', name: '⚡ Quick Hands', desc: '+10% Fire Rate', apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.9)); } },
     { id: 'nimble', name: '🏃 Nimble', desc: '+0.3 Speed, +5% Dodge', apply: p => { p.speed += 0.3; p.dodge = Math.min(0.7, p.dodge + 0.05); } },
     { id: 'vampirism', name: '🧛 Vampirism', desc: '+8% Life Steal', apply: p => { p.lifeSteal += 0.08; } },
@@ -355,7 +358,7 @@ const PASSIVE_ABILITIES = [
     { id: 'thick_skin', name: '💚 Thick Skin', desc: '+25 Max HP, Full Heal', apply: p => { p.maxHealth += 25; p.health = p.maxHealth; } },
     { id: 'bullet_storm', name: '🌟 Bullet Storm', desc: '+1 Projectile', apply: p => { p.projectileCount += 1; } },
     { id: 'scavenger', name: '🧲 Scavenger', desc: '+25 Pickup Range', apply: p => { p.pickupRange += 25; } },
-    { id: 'regeneration', name: '💊 Regeneration', desc: '+0.3 HP/s Regen', apply: p => { p.healthRegen = (p.healthRegen || 0) + 0.3; } },
+    { id: 'regeneration', name: '💊 Regeneration', desc: '+0.6 HP/s Regen', apply: p => { p.healthRegen = (p.healthRegen || 0) + 0.6; } },
     { id: 'adrenaline', name: '💉 Adrenaline', desc: '+0.5 Speed when below 50% HP', apply: p => { p.adrenaline = (p.adrenaline || 0) + 1; } },
     { id: 'thorns', name: '🌵 Thorns', desc: 'Reflect 20% melee damage back', apply: p => { p.thorns = (p.thorns || 0) + 0.2; } },
 ];
@@ -391,8 +394,8 @@ const TRANSFORMATIVE_ITEMS = [
       apply: p => { p.phaseShift = true; p.phaseShiftCooldown = 0; } },
     { id: 'blood_shield', name: '🩸 Blood Shield', desc: 'Overkill damage on enemies becomes temp shield', category: 'defensive',
       apply: p => { p.bloodShield = true; p.tempShield = p.tempShield || 0; } },
-    { id: 'iron_skin', name: '🛡️ Iron Skin', desc: '+4 Armor, +20 Max HP', category: 'defensive',
-      apply: p => { p.armor += 4; p.maxHealth += 20; p.health = Math.min(p.health + 20, p.maxHealth); } },
+    { id: 'iron_skin', name: '🛡️ Iron Skin', desc: '+5 Armor, +20 Max HP', category: 'defensive',
+      apply: p => { p.armor += 5; p.maxHealth += 20; p.health = Math.min(p.health + 20, p.maxHealth); } },
     
     // Utility
     { id: 'black_hole', name: '🌀 Black Hole', desc: 'Every 25s, spawn a vortex pulling enemies', category: 'utility',
@@ -1611,7 +1614,12 @@ class Player {
             createParticles(this.x, this.y, '#4ecdc4', 8);
             return;
         }
-        const finalDamage = Math.max(1, Math.floor(amount * (100 / (100 + this.armor))));
+        // Diminishing-returns armor: 10 armor ≈ 25% reduction, 20 ≈ 40%,
+        // 30 ≈ 50%, hard-capped at 60% so even Juggernaut can still die.
+        // Old `100/(100+armor)` made 10 armor a measly 9% reduction, which
+        // made Tank/Juggernaut/Engineer not actually feel tanky.
+        const armorReduction = Math.min(0.60, this.armor / (this.armor + 30));
+        const finalDamage = Math.max(1, Math.floor(amount * (1 - armorReduction)));
         this.health -= finalDamage;
         game.stats.damageTaken += finalDamage;
         // Track when the player was last actually hit so the renderer can
@@ -2223,10 +2231,13 @@ class Enemy {
             this.type = type;
             this.size = CONFIG.ENEMY_SIZE * bossType.size;
             const diffSettings = game.difficultySettings || CONFIG.DIFFICULTY.normal;
-            this.speed = (0.4 + Math.log2(1 + wave * 0.15)) * 0.4 * diffSettings.enemySpeedMult;
-            this.maxHealth = (15 + wave * 3 + Math.pow(wave, 1.3)) * bossType.health * diffSettings.enemyHealthMult;
+            this.speed = (0.4 + Math.log2(1 + wave * 0.12)) * 0.4 * diffSettings.enemySpeedMult;
+            // Smoother late-wave HP curve: replaced runaway wave^1.3 with
+            // wave^1.15 + slightly steeper linear term. Same difficulty up to
+            // ~wave 20, much fairer past wave 30 where things became unwinnable.
+            this.maxHealth = (15 + wave * 4 + Math.pow(wave, 1.15)) * bossType.health * diffSettings.enemyHealthMult;
             this.health = this.maxHealth;
-            this.damage = (4 + wave * 1.2 + Math.pow(wave, 1.1) * 0.3) * bossType.damage * diffSettings.enemyDamageMult;
+            this.damage = (4 + wave * 0.9 + Math.pow(wave, 1.05) * 0.25) * bossType.damage * diffSettings.enemyDamageMult;
             this.creditValue = Math.floor(bossType.credits * (diffSettings.creditMult || 1));
             this.color = bossType.color;
             this.name = bossType.name;
@@ -2254,10 +2265,13 @@ class Enemy {
             this.type = type;
             this.size = CONFIG.ENEMY_SIZE * (enemyType.size || 1);
             const diffSettings = game.difficultySettings || CONFIG.DIFFICULTY.normal;
-            this.speed = (1 + Math.log2(1 + wave * 0.3)) * enemyType.speed * diffSettings.enemySpeedMult;
-            this.maxHealth = (15 + wave * 3 + Math.pow(wave, 1.3)) * enemyType.health * diffSettings.enemyHealthMult;
+            // Tame "fast" enemy speed runaway: log2(1+wave*0.18) so
+            // wave-30 Stalkers don't outrun base player speed.
+            this.speed = (1 + Math.log2(1 + wave * 0.18)) * enemyType.speed * diffSettings.enemySpeedMult;
+            // See boss block above — same gentler late-wave curve.
+            this.maxHealth = (15 + wave * 4 + Math.pow(wave, 1.15)) * enemyType.health * diffSettings.enemyHealthMult;
             this.health = this.maxHealth;
-            this.damage = (4 + wave * 1.2 + Math.pow(wave, 1.1) * 0.3) * enemyType.damage * diffSettings.enemyDamageMult;
+            this.damage = (4 + wave * 0.9 + Math.pow(wave, 1.05) * 0.25) * enemyType.damage * diffSettings.enemyDamageMult;
             this.creditValue = Math.floor((2 + wave * 0.8) * enemyType.credits * (diffSettings.creditMult || 1));
 
             // Corruption scaling - enemies harder but better rewards at high corruption
@@ -5480,8 +5494,10 @@ function spawnWave() {
         game.enemies.push(boss);
         showNotification(`BOSS WAVE: ${boss.name}`);
     } else {
-        // Better enemy count scaling: starts at 8, exponential feel in later waves
-        let enemyCount = Math.floor(8 + game.wave * 2 + Math.pow(game.wave, 1.2));
+        // Enemy count: was wave^1.2 which made wave 50+ unrenderable (220+
+        // enemies). Trimmed to wave^1.1 so wave 50 ≈ 180 enemies, wave 30 ≈
+        // 110 — still feels swarm-y, no longer a slideshow.
+        let enemyCount = Math.floor(8 + game.wave * 2 + Math.pow(game.wave, 1.1));
         
         // Scale enemy count for multiplayer
         if (game.isMultiplayer) {
