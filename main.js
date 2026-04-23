@@ -1100,9 +1100,14 @@ class Player {
         this.isMoving = false;
         this.facingRight = true;
         this.aimAngle = 0;
-        // Multi-weapon system
+        // Multi-weapon system - all weapons stay simultaneously active and
+        // orbit the player like Vampire Survivors / Brotato / Binding of Isaac orbs.
         this.weaponSlots = [{ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }];
         this.maxWeaponSlots = 4;
+        // Orbital weapon orbs around the player
+        this.weaponOrbitAngle = 0;            // global rotation of the orbit ring
+        this.weaponOrbitRadius = 48;          // px from player center
+        this.weaponOrbitSpeed = 0.025;        // radians per frame
         // Gameplay-changing item flags
         this.bulletBounce = 0;
         this.splitShot = false;
@@ -1218,6 +1223,10 @@ class Player {
             this.walkTimer++;
             if (this.walkTimer >= ARENA_CONSTANTS.WALK_ANIM_FRAME_DURATION) { this.walkTimer = 0; this.walkFrame = this.walkFrame === 0 ? 1 : 0; }
         } else { this.walkTimer = 0; this.walkFrame = 0; }
+
+        // Advance the orbit angle for the orbiting weapon orbs.
+        this.weaponOrbitAngle += this.weaponOrbitSpeed;
+        if (this.weaponOrbitAngle > Math.PI * 2) this.weaponOrbitAngle -= Math.PI * 2;
 
         this.shoot();
 
@@ -1426,18 +1435,55 @@ class Player {
         });
     }
 
-    shoot() {
-        const nearest = game.enemies
-            .filter(e => Math.hypot(e.x - this.x, e.y - this.y) <= this.range)
-            .sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y));
+    /**
+     * Compute the world-space position of a weapon orb for a given slot.
+     * Orbs are evenly spaced around the player and rotate with weaponOrbitAngle.
+     */
+    getWeaponOrbPosition(slotIndex) {
+        const slotCount = Math.max(1, this.weaponSlots.length);
+        const a = this.weaponOrbitAngle + (slotIndex / slotCount) * Math.PI * 2;
+        return {
+            angle: a,
+            x: this.x + Math.cos(a) * this.weaponOrbitRadius,
+            y: this.y + Math.sin(a) * this.weaponOrbitRadius,
+        };
+    }
 
-        if (nearest.length === 0) return;
-        this.aimAngle = Math.atan2(nearest[0].y - this.y, nearest[0].x - this.x);
+    shoot() {
+        // Find candidate enemies in range relative to the player center.
+        const inRange = game.enemies
+            .filter(e => Math.hypot(e.x - this.x, e.y - this.y) <= this.range);
+
+        if (inRange.length === 0) {
+            // Still tick down weapon cooldowns so that newly-spawned enemies
+            // can be engaged immediately, and keep the aim angle pointing to
+            // the orbit so the body draw code doesn't snap.
+            this.weaponSlots.forEach(slot => { if (slot.cooldown > 0) slot.cooldown--; });
+            return;
+        }
+        // For the body/arm aim animation, point at the nearest enemy from
+        // the player center.
+        const nearestForAim = inRange.reduce((a, b) =>
+            Math.hypot(a.x - this.x, a.y - this.y) < Math.hypot(b.x - this.x, b.y - this.y) ? a : b);
+        this.aimAngle = Math.atan2(nearestForAim.y - this.y, nearestForAim.x - this.x);
 
         this.weaponSlots.forEach((slot, slotIndex) => {
             if (slot.cooldown > 0) { slot.cooldown--; return; }
             const weapon = WEAPON_TYPES[slot.type];
             if (!weapon) return;
+
+            // Each weapon fires from its current orbit position so the
+            // weapons feel like Vampire-Survivors / Isaac orbs flying around
+            // the character.
+            const orb = this.getWeaponOrbPosition(slotIndex);
+            const orbX = orb.x;
+            const orbY = orb.y;
+
+            // Each orb picks the enemies nearest *to itself*, which gives
+            // each orb its own coverage arc instead of all firing the same
+            // direction.
+            const sortedForOrb = inRange.slice().sort((a, b) =>
+                Math.hypot(a.x - orbX, a.y - orbY) - Math.hypot(b.x - orbX, b.y - orbY));
 
             let projectiles = this.projectileCount;
             if (hasPowerup('multishot')) {
@@ -1445,27 +1491,27 @@ class Player {
                 if (powerup) projectiles += powerup.data.value;
             }
 
-            const targets = nearest.slice(0, projectiles);
-            targets.forEach((enemy, ti) => {
-                const angle = Math.atan2(enemy.y - this.y, enemy.x - this.x);
+            const targets = sortedForOrb.slice(0, projectiles);
+            targets.forEach((enemy) => {
+                const angle = Math.atan2(enemy.y - orbY, enemy.x - orbX);
                 if (slot.type === 'spread') {
                     for (let i = 0; i < 5; i++) {
                         const spreadAngle = angle + (i - 2) * 0.15;
-                        game.bullets.push(new Bullet(this.x, this.y, spreadAngle, this, weapon));
+                        game.bullets.push(new Bullet(orbX, orbY, spreadAngle, this, weapon));
                     }
                     // Mirror shot - fire reverse copy
                     if (this.mirrorShot && !weapon.continuous) {
                         const mirrorAngle = angle + Math.PI;
-                        const mirrorBullet = new Bullet(this.x, this.y, mirrorAngle, this, weapon);
+                        const mirrorBullet = new Bullet(orbX, orbY, mirrorAngle, this, weapon);
                         mirrorBullet.isMirror = true;
                         game.bullets.push(mirrorBullet);
                     }
                 } else {
-                    game.bullets.push(new Bullet(this.x, this.y, angle, this, weapon));
+                    game.bullets.push(new Bullet(orbX, orbY, angle, this, weapon));
                     // Mirror shot - fire reverse copy
                     if (this.mirrorShot && !weapon.continuous) {
                         const mirrorAngle = angle + Math.PI;
-                        const mirrorBullet = new Bullet(this.x, this.y, mirrorAngle, this, weapon);
+                        const mirrorBullet = new Bullet(orbX, orbY, mirrorAngle, this, weapon);
                         mirrorBullet.isMirror = true;
                         game.bullets.push(mirrorBullet);
                     }
@@ -1474,17 +1520,17 @@ class Player {
             // Evolved weapon bonuses
             if (slot.evolved && slot.evolvedData) {
                 const evo = slot.evolvedData;
-                // Galaxy Burst - 360° ring
+                // Galaxy Burst - 360° ring (centered on the orb)
                 if (evo.fullCircle) {
                     for (let ring = 0; ring < evo.projectiles; ring++) {
                         const ringAngle = (ring / evo.projectiles) * Math.PI * 2;
-                        const b = new Bullet(this.x, this.y, ringAngle, this, weapon);
+                        const b = new Bullet(orbX, orbY, ringAngle, this, weapon);
                         b.damage *= evo.damage;
                         b.color = evo.color;
                         game.bullets.push(b);
                     }
                 }
-                // Orbital Strike - rain rockets from sky
+                // Orbital Strike - rain rockets from sky (still centered on player)
                 if (evo.orbitalStrike) {
                     for (let s = 0; s < evo.strikeCount; s++) {
                         setTimeout(() => {
@@ -1805,6 +1851,48 @@ class Player {
             ctx.save(); ctx.globalAlpha = 0.2; ctx.strokeStyle = '#4ecdc4'; ctx.lineWidth = 1.5;
             const dir = this.facingRight ? -1 : 1;
             for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.moveTo(cx + dir * i * 6, cy - 4); ctx.lineTo(cx + dir * i * 6, cy + 4); ctx.stroke(); }
+            ctx.restore();
+        }
+
+        // Weapon orbs - all collected weapons orbit the player like
+        // Vampire Survivors / Brotato / Binding of Isaac familiars.
+        if (this.weaponSlots && this.weaponSlots.length > 0) {
+            ctx.save();
+            const slotCount = this.weaponSlots.length;
+            const now = Date.now();
+            for (let i = 0; i < slotCount; i++) {
+                const slot = this.weaponSlots[i];
+                const weapon = WEAPON_TYPES[slot.type];
+                if (!weapon) continue;
+                const a = this.weaponOrbitAngle + (i / slotCount) * Math.PI * 2;
+                const ox = cx + Math.cos(a) * this.weaponOrbitRadius;
+                const oy = cy + Math.sin(a) * this.weaponOrbitRadius;
+                const orbColor = (slot.evolved && slot.evolvedData) ? slot.evolvedData.color : weapon.color;
+                // Cooldown indicator - the orb pulses & dims while reloading.
+                const cdRatio = (slot.maxCooldown && slot.cooldown > 0)
+                    ? slot.cooldown / slot.maxCooldown : 0;
+                const ready = cdRatio <= 0;
+                const pulse = ready ? (0.85 + Math.sin(now * 0.012 + i) * 0.15) : 0.55;
+                const orbR = 8 + (ready ? 1.5 : 0);
+                ctx.globalAlpha = pulse;
+                ctx.shadowColor = orbColor;
+                ctx.shadowBlur = ready ? 12 : 4;
+                ctx.fillStyle = orbColor;
+                ctx.beginPath(); ctx.arc(ox, oy, orbR, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1;
+                // Inner highlight
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.beginPath(); ctx.arc(ox - orbR * 0.3, oy - orbR * 0.3, orbR * 0.35, 0, Math.PI * 2); ctx.fill();
+                // Cooldown ring
+                if (!ready) {
+                    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(ox, oy, orbR + 2, -Math.PI / 2, -Math.PI / 2 + (1 - cdRatio) * Math.PI * 2);
+                    ctx.stroke();
+                }
+            }
             ctx.restore();
         }
 
@@ -4205,6 +4293,10 @@ class Bullet {
         this.explosion = weapon.explosion;
         this.piercing = 1;
         this.hitEnemies = [];
+        // Remember the source weapon so per-bullet effects (e.g. split shot)
+        // can spawn matching projectiles regardless of which orbiting weapon
+        // fired this bullet.
+        this.weapon = weapon;
     }
 
     update() {
@@ -4260,8 +4352,9 @@ class Bullet {
                 this.hitEnemies.push(enemy);
                 // Split shot
                 if (game.player && game.player.splitShot && !this.isSplit) {
+                    const splitWeapon = this.weapon || WEAPON_TYPES.basic;
                     [this.angle + 0.5, this.angle - 0.5].forEach(a => {
-                        const splitBullet = new Bullet(this.x, this.y, a, game.player, WEAPON_TYPES[game.currentWeapon] || WEAPON_TYPES.basic);
+                        const splitBullet = new Bullet(this.x, this.y, a, game.player, splitWeapon);
                         splitBullet.damage *= 0.5; splitBullet.isSplit = true; splitBullet.size *= 0.7;
                         game.bullets.push(splitBullet);
                     });
@@ -6032,12 +6125,20 @@ function drawPauseMenu(ctx) {
     ctx.fillText(`Credits: ${game.credits}`, CONFIG.CANVAS_WIDTH / 2, menuY + 180);
     ctx.fillText(`Combo: ${game.stats.comboKills}x`, CONFIG.CANVAS_WIDTH / 2, menuY + 210);
     
-    // Current weapon
+    // Active weapons - all collected weapons orbit the player simultaneously.
     ctx.fillStyle = '#4ecdc4';
     ctx.font = '20px monospace';
-    const weapon = WEAPON_TYPES[game.currentWeapon];
-    const weaponName = weapon.name;
-    ctx.fillText(`Current Weapon: ${weaponName}`, CONFIG.CANVAS_WIDTH / 2, menuY + 250);
+    let activeWeaponNames = '🔫 Blaster';
+    if (game.player && Array.isArray(game.player.weaponSlots) && game.player.weaponSlots.length > 0) {
+        activeWeaponNames = game.player.weaponSlots
+            .map(s => {
+                const w = WEAPON_TYPES[s.type];
+                if (s.evolved && s.evolvedData) return s.evolvedData.name;
+                return w ? w.name : s.type;
+            })
+            .join(', ');
+    }
+    ctx.fillText(`Active Weapons: ${activeWeaponNames}`, CONFIG.CANVAS_WIDTH / 2, menuY + 250);
     
     // Player stats in pause
     ctx.fillStyle = '#888';
@@ -6065,7 +6166,7 @@ function drawPauseMenu(ctx) {
     ctx.restore();
 }
 
-// Draw weapon indicator
+// Draw weapon indicator - lists all simultaneously-active orbiting weapons.
 function drawWeaponIndicator(ctx) {
     if (!game.player) return;
     const slots = game.player.weaponSlots;
@@ -6078,18 +6179,19 @@ function drawWeaponIndicator(ctx) {
     slots.forEach((slot, i) => {
         const sx = x + i * (slotWidth + 5);
         const weapon = WEAPON_TYPES[slot.type];
-        const isActive = i === (game.activeWeaponSlot || 0);
-        ctx.fillStyle = isActive ? 'rgba(0,255,136,0.15)' : 'rgba(0,0,0,0.7)';
+        // All weapons are always active in the orbital weapon system, so we
+        // no longer highlight a single "active" slot.
+        ctx.fillStyle = 'rgba(0,255,136,0.10)';
         ctx.fillRect(sx, y, slotWidth, 38);
         if (slot.cooldown > 0 && slot.maxCooldown > 0) {
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
             ctx.fillRect(sx, y, slotWidth * (slot.cooldown / slot.maxCooldown), 38);
         }
-        ctx.strokeStyle = isActive ? '#00ff88' : (weapon ? weapon.color : '#475569');
-        ctx.lineWidth = isActive ? 3 : 1;
+        ctx.strokeStyle = weapon ? weapon.color : '#475569';
+        ctx.lineWidth = 2;
         ctx.strokeRect(sx, y, slotWidth, 38);
         ctx.fillStyle = '#888'; ctx.font = '10px monospace'; ctx.textAlign = 'left';
-        ctx.fillText(`S${i + 1}`, sx + 3, y + 12);
+        ctx.fillText(`#${i + 1}`, sx + 3, y + 12);
         ctx.fillStyle = weapon ? weapon.color : '#fff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'center';
         const displayName = slot.evolved && slot.evolvedData ? slot.evolvedData.name.split(' ').pop() : (weapon ? weapon.name.split(' ').pop() : '???');
         const displayColor = slot.evolved && slot.evolvedData ? slot.evolvedData.color : (weapon ? weapon.color : '#fff');
@@ -7680,28 +7782,9 @@ window.addEventListener('keydown', e => {
         e.preventDefault();
     }
     
-    // Tab cycles active weapon slot
-    if (e.key === 'Tab' && game.state === 'playing' && !game.paused && game.player) {
-        game.activeWeaponSlot = ((game.activeWeaponSlot || 0) + 1) % game.player.weaponSlots.length;
-        showNotification(`Slot ${game.activeWeaponSlot + 1} selected`, '#4ecdc4', 800);
-        e.preventDefault();
-    }
-    // Number keys assign weapon to active slot
-    if (game.state === 'playing' && !game.paused) {
-        const weapons = ['basic', 'laser', 'rocket', 'spread', 'flamethrower', 'lightning', 'freeze', 'plasma'];
-        if (e.key >= '1' && e.key <= '8') {
-            const weaponIndex = parseInt(e.key) - 1;
-            if (weaponIndex < weapons.length && game.player) {
-                const slot = game.activeWeaponSlot || 0;
-                if (slot < game.player.weaponSlots.length) {
-                    game.player.weaponSlots[slot].type = weapons[weaponIndex];
-                    game.currentWeapon = weapons[weaponIndex];
-                    showNotification(`Slot ${slot + 1}: ${WEAPON_TYPES[weapons[weaponIndex]].name}`, '#4ecdc4', 1000);
-                    Sound.play('pickup');
-                }
-            }
-        }
-    }
+    // Weapon switching has been removed: all weapons stay simultaneously
+    // active and orbit the player like Vampire Survivors / Brotato / Isaac
+    // orbs, so there is no longer an "active slot" or per-key weapon swap.
 });
 
 window.addEventListener('keyup', e => game.keys[e.key] = false);
@@ -7919,23 +8002,29 @@ function showMultiplayerModal() {
         return;
     }
     
-    // If we're not yet connected, wait briefly for the auto-connect to land
-    // before giving up. Opening the start menu and immediately clicking
-    // multiplayer used to race the WebSocket handshake and show
-    // "Cannot connect to multiplayer server" even though the server was fine.
+    // If we're not yet connected, wait for the auto-connect to land before
+    // giving up. Opening the start menu and immediately clicking multiplayer
+    // used to race the WebSocket handshake and show "Cant connect to the
+    // server" even though the server was fine.
     if (!mp.connected) {
-        showNotification('🔌 Connecting to multiplayer server…', '#ffd93d', 1500);
+        const tt = (typeof t === 'function') ? t : (k, fb) => fb;
+        showNotification('🔌 ' + tt('mp.connecting', 'Connecting to multiplayer server…'), '#ffd93d', 1500);
         if (typeof mp.connect === 'function') {
             try { mp.connect(); } catch {}
         }
         const start = Date.now();
+        // Give the handshake up to 12s before reporting failure - cold-start
+        // proxies / Hetzner edges can take a few seconds.
+        const TIMEOUT_MS = 12000;
         const wait = setInterval(() => {
             if (mp.connected) {
                 clearInterval(wait);
                 showMultiplayerModal();
-            } else if (Date.now() - start > 5000) {
+            } else if (Date.now() - start > TIMEOUT_MS) {
                 clearInterval(wait);
-                showNotification('⚠️ Cannot connect to multiplayer server', '#ff6b6b', 3000);
+                const baseMsg = tt('mp.cantConnect', '⚠️ Cannot connect to multiplayer server');
+                const detail = mp.lastError ? ` — ${mp.lastError}` : '';
+                showNotification(baseMsg + detail + ' (tap KOOP again to retry)', '#ff6b6b', 6000);
             }
         }, 200);
         return;

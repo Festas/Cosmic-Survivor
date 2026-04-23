@@ -12,6 +12,7 @@ const MultiplayerClient = {
     room: null,
     localPlayerId: null,
     _lastRoomCode: null, // Track last room for rejoin on reconnect
+    lastError: null,    // Most recent connection/auth error message (for UI)
     
     // Callbacks (set by the game)
     onConnected: null,
@@ -45,24 +46,37 @@ const MultiplayerClient = {
         }
 
         this.serverUrl = serverUrl || this._getDefaultServerUrl();
-        
+
+        // file:// origins can't open ws:// to a real backend without a host;
+        // surface a clear error instead of letting the browser fail silently.
+        if (typeof window !== 'undefined' && window.location && window.location.protocol === 'file:') {
+            const msg = 'Multiplayer is unavailable when the page is opened directly from disk (file://). Please run the game from the deployed site or via "npm run dev:all".';
+            console.error('[MP] ' + msg);
+            this.lastError = msg;
+            if (this.onError) this.onError(msg);
+            return;
+        }
+
         try {
             this.ws = new WebSocket(this.serverUrl);
         } catch (e) {
             console.error('[MP] Failed to create WebSocket:', e);
-            if (this.onError) this.onError('Failed to connect to server');
+            const msg = `Failed to connect to ${this.serverUrl}: ${e && e.message ? e.message : e}`;
+            this.lastError = msg;
+            if (this.onError) this.onError(msg);
             return;
         }
 
         this.ws.onopen = () => {
             console.log('[MP] Connected to server');
             this.connected = true;
-            
+            this.lastError = null;
+
             // Try to restore session
             if (this.sessionToken) {
                 this.send({ type: 'restore_session', token: this.sessionToken });
             }
-            
+
             if (this.onConnected) this.onConnected();
 
             // Attempt to rejoin the last room after reconnect
@@ -76,13 +90,32 @@ const MultiplayerClient = {
             }
         };
 
-        this.ws.onclose = () => {
-            console.log('[MP] Disconnected from server');
+        this.ws.onclose = (ev) => {
+            const wasConnected = this.connected;
+            console.log(`[MP] Disconnected from server (code=${ev && ev.code}, reason=${ev && ev.reason || ''}, wasClean=${ev && ev.wasClean})`);
             this.connected = false;
             this.authenticated = false;
             this.room = null;
+
+            // If we never managed to connect, surface a clearer error so the
+            // UI doesn't just say "Cant connect to the server" with no hint
+            // about what's wrong.
+            if (!wasConnected) {
+                let detail = '';
+                if (ev && ev.code === 1006) {
+                    detail = ' (network unreachable / handshake failed - is the multiplayer server running?)';
+                } else if (ev && ev.reason) {
+                    detail = ` (${ev.reason})`;
+                } else if (ev && ev.code) {
+                    detail = ` (code ${ev.code})`;
+                }
+                const msg = `Cannot connect to ${this.serverUrl}${detail}`;
+                this.lastError = msg;
+                if (this.onError) this.onError(msg);
+            }
+
             if (this.onDisconnected) this.onDisconnected();
-            
+
             // Auto-reconnect after 3 seconds
             setTimeout(() => {
                 if (!this.connected) {
@@ -93,8 +126,10 @@ const MultiplayerClient = {
         };
 
         this.ws.onerror = (err) => {
-            console.error('[MP] WebSocket error');
-            if (this.onError) this.onError('Connection error');
+            console.error('[MP] WebSocket error', err);
+            const msg = `Connection error talking to ${this.serverUrl}`;
+            this.lastError = msg;
+            if (this.onError) this.onError(msg);
         };
 
         this.ws.onmessage = (event) => {
