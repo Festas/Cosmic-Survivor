@@ -250,7 +250,7 @@ const MultiplayerClient = {
         if (probe.ok) {
             // Backend is healthy over HTTP, but WS upgrade failed → upstream
             // proxy is missing WebSocket Upgrade/Connection header forwarding.
-            msg = `Multiplayer server is reachable over HTTPS but the WebSocket upgrade is failing (close code ${closeCode}). The reverse proxy in front of ${this.serverUrl} likely isn't configured to forward 'Upgrade: websocket' / 'Connection: upgrade' headers. See DEPLOYMENT.md → "Host reverse-proxy WebSocket configuration".`;
+            msg = `Multiplayer server is reachable over HTTPS but the WebSocket upgrade is failing (close code ${closeCode}). The reverse proxy in front of ${this.serverUrl} likely isn't configured to forward 'Upgrade: websocket' / 'Connection: upgrade' headers. See DEPLOYMENT.md → "Host Nginx WebSocket Setup".`;
         } else if (probe.reason && probe.reason.startsWith('http-')) {
             const code = probe.reason.replace('http-', '');
             msg = `Multiplayer backend returned HTTP ${code} from ${probe.url}. The container or upstream proxy is misconfigured.`;

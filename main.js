@@ -6476,10 +6476,10 @@ function drawDPSMeter(ctx) {
 }
 
 // Draw all entries in game.bullets. Player bullets are Bullet instances with
-// a draw() method, but enemy bullets (e.g. boss phase-3 bursts at line ~2422
-// and shooter projectiles at ~2764) are pushed as plain objects without one.
-// We render those inline so they are visible and never crash the renderer
-// with "b.draw is not a function".
+// a draw() method, but enemy bullets (e.g. boss phase-3 bursts and shooter
+// projectiles) are pushed as plain objects without one. We render those
+// inline so they are visible and never crash the renderer with
+// "b.draw is not a function".
 // Screen-space overlays drawn over the world view but under the HUD:
 //   - red full-screen damage flash whenever the player just took a hit
 //   - subtle dark vignette while a boss is alive (focuses the eye on action)
