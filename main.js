@@ -1614,6 +1614,10 @@ class Player {
         const finalDamage = Math.max(1, Math.floor(amount * (100 / (100 + this.armor))));
         this.health -= finalDamage;
         game.stats.damageTaken += finalDamage;
+        // Track when the player was last actually hit so the renderer can
+        // pulse a brief red full-screen damage flash for visceral feedback.
+        this._lastHitTime = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        this._lastHitDamage = finalDamage;
         
         // Thorns passive - reflect damage to nearest enemy
         if (this.thorns > 0) {
@@ -6476,6 +6480,49 @@ function drawDPSMeter(ctx) {
 // and shooter projectiles at ~2764) are pushed as plain objects without one.
 // We render those inline so they are visible and never crash the renderer
 // with "b.draw is not a function".
+// Screen-space overlays drawn over the world view but under the HUD:
+//   - red full-screen damage flash whenever the player just took a hit
+//   - subtle dark vignette while a boss is alive (focuses the eye on action)
+function drawScreenOverlays(ctx) {
+    const W = CONFIG.CANVAS_WIDTH;
+    const H = CONFIG.CANVAS_HEIGHT;
+
+    // Boss vignette: subtle radial darkening at the corners while a boss
+    // is in play, gives the encounter a heavier "this is dangerous" feel.
+    const bossPresent = game.enemies && game.enemies.some(e => e && e.isBoss);
+    if (bossPresent) {
+        ctx.save();
+        const cx = W / 2;
+        const cy = H / 2;
+        const inner = Math.max(W, H) * 0.32;
+        const outer = Math.max(W, H) * 0.78;
+        const grad = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.45)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+    }
+
+    // Damage flash: 220 ms red overlay scaled by hit severity.
+    if (game.player && game.player._lastHitTime) {
+        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        const elapsed = now - game.player._lastHitTime;
+        const DURATION = 220;
+        if (elapsed >= 0 && elapsed < DURATION) {
+            const t = 1 - elapsed / DURATION; // 1 → 0
+            // Cap base alpha by hit severity vs. max HP, but always show at
+            // least a faint flash so even 1 HP scratches register.
+            const sev = Math.min(1, (game.player._lastHitDamage || 1) / Math.max(1, game.player.maxHealth * 0.25));
+            const alpha = (0.10 + 0.30 * sev) * t;
+            ctx.save();
+            ctx.fillStyle = `rgba(255, 40, 40, ${alpha.toFixed(3)})`;
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+        }
+    }
+}
+
 function drawBullets(ctx) {
     for (const b of game.bullets) {
         if (typeof b.draw === 'function') {
@@ -7088,43 +7135,93 @@ function updateAccountUI(profile) {
 let lastTime = 0;
 let timer = 0;
 
-// Initialize starfield
+// Initialize a multi-layer parallax starfield. Stars are stored in canvas
+// coordinates (0..CANVAS_WIDTH/HEIGHT) and rendered in screen space with a
+// per-layer parallax factor against the camera, so far stars barely move
+// when the player walks while near stars scroll quickly — gives real depth.
 function initStarfield() {
     game.stars = [];
-    for (let i = 0; i < 150; i++) {
-        game.stars.push({
-            x: Math.random() * CONFIG.WORLD_WIDTH,
-            y: Math.random() * CONFIG.WORLD_HEIGHT,
-            size: Math.random() * 2,
-            speed: 0.1 + Math.random() * 0.5,
-            twinkle: Math.random() * Math.PI * 2,
+    const W = CONFIG.CANVAS_WIDTH;
+    const H = CONFIG.CANVAS_HEIGHT;
+    // 3 layers: far (slow scroll, dim, small), mid, near (fast, bright, big).
+    const layers = [
+        { count: 100, parallax: 0.15, sizeMin: 0.4, sizeMax: 1.0, brightnessMin: 0.4, brightnessMax: 0.7, palette: ['#9bb6ff', '#c6d4ff', '#ffffff'] },
+        { count: 60,  parallax: 0.45, sizeMin: 0.8, sizeMax: 1.6, brightnessMin: 0.6, brightnessMax: 0.9, palette: ['#ffffff', '#fff7d6', '#d6e4ff'] },
+        { count: 30,  parallax: 0.85, sizeMin: 1.4, sizeMax: 2.4, brightnessMin: 0.85, brightnessMax: 1.0, palette: ['#ffffff', '#ffd6f5', '#d6fff0', '#ffe9b3'] },
+    ];
+    for (const layer of layers) {
+        for (let i = 0; i < layer.count; i++) {
+            game.stars.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                size: layer.sizeMin + Math.random() * (layer.sizeMax - layer.sizeMin),
+                parallax: layer.parallax,
+                brightness: layer.brightnessMin + Math.random() * (layer.brightnessMax - layer.brightnessMin),
+                color: layer.palette[Math.floor(Math.random() * layer.palette.length)],
+                twinkle: Math.random() * Math.PI * 2,
+                twinkleSpeed: 0.02 + Math.random() * 0.06,
+            });
+        }
+    }
+    // A few large soft "nebula puff" sprites in the deepest layer for color depth.
+    game.nebulae = [];
+    const nebulaColors = ['rgba(138, 43, 226, 0.10)', 'rgba(78, 205, 196, 0.08)', 'rgba(255, 107, 107, 0.07)', 'rgba(0, 255, 136, 0.07)'];
+    for (let i = 0; i < 4; i++) {
+        game.nebulae.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            radius: 180 + Math.random() * 220,
+            parallax: 0.08 + Math.random() * 0.06,
+            color: nebulaColors[i % nebulaColors.length],
         });
     }
 }
 
 function updateStarfield() {
-    game.stars.forEach(star => {
-        star.y += star.speed;
-        star.twinkle += 0.05;
-        if (star.y > CONFIG.WORLD_HEIGHT) {
-            star.y = 0;
-            star.x = Math.random() * CONFIG.WORLD_WIDTH;
-        }
-    });
+    if (!game.stars) return;
+    for (const star of game.stars) {
+        star.twinkle += star.twinkleSpeed;
+    }
 }
 
+// Render the starfield + nebula puffs in screen space so we can apply
+// per-layer parallax against the camera. Called inside the camera-translated
+// block, so we temporarily reset the transform to draw screen-relative,
+// then restore it for the rest of the world rendering.
 function drawStarfield(ctx) {
+    if (!game.stars) return;
+    const W = CONFIG.CANVAS_WIDTH;
+    const H = CONFIG.CANVAS_HEIGHT;
     ctx.save();
-    game.stars.forEach(star => {
-        const alpha = 0.3 + Math.sin(star.twinkle) * 0.3;
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = '#fff';
-        ctx.shadowColor = '#fff';
-        ctx.shadowBlur = star.size * 2;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // Nebula puffs (deepest, behind stars)
+    if (game.nebulae) {
+        for (const n of game.nebulae) {
+            const sx = (((n.x - game.camera.x * n.parallax) % W) + W) % W;
+            const sy = (((n.y - game.camera.y * n.parallax) % H) + H) % H;
+            const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, n.radius);
+            grad.addColorStop(0, n.color);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(sx - n.radius, sy - n.radius, n.radius * 2, n.radius * 2);
+        }
+    }
+
+    // Stars per layer with parallax — modulo wraps around the viewport so
+    // they appear to scroll infinitely in any direction.
+    for (const star of game.stars) {
+        const sx = (((star.x - game.camera.x * star.parallax) % W) + W) % W;
+        const sy = (((star.y - game.camera.y * star.parallax) % H) + H) % H;
+        const twinkle = 0.55 + Math.sin(star.twinkle) * 0.45;
+        ctx.globalAlpha = Math.max(0.05, twinkle * star.brightness);
+        ctx.fillStyle = star.color;
+        ctx.shadowColor = star.color;
+        ctx.shadowBlur = star.size * 2.5;
         ctx.beginPath();
-        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.arc(sx, sy, star.size, 0, Math.PI * 2);
         ctx.fill();
-    });
+    }
     ctx.restore();
 }
 
@@ -7402,6 +7499,9 @@ function gameLoop(timestamp) {
         // Draw HUD elements (outside camera transform)
         ctx.restore();
         ctx.save();
+        // Screen-space damage flash + boss vignette (drawn over the world,
+        // under the HUD so HUD text stays crisp).
+        drawScreenOverlays(ctx);
         drawNotifications(ctx);
         drawJoystick(ctx);
         drawActivePowerups(ctx);
