@@ -542,6 +542,12 @@ const game = {
 // integration scripts) can detect when the player is mid-run.
 try { window.game = game; } catch {}
 
+// Expose CHARACTERS array so integration scripts (e.g. game-integration.js
+// filterCharacterSelection) can rebuild the character list. Without this
+// exposure the integration script clears #character-list and bails out,
+// leaving an empty character-select modal — i.e. character selection breaks.
+try { window.CHARACTERS = CHARACTERS; } catch {}
+
 function loadPersistentStats() {
     const defaults = { totalKills: 0, totalCredits: 0, maxWave: 0, upgradesPurchased: 0, weaponsUnlocked: 1 };
     try {
@@ -7710,10 +7716,34 @@ function initMultiplayerUI() {
     accountBtn.addEventListener('click', showAccountModal);
     document.body.appendChild(accountBtn);
     
-    // Multiplayer is now reachable via the game-mode picker (opens after
-    // pressing "Begin Mission"), so we no longer inject a separate
-    // "Co-op Multiplayer" button into the start menu — that kept the menu
-    // cluttered with three duplicate buttons (Multiplayer / Story / Daily).
+    // Multiplayer is *also* reachable via the game-mode picker (opens after
+    // pressing "Begin Mission"), but we surface a dedicated button on the
+    // start menu so multiplayer remains discoverable. (Players reported
+    // "Multiplayer isn't working at all" after it was hidden inside the
+    // picker — most never realized it was still there.)
+    const startModal = document.getElementById('start-modal');
+    if (startModal) {
+        const modalContent = startModal.querySelector('.modal-content');
+        if (modalContent && !document.getElementById('multiplayer-btn')) {
+            const mpBtn = document.createElement('button');
+            mpBtn.id = 'multiplayer-btn';
+            mpBtn.className = 'btn-primary multiplayer-btn';
+            const tt = (k, f) => (window.t ? window.t(k, f) : f);
+            mpBtn.textContent = tt('menu.multiplayer', '🎮 Co-op Multiplayer');
+            mpBtn.addEventListener('click', showMultiplayerModal);
+            const settingsBtn = document.getElementById('settings-btn');
+            if (settingsBtn) {
+                modalContent.insertBefore(mpBtn, settingsBtn);
+            } else {
+                modalContent.appendChild(mpBtn);
+            }
+            if (window.i18n) {
+                window.i18n.onChange(() => {
+                    mpBtn.textContent = tt('menu.multiplayer', '🎮 Co-op Multiplayer');
+                });
+            }
+        }
+    }
     
     // Try auto-connect and restore session
     if (window.MultiplayerClient) {
@@ -7801,10 +7831,30 @@ function showAccountModal() {
         function checkConnection() {
             if (!mp || !mp.connected) {
                 const errorEl = document.getElementById('auth-error');
-                if (errorEl) errorEl.textContent = 'Not connected to server. Please wait and try again.';
+                if (errorEl) errorEl.textContent = 'Connecting to server… please try again in a moment.';
+                // Try to (re-)establish the connection in the background so
+                // the next click succeeds. The auth error message is cleared
+                // automatically once a connection event lands.
+                if (mp && typeof mp.connect === 'function') {
+                    try { mp.connect(); } catch {}
+                }
                 return false;
             }
             return true;
+        }
+        
+        // Clear the "connecting…" error once the WebSocket actually opens,
+        // so the user isn't left staring at a stale message after the
+        // background reconnect succeeds.
+        if (mp) {
+            const prevConnected = mp.onConnected;
+            mp.onConnected = () => {
+                if (prevConnected) { try { prevConnected(); } catch {} }
+                const errorEl = document.getElementById('auth-error');
+                if (errorEl && errorEl.textContent.startsWith('Connecting')) {
+                    errorEl.textContent = '';
+                }
+            };
         }
 
         // Login
@@ -7864,14 +7914,54 @@ function showAccountModal() {
 function showMultiplayerModal() {
     const mp = window.MultiplayerClient;
     
-    if (!mp || !mp.connected) {
-        showNotification('⚠️ Cannot connect to multiplayer server', '#ff6b6b', 3000);
+    if (!mp) {
+        showNotification('⚠️ Multiplayer module not loaded', '#ff6b6b', 3000);
         return;
     }
     
+    // If we're not yet connected, wait briefly for the auto-connect to land
+    // before giving up. Opening the start menu and immediately clicking
+    // multiplayer used to race the WebSocket handshake and show
+    // "Cannot connect to multiplayer server" even though the server was fine.
+    if (!mp.connected) {
+        showNotification('🔌 Connecting to multiplayer server…', '#ffd93d', 1500);
+        if (typeof mp.connect === 'function') {
+            try { mp.connect(); } catch {}
+        }
+        const start = Date.now();
+        const wait = setInterval(() => {
+            if (mp.connected) {
+                clearInterval(wait);
+                showMultiplayerModal();
+            } else if (Date.now() - start > 5000) {
+                clearInterval(wait);
+                showNotification('⚠️ Cannot connect to multiplayer server', '#ff6b6b', 3000);
+            }
+        }, 200);
+        return;
+    }
+    
+    // No account required: silently sign in as a guest so the user can
+    // jump straight into multiplayer without going through registration.
+    // They can still upgrade to a real account later via the 👤 Account
+    // button.
     if (!mp.authenticated) {
-        showAccountModal();
-        showNotification('Please log in or create an account first', '#ffd93d', 3000);
+        const prevSuccess = mp.onAuthSuccess;
+        mp.onAuthSuccess = (profile) => {
+            mp.onAuthSuccess = prevSuccess;
+            if (prevSuccess) {
+                try { prevSuccess(profile); } catch {}
+            } else if (typeof updateAccountUI === 'function') {
+                updateAccountUI(profile);
+            }
+            // Re-open the multiplayer modal now that we're authenticated.
+            showMultiplayerModal();
+        };
+        if (typeof mp.loginAsGuest === 'function') {
+            mp.loginAsGuest();
+        } else {
+            showAccountModal();
+        }
         return;
     }
     
@@ -7962,6 +8052,16 @@ function showMultiplayerModal() {
 
 window.addEventListener('load', init);
 
+// Expose additional symbols needed by integration scripts (game-integration.js
+// rebuilds the character-select list and needs to construct Player instances
+// and start the game loop). Without these exposures the integration silently
+// clears the character list, which is what broke "I can't choose a character".
+try {
+    window.Player = Player;
+    window.spawnWave = spawnWave;
+    window.gameLoop = gameLoop;
+} catch {}
+
 // ==================== REWORK: GAME MODES, STORY, DAILY, MP UX ====================
 // All additions below are additive; they wire the new i18n / story / multiplayer-extras systems
 // into the existing game without modifying core gameplay.
@@ -8040,7 +8140,7 @@ function showGameModeMenu() {
                 </div>
                 <div class="gamemode-card" data-mode="multiplayer">
                     <h3>${tt('menu.multiplayer', '🎮 Co-op Multiplayer')}</h3>
-                    <p>${tt('menu.multiplayerDesc', 'Up to 4 players online. Share XP, share glory.')}</p>
+                    <p>${tt('menu.multiplayerDesc', 'Up to 4 players online. Share XP, share glory. No account required.')}</p>
                 </div>
             </div>
             <button class="btn-secondary gamemode-back">${tt('common.back', 'Back')}</button>
