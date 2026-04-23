@@ -40,9 +40,29 @@ const MultiplayerClient = {
     // Delay before attempting room rejoin after reconnect (allows session restore to complete)
     _sessionRestoreDelay: 500,
 
+    // Reconnect backoff state. We previously retried every 3 s forever, which
+    // floods the console (and hammers a down server / reverse proxy) when the
+    // backend is unreachable — exactly the symptom of code=1006 spam in the
+    // browser. Use exponential backoff with a hard cap on attempts; user can
+    // manually retry by clicking "Connect" again, which resets the counter.
+    _reconnectAttempts: 0,
+    _reconnectTimer: null,
+    _giveUpReconnect: false,
+    _maxReconnectAttempts: 8,
+    _reconnectBaseDelay: 2000,   // 2s
+    _reconnectMaxDelay: 60000,   // cap individual backoff at 60s
+
     connect(serverUrl) {
         if (this.ws && this.ws.readyState <= 1) {
             return; // Already connected or connecting
+        }
+
+        // A manual connect() (e.g. user pressed Connect, or first call from
+        // the game) resets the give-up state so we will try again.
+        this._giveUpReconnect = false;
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
         }
 
         this.serverUrl = serverUrl || this._getDefaultServerUrl();
@@ -71,6 +91,9 @@ const MultiplayerClient = {
             console.log('[MP] Connected to server');
             this.connected = true;
             this.lastError = null;
+            // Successful connect — reset reconnect backoff
+            this._reconnectAttempts = 0;
+            this._giveUpReconnect = false;
 
             // Try to restore session
             if (this.sessionToken) {
@@ -116,13 +139,33 @@ const MultiplayerClient = {
 
             if (this.onDisconnected) this.onDisconnected();
 
-            // Auto-reconnect after 3 seconds
-            setTimeout(() => {
-                if (!this.connected) {
-                    console.log('[MP] Attempting reconnect...');
+            // Auto-reconnect with exponential backoff so a permanently down
+            // server (or misconfigured edge proxy) doesn't spam the console
+            // with one connect attempt every 3 seconds forever.
+            if (this._giveUpReconnect) {
+                return;
+            }
+            if (this._reconnectAttempts >= this._maxReconnectAttempts) {
+                this._giveUpReconnect = true;
+                const giveUpMsg = `Cannot reach multiplayer server after ${this._reconnectAttempts} attempts. Please check your connection and click Connect to retry.`;
+                console.warn('[MP] ' + giveUpMsg);
+                this.lastError = giveUpMsg;
+                if (this.onError) this.onError(giveUpMsg);
+                return;
+            }
+            this._reconnectAttempts++;
+            const backoff = Math.min(
+                this._reconnectMaxDelay,
+                this._reconnectBaseDelay * Math.pow(2, this._reconnectAttempts - 1)
+            );
+            if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = setTimeout(() => {
+                this._reconnectTimer = null;
+                if (!this.connected && !this._giveUpReconnect) {
+                    console.log(`[MP] Attempting reconnect (#${this._reconnectAttempts})...`);
                     this.connect(this.serverUrl);
                 }
-            }, 3000);
+            }, backoff);
         };
 
         this.ws.onerror = (err) => {
@@ -138,6 +181,13 @@ const MultiplayerClient = {
     },
 
     disconnect() {
+        // Clear pending reconnect timer + give up so we don't auto-reconnect
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
+        }
+        this._giveUpReconnect = true;
+        this._reconnectAttempts = 0;
         if (this.ws) {
             this.ws.onclose = null; // Prevent auto-reconnect
             this.ws.close();

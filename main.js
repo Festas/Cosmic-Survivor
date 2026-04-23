@@ -6471,6 +6471,29 @@ function drawDPSMeter(ctx) {
     ctx.restore();
 }
 
+// Draw all entries in game.bullets. Player bullets are Bullet instances with
+// a draw() method, but enemy bullets (e.g. boss phase-3 bursts at line ~2422
+// and shooter projectiles at ~2764) are pushed as plain objects without one.
+// We render those inline so they are visible and never crash the renderer
+// with "b.draw is not a function".
+function drawBullets(ctx) {
+    for (const b of game.bullets) {
+        if (typeof b.draw === 'function') {
+            b.draw(ctx);
+        } else {
+            ctx.save();
+            const color = b.color || '#ff6b6b';
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = color;
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.size || 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+}
+
 function drawBossHealthBar(ctx) {
     const boss = game.enemies.find(e => e.isBoss);
     if (!boss || game.state !== 'playing') return;
@@ -7312,7 +7335,7 @@ function gameLoop(timestamp) {
         game.xpOrbs.forEach(orb => orb.draw(ctx));
         game.powerups.forEach(p => p.draw(ctx));
         game.enemies.forEach(e => e.draw(ctx));
-        game.bullets.forEach(b => b.draw(ctx));
+        drawBullets(ctx);
         game.player.draw(ctx);
         // Draw remote players (multiplayer)
         if (game.isMultiplayer) {
@@ -7399,7 +7422,7 @@ function gameLoop(timestamp) {
         game.xpOrbs.forEach(orb => orb.draw(ctx));
         game.powerups.forEach(p => p.draw(ctx));
         game.enemies.forEach(e => e.draw(ctx));
-        game.bullets.forEach(b => b.draw(ctx));
+        drawBullets(ctx);
         game.player.draw(ctx);
         if (game.isMultiplayer) {
             for (const rp of game.remotePlayers.values()) {
