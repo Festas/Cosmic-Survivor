@@ -122,7 +122,8 @@ const MultiplayerClient = {
 
             // If we never managed to connect, surface a clearer error so the
             // UI doesn't just say "Cant connect to the server" with no hint
-            // about what's wrong.
+            // about what's wrong, and kick off an HTTP health probe to tell
+            // the user *what* is actually broken (proxy vs container down).
             if (!wasConnected) {
                 let detail = '';
                 if (ev && ev.code === 1006) {
@@ -135,6 +136,14 @@ const MultiplayerClient = {
                 const msg = `Cannot connect to ${this.serverUrl}${detail}`;
                 this.lastError = msg;
                 if (this.onError) this.onError(msg);
+
+                // Run an async HTTP health probe and replace lastError with a
+                // more actionable diagnostic. We only do this on the *first*
+                // failed handshake so we don't spam the network with probes
+                // during the reconnect backoff loop.
+                if (this._reconnectAttempts === 0) {
+                    this._diagnoseAndReport(ev && ev.code).catch(() => {});
+                }
             }
 
             if (this.onDisconnected) this.onDisconnected();
@@ -202,6 +211,57 @@ const MultiplayerClient = {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host; // includes port if non-standard
         return `${protocol}//${host}/ws`;
+    },
+
+    // Probe the HTTP health endpoint that's deployed alongside the WS server
+    // (nginx routes /api/health to the multiplayer server's /health). This is
+    // used after a WebSocket failure to tell the user *what* is actually
+    // broken: backend down vs. backend up but the reverse proxy isn't passing
+    // WebSocket upgrade headers (the classic same-host wss:// 1006 cause).
+    async _probeHealth() {
+        if (typeof fetch !== 'function' || typeof window === 'undefined' || !window.location) {
+            return { ok: false, reason: 'no-fetch' };
+        }
+        const httpProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        const url = `${httpProtocol}//${window.location.host}/api/health`;
+        try {
+            const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const timer = ctl ? setTimeout(() => ctl.abort(), 5000) : null;
+            const resp = await fetch(url, {
+                method: 'GET',
+                cache: 'no-store',
+                signal: ctl ? ctl.signal : undefined,
+            });
+            if (timer) clearTimeout(timer);
+            if (!resp.ok) {
+                return { ok: false, reason: `http-${resp.status}`, url };
+            }
+            return { ok: true, url };
+        } catch (e) {
+            return { ok: false, reason: (e && e.name === 'AbortError') ? 'timeout' : 'network', url };
+        }
+    },
+
+    // After a WS handshake failure, probe HTTP and produce an actionable
+    // diagnostic message instead of the generic "code=1006 handshake failed".
+    async _diagnoseAndReport(closeCode) {
+        const probe = await this._probeHealth();
+        let msg;
+        if (probe.ok) {
+            // Backend is healthy over HTTP, but WS upgrade failed → upstream
+            // proxy is missing WebSocket Upgrade/Connection header forwarding.
+            msg = `Multiplayer server is reachable over HTTPS but the WebSocket upgrade is failing (close code ${closeCode}). The reverse proxy in front of ${this.serverUrl} likely isn't configured to forward 'Upgrade: websocket' / 'Connection: upgrade' headers. See DEPLOYMENT.md → "Host reverse-proxy WebSocket configuration".`;
+        } else if (probe.reason && probe.reason.startsWith('http-')) {
+            const code = probe.reason.replace('http-', '');
+            msg = `Multiplayer backend returned HTTP ${code} from ${probe.url}. The container or upstream proxy is misconfigured.`;
+        } else if (probe.reason === 'timeout') {
+            msg = `Multiplayer server timed out (HTTP probe to ${probe.url} did not respond). The container is likely down or unreachable.`;
+        } else {
+            msg = `Multiplayer server is unreachable (cannot reach ${probe.url || this.serverUrl}). Check that the multiplayer container is running and that DNS / firewall allow the connection.`;
+        }
+        console.warn('[MP][diag] ' + msg);
+        this.lastError = msg;
+        if (this.onError) this.onError(msg);
     },
 
     send(data) {
