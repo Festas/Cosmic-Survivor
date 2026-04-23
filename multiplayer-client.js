@@ -40,9 +40,29 @@ const MultiplayerClient = {
     // Delay before attempting room rejoin after reconnect (allows session restore to complete)
     _sessionRestoreDelay: 500,
 
+    // Reconnect backoff state. We previously retried every 3 s forever, which
+    // floods the console (and hammers a down server / reverse proxy) when the
+    // backend is unreachable — exactly the symptom of code=1006 spam in the
+    // browser. Use exponential backoff with a hard cap on attempts; user can
+    // manually retry by clicking "Connect" again, which resets the counter.
+    _reconnectAttempts: 0,
+    _reconnectTimer: null,
+    _giveUpReconnect: false,
+    _maxReconnectAttempts: 8,
+    _reconnectBaseDelay: 2000,   // 2s
+    _reconnectMaxDelay: 60000,   // cap individual backoff at 60s
+
     connect(serverUrl) {
         if (this.ws && this.ws.readyState <= 1) {
             return; // Already connected or connecting
+        }
+
+        // A manual connect() (e.g. user pressed Connect, or first call from
+        // the game) resets the give-up state so we will try again.
+        this._giveUpReconnect = false;
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
         }
 
         this.serverUrl = serverUrl || this._getDefaultServerUrl();
@@ -71,6 +91,9 @@ const MultiplayerClient = {
             console.log('[MP] Connected to server');
             this.connected = true;
             this.lastError = null;
+            // Successful connect — reset reconnect backoff
+            this._reconnectAttempts = 0;
+            this._giveUpReconnect = false;
 
             // Try to restore session
             if (this.sessionToken) {
@@ -99,7 +122,8 @@ const MultiplayerClient = {
 
             // If we never managed to connect, surface a clearer error so the
             // UI doesn't just say "Cant connect to the server" with no hint
-            // about what's wrong.
+            // about what's wrong, and kick off an HTTP health probe to tell
+            // the user *what* is actually broken (proxy vs container down).
             if (!wasConnected) {
                 let detail = '';
                 if (ev && ev.code === 1006) {
@@ -112,17 +136,45 @@ const MultiplayerClient = {
                 const msg = `Cannot connect to ${this.serverUrl}${detail}`;
                 this.lastError = msg;
                 if (this.onError) this.onError(msg);
+
+                // Run an async HTTP health probe and replace lastError with a
+                // more actionable diagnostic. We only do this on the *first*
+                // failed handshake so we don't spam the network with probes
+                // during the reconnect backoff loop.
+                if (this._reconnectAttempts === 0) {
+                    this._diagnoseAndReport(ev && ev.code).catch(() => {});
+                }
             }
 
             if (this.onDisconnected) this.onDisconnected();
 
-            // Auto-reconnect after 3 seconds
-            setTimeout(() => {
-                if (!this.connected) {
-                    console.log('[MP] Attempting reconnect...');
+            // Auto-reconnect with exponential backoff so a permanently down
+            // server (or misconfigured edge proxy) doesn't spam the console
+            // with one connect attempt every 3 seconds forever.
+            if (this._giveUpReconnect) {
+                return;
+            }
+            if (this._reconnectAttempts >= this._maxReconnectAttempts) {
+                this._giveUpReconnect = true;
+                const giveUpMsg = `Cannot reach multiplayer server after ${this._reconnectAttempts} attempts. Please check your connection and use the Connect button to retry.`;
+                console.warn('[MP] ' + giveUpMsg);
+                this.lastError = giveUpMsg;
+                if (this.onError) this.onError(giveUpMsg);
+                return;
+            }
+            this._reconnectAttempts++;
+            const backoff = Math.min(
+                this._reconnectMaxDelay,
+                this._reconnectBaseDelay * Math.pow(2, this._reconnectAttempts - 1)
+            );
+            if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = setTimeout(() => {
+                this._reconnectTimer = null;
+                if (!this.connected && !this._giveUpReconnect) {
+                    console.log(`[MP] Attempting reconnect (#${this._reconnectAttempts} of ${this._maxReconnectAttempts})...`);
                     this.connect(this.serverUrl);
                 }
-            }, 3000);
+            }, backoff);
         };
 
         this.ws.onerror = (err) => {
@@ -138,6 +190,13 @@ const MultiplayerClient = {
     },
 
     disconnect() {
+        // Clear pending reconnect timer + give up so we don't auto-reconnect
+        if (this._reconnectTimer) {
+            clearTimeout(this._reconnectTimer);
+            this._reconnectTimer = null;
+        }
+        this._giveUpReconnect = true;
+        this._reconnectAttempts = 0;
         if (this.ws) {
             this.ws.onclose = null; // Prevent auto-reconnect
             this.ws.close();
@@ -152,6 +211,57 @@ const MultiplayerClient = {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const host = window.location.host; // includes port if non-standard
         return `${protocol}//${host}/ws`;
+    },
+
+    // Probe the HTTP health endpoint that's deployed alongside the WS server
+    // (nginx routes /api/health to the multiplayer server's /health). This is
+    // used after a WebSocket failure to tell the user *what* is actually
+    // broken: backend down vs. backend up but the reverse proxy isn't passing
+    // WebSocket upgrade headers (the classic same-host wss:// 1006 cause).
+    async _probeHealth() {
+        if (typeof fetch !== 'function' || typeof window === 'undefined' || !window.location) {
+            return { ok: false, reason: 'no-fetch' };
+        }
+        const httpProtocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        const url = `${httpProtocol}//${window.location.host}/api/health`;
+        try {
+            const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+            const timer = ctl ? setTimeout(() => ctl.abort(), 5000) : null;
+            const resp = await fetch(url, {
+                method: 'GET',
+                cache: 'no-store',
+                signal: ctl ? ctl.signal : undefined,
+            });
+            if (timer) clearTimeout(timer);
+            if (!resp.ok) {
+                return { ok: false, reason: `http-${resp.status}`, url };
+            }
+            return { ok: true, url };
+        } catch (e) {
+            return { ok: false, reason: (e && e.name === 'AbortError') ? 'timeout' : 'network', url };
+        }
+    },
+
+    // After a WS handshake failure, probe HTTP and produce an actionable
+    // diagnostic message instead of the generic "code=1006 handshake failed".
+    async _diagnoseAndReport(closeCode) {
+        const probe = await this._probeHealth();
+        let msg;
+        if (probe.ok) {
+            // Backend is healthy over HTTP, but WS upgrade failed → upstream
+            // proxy is missing WebSocket Upgrade/Connection header forwarding.
+            msg = `Multiplayer server is reachable over HTTPS but the WebSocket upgrade is failing (close code ${closeCode}). The reverse proxy in front of ${this.serverUrl} likely isn't configured to forward 'Upgrade: websocket' / 'Connection: upgrade' headers. See DEPLOYMENT.md → "Host Nginx WebSocket Setup".`;
+        } else if (probe.reason && probe.reason.startsWith('http-')) {
+            const code = probe.reason.replace('http-', '');
+            msg = `Multiplayer backend returned HTTP ${code} from ${probe.url}. The container or upstream proxy is misconfigured.`;
+        } else if (probe.reason === 'timeout') {
+            msg = `Multiplayer server timed out (HTTP probe to ${probe.url} did not respond). The container is likely down or unreachable.`;
+        } else {
+            msg = `Multiplayer server is unreachable (cannot reach ${probe.url || this.serverUrl}). Check that the multiplayer container is running and that DNS / firewall allow the connection.`;
+        }
+        console.warn('[MP][diag] ' + msg);
+        this.lastError = msg;
+        if (this.onError) this.onError(msg);
     },
 
     send(data) {

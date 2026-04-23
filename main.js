@@ -36,10 +36,10 @@ const CONFIG = {
     MINIMAP_MARGIN: 10,
     // Difficulty presets
     DIFFICULTY: {
-        easy: { enemyHealthMult: 0.7, enemyDamageMult: 0.6, enemySpeedMult: 0.85, creditMult: 1.3, xpMult: 1.2 },
-        normal: { enemyHealthMult: 1.0, enemyDamageMult: 1.0, enemySpeedMult: 1.0, creditMult: 1.0, xpMult: 1.0 },
-        hard: { enemyHealthMult: 1.4, enemyDamageMult: 1.3, enemySpeedMult: 1.1, creditMult: 0.85, xpMult: 0.9 },
-        nightmare: { enemyHealthMult: 2.0, enemyDamageMult: 1.6, enemySpeedMult: 1.2, creditMult: 0.7, xpMult: 0.8 },
+        easy:      { enemyHealthMult: 0.7, enemyDamageMult: 0.6,  enemySpeedMult: 0.85, creditMult: 1.3,  xpMult: 1.2 },
+        normal:    { enemyHealthMult: 1.0, enemyDamageMult: 1.0,  enemySpeedMult: 1.0,  creditMult: 1.0,  xpMult: 1.0 },
+        hard:      { enemyHealthMult: 1.3, enemyDamageMult: 1.25, enemySpeedMult: 1.08, creditMult: 0.9,  xpMult: 0.95 },
+        nightmare: { enemyHealthMult: 1.7, enemyDamageMult: 1.45, enemySpeedMult: 1.18, creditMult: 0.75, xpMult: 0.85 },
     },
 };
 
@@ -54,13 +54,13 @@ const CHARACTERS = [
         id: 'balanced',
         name: '⚖️ Balanced',
         description: 'Well-rounded stats for all situations',
-        maxHealth: 100, speed: 3, damage: 10, fireRate: 30,
+        maxHealth: 100, speed: 3, damage: 10, fireRate: 32,
     },
     {
         id: 'tank',
         name: '🛡️ Tank',
         description: 'Heavy armor, solid damage',
-        maxHealth: 180, speed: 2.2, damage: 9, fireRate: 38, armor: 6,
+        maxHealth: 180, speed: 2.2, damage: 11, fireRate: 38, armor: 8,
     },
     {
         id: 'speedster',
@@ -72,7 +72,7 @@ const CHARACTERS = [
         id: 'sniper',
         name: '🎯 Sniper',
         description: 'Precision shots from afar',
-        maxHealth: 80, speed: 2.5, damage: 22, fireRate: 48, critChance: 0.2, critDamage: 2.2, range: 650,
+        maxHealth: 80, speed: 2.5, damage: 22, fireRate: 44, critChance: 0.2, critDamage: 2.2, range: 650,
     },
     {
         id: 'gunslinger',
@@ -90,19 +90,19 @@ const CHARACTERS = [
         id: 'berserker',
         name: '⚔️ Berserker',
         description: 'Aggressive glass cannon',
-        maxHealth: 75, speed: 3.8, damage: 16, fireRate: 24, critChance: 0.2, critDamage: 1.8, dodge: 0.1,
+        maxHealth: 75, speed: 3.8, damage: 14, fireRate: 24, critChance: 0.2, critDamage: 1.8, dodge: 0.1,
     },
     {
         id: 'engineer',
         name: '🔧 Engineer',
         description: 'Defensive specialist with range',
-        maxHealth: 130, speed: 2.3, damage: 9, fireRate: 36, armor: 7, range: 500, pickupRange: 65,
+        maxHealth: 130, speed: 2.3, damage: 10, fireRate: 36, armor: 8, range: 500, pickupRange: 65,
     },
     {
         id: 'medic',
         name: '💊 Medic',
         description: 'Regenerates health over time',
-        maxHealth: 120, speed: 2.6, damage: 8, fireRate: 34, armor: 3, lifeSteal: 0.1, healthRegen: 0.4,
+        maxHealth: 120, speed: 2.6, damage: 9, fireRate: 32, armor: 3, lifeSteal: 0.1, healthRegen: 0.8,
     },
     {
         id: 'assassin',
@@ -114,13 +114,13 @@ const CHARACTERS = [
         id: 'summoner',
         name: '🔮 Summoner',
         description: 'Commands powerful attack drones',
-        maxHealth: 100, speed: 2.6, damage: 8, fireRate: 42, armor: 2, dodge: 0.05, maxDrones: 2,
+        maxHealth: 100, speed: 2.6, damage: 9, fireRate: 38, armor: 2, dodge: 0.05, maxDrones: 2,
     },
     {
         id: 'juggernaut',
         name: '💪 Juggernaut',
         description: 'Unstoppable force, immovable object',
-        maxHealth: 200, speed: 1.8, damage: 12, fireRate: 45, armor: 10, lifeSteal: 0.08, knockbackImmune: true,
+        maxHealth: 200, speed: 1.8, damage: 13, fireRate: 45, armor: 14, lifeSteal: 0.08, knockbackImmune: true,
     },
 ];
 
@@ -316,20 +316,23 @@ const ENEMY_TYPES = {
 };
 
 // Boss types
+// Credits roughly doubled vs old values — bosses now actually feel like the
+// jackpot they're meant to be (was: 5 trash mobs > 1 boss in payout).
+// Health multipliers slightly trimmed so wave 25+ bosses aren't HP sponges.
 const BOSS_TYPES = {
-    destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 12, damage: 2.5, credits: 100, xp: 50,
+    destroyer: { name: '👹 Destroyer', color: '#dc2626', size: 2.4, health: 9, damage: 2.5, credits: 200, xp: 80,
         palette: { body: '#dc2626', core: '#fecaca', glow: '#ff0000', accent: '#991b1b', wing: '#7f1d1d' } },
-    broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 10, damage: 1.8, credits: 120, xp: 60, summons: true,
+    broodmother: { name: '🕷️ Brood Mother', color: '#7c2d12', size: 2.8, health: 8, damage: 1.8, credits: 240, xp: 100, summons: true,
         palette: { body: '#7c2d12', core: '#d97706', glow: '#f59e0b', accent: '#451a03', wing: '#a16207' } },
-    voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 8, damage: 2.2, credits: 150, xp: 70, teleports: true,
+    voidwalker: { name: '👻 Void Walker', color: '#581c87', size: 2.2, health: 7, damage: 2.2, credits: 280, xp: 120, teleports: true,
         palette: { body: '#581c87', core: '#a78bfa', glow: '#8b5cf6', accent: '#3b0764', wing: '#7c3aed' } },
-    necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 11, damage: 2.0, credits: 180, xp: 80, resurrects: true,
+    necromancer: { name: '💀 Necromancer', color: '#4c1d95', size: 2.6, health: 8, damage: 2.0, credits: 320, xp: 140, resurrects: true,
         palette: { body: '#4c1d95', core: '#a78bfa', glow: '#8b5cf6', accent: '#2e1065', wing: '#6d28d9' } },
-    titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 16, damage: 3.5, credits: 200, xp: 100, earthquake: true,
+    titan: { name: '⚡ Titan', color: '#b91c1c', size: 3.2, health: 12, damage: 3.5, credits: 400, xp: 180, earthquake: true,
         palette: { body: '#b91c1c', core: '#fbbf24', glow: '#f59e0b', accent: '#7f1d1d', wing: '#92400e' } },
-    hivemind: { name: '🧠 Hivemind', color: '#7e22ce', size: 2.5, health: 14, damage: 1.5, credits: 220, xp: 90, commands: true,
+    hivemind: { name: '🧠 Hivemind', color: '#7e22ce', size: 2.5, health: 11, damage: 1.5, credits: 380, xp: 160, commands: true,
         palette: { body: '#7e22ce', core: '#d8b4fe', glow: '#c084fc', accent: '#581c87', wing: '#a855f7' } },
-    leviathan: { name: '🐉 Leviathan', color: '#0f766e', size: 3.5, health: 20, damage: 3.0, credits: 280, xp: 120, charges: true,
+    leviathan: { name: '🐉 Leviathan', color: '#0f766e', size: 3.5, health: 14, damage: 3.0, credits: 480, xp: 200, charges: true,
         palette: { body: '#0f766e', core: '#5eead4', glow: '#2dd4bf', accent: '#134e4a', wing: '#14b8a6' } },
 };
 
@@ -347,7 +350,7 @@ const ELITE_MODIFIERS = {
 // XP level-up passive abilities (pick 1 of 3)
 const PASSIVE_ABILITIES = [
     { id: 'glass_cannon', name: '🔥 Glass Cannon', desc: '+15% Damage, -10% Max HP', apply: p => { p.damage = Math.floor(p.damage * 1.15); p.maxHealth = Math.floor(p.maxHealth * 0.9); p.health = Math.min(p.health, p.maxHealth); } },
-    { id: 'fortify', name: '🛡️ Fortify', desc: '+2 Armor, +15 Max HP', apply: p => { p.armor += 2; p.maxHealth += 15; p.health = Math.min(p.health + 15, p.maxHealth); } },
+    { id: 'fortify', name: '🛡️ Fortify', desc: '+3 Armor, +15 Max HP', apply: p => { p.armor += 3; p.maxHealth += 15; p.health = Math.min(p.health + 15, p.maxHealth); } },
     { id: 'quick_hands', name: '⚡ Quick Hands', desc: '+10% Fire Rate', apply: p => { p.fireRate = Math.max(5, Math.floor(p.fireRate * 0.9)); } },
     { id: 'nimble', name: '🏃 Nimble', desc: '+0.3 Speed, +5% Dodge', apply: p => { p.speed += 0.3; p.dodge = Math.min(0.7, p.dodge + 0.05); } },
     { id: 'vampirism', name: '🧛 Vampirism', desc: '+8% Life Steal', apply: p => { p.lifeSteal += 0.08; } },
@@ -355,7 +358,7 @@ const PASSIVE_ABILITIES = [
     { id: 'thick_skin', name: '💚 Thick Skin', desc: '+25 Max HP, Full Heal', apply: p => { p.maxHealth += 25; p.health = p.maxHealth; } },
     { id: 'bullet_storm', name: '🌟 Bullet Storm', desc: '+1 Projectile', apply: p => { p.projectileCount += 1; } },
     { id: 'scavenger', name: '🧲 Scavenger', desc: '+25 Pickup Range', apply: p => { p.pickupRange += 25; } },
-    { id: 'regeneration', name: '💊 Regeneration', desc: '+0.3 HP/s Regen', apply: p => { p.healthRegen = (p.healthRegen || 0) + 0.3; } },
+    { id: 'regeneration', name: '💊 Regeneration', desc: '+0.6 HP/s Regen', apply: p => { p.healthRegen = (p.healthRegen || 0) + 0.6; } },
     { id: 'adrenaline', name: '💉 Adrenaline', desc: '+0.5 Speed when below 50% HP', apply: p => { p.adrenaline = (p.adrenaline || 0) + 1; } },
     { id: 'thorns', name: '🌵 Thorns', desc: 'Reflect 20% melee damage back', apply: p => { p.thorns = (p.thorns || 0) + 0.2; } },
 ];
@@ -391,8 +394,8 @@ const TRANSFORMATIVE_ITEMS = [
       apply: p => { p.phaseShift = true; p.phaseShiftCooldown = 0; } },
     { id: 'blood_shield', name: '🩸 Blood Shield', desc: 'Overkill damage on enemies becomes temp shield', category: 'defensive',
       apply: p => { p.bloodShield = true; p.tempShield = p.tempShield || 0; } },
-    { id: 'iron_skin', name: '🛡️ Iron Skin', desc: '+4 Armor, +20 Max HP', category: 'defensive',
-      apply: p => { p.armor += 4; p.maxHealth += 20; p.health = Math.min(p.health + 20, p.maxHealth); } },
+    { id: 'iron_skin', name: '🛡️ Iron Skin', desc: '+5 Armor, +20 Max HP', category: 'defensive',
+      apply: p => { p.armor += 5; p.maxHealth += 20; p.health = Math.min(p.health + 20, p.maxHealth); } },
     
     // Utility
     { id: 'black_hole', name: '🌀 Black Hole', desc: 'Every 25s, spawn a vortex pulling enemies', category: 'utility',
@@ -1611,9 +1614,18 @@ class Player {
             createParticles(this.x, this.y, '#4ecdc4', 8);
             return;
         }
-        const finalDamage = Math.max(1, Math.floor(amount * (100 / (100 + this.armor))));
+        // Diminishing-returns armor: 10 armor ≈ 25% reduction, 20 ≈ 40%,
+        // 30 ≈ 50%, hard-capped at 60% so even Juggernaut can still die.
+        // Old `100/(100+armor)` made 10 armor a measly 9% reduction, which
+        // made Tank/Juggernaut/Engineer not actually feel tanky.
+        const armorReduction = Math.min(0.60, this.armor / (this.armor + 30));
+        const finalDamage = Math.max(1, Math.floor(amount * (1 - armorReduction)));
         this.health -= finalDamage;
         game.stats.damageTaken += finalDamage;
+        // Track when the player was last actually hit so the renderer can
+        // pulse a brief red full-screen damage flash for visceral feedback.
+        this._lastHitTime = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        this._lastHitDamage = finalDamage;
         
         // Thorns passive - reflect damage to nearest enemy
         if (this.thorns > 0) {
@@ -2219,10 +2231,13 @@ class Enemy {
             this.type = type;
             this.size = CONFIG.ENEMY_SIZE * bossType.size;
             const diffSettings = game.difficultySettings || CONFIG.DIFFICULTY.normal;
-            this.speed = (0.4 + Math.log2(1 + wave * 0.15)) * 0.4 * diffSettings.enemySpeedMult;
-            this.maxHealth = (15 + wave * 3 + Math.pow(wave, 1.3)) * bossType.health * diffSettings.enemyHealthMult;
+            this.speed = (0.4 + Math.log2(1 + wave * 0.12)) * 0.4 * diffSettings.enemySpeedMult;
+            // Smoother late-wave HP curve: replaced runaway wave^1.3 with
+            // wave^1.15 + slightly steeper linear term. Same difficulty up to
+            // ~wave 20, much fairer past wave 30 where things became unwinnable.
+            this.maxHealth = (15 + wave * 4 + Math.pow(wave, 1.15)) * bossType.health * diffSettings.enemyHealthMult;
             this.health = this.maxHealth;
-            this.damage = (4 + wave * 1.2 + Math.pow(wave, 1.1) * 0.3) * bossType.damage * diffSettings.enemyDamageMult;
+            this.damage = (4 + wave * 0.9 + Math.pow(wave, 1.05) * 0.25) * bossType.damage * diffSettings.enemyDamageMult;
             this.creditValue = Math.floor(bossType.credits * (diffSettings.creditMult || 1));
             this.color = bossType.color;
             this.name = bossType.name;
@@ -2250,10 +2265,13 @@ class Enemy {
             this.type = type;
             this.size = CONFIG.ENEMY_SIZE * (enemyType.size || 1);
             const diffSettings = game.difficultySettings || CONFIG.DIFFICULTY.normal;
-            this.speed = (1 + Math.log2(1 + wave * 0.3)) * enemyType.speed * diffSettings.enemySpeedMult;
-            this.maxHealth = (15 + wave * 3 + Math.pow(wave, 1.3)) * enemyType.health * diffSettings.enemyHealthMult;
+            // Tame "fast" enemy speed runaway: log2(1+wave*0.18) so
+            // wave-30 Stalkers don't outrun base player speed.
+            this.speed = (1 + Math.log2(1 + wave * 0.18)) * enemyType.speed * diffSettings.enemySpeedMult;
+            // See boss block above — same gentler late-wave curve.
+            this.maxHealth = (15 + wave * 4 + Math.pow(wave, 1.15)) * enemyType.health * diffSettings.enemyHealthMult;
             this.health = this.maxHealth;
-            this.damage = (4 + wave * 1.2 + Math.pow(wave, 1.1) * 0.3) * enemyType.damage * diffSettings.enemyDamageMult;
+            this.damage = (4 + wave * 0.9 + Math.pow(wave, 1.05) * 0.25) * enemyType.damage * diffSettings.enemyDamageMult;
             this.creditValue = Math.floor((2 + wave * 0.8) * enemyType.credits * (diffSettings.creditMult || 1));
 
             // Corruption scaling - enemies harder but better rewards at high corruption
@@ -5476,8 +5494,10 @@ function spawnWave() {
         game.enemies.push(boss);
         showNotification(`BOSS WAVE: ${boss.name}`);
     } else {
-        // Better enemy count scaling: starts at 8, exponential feel in later waves
-        let enemyCount = Math.floor(8 + game.wave * 2 + Math.pow(game.wave, 1.2));
+        // Enemy count: was wave^1.2 which made wave 50+ unrenderable (220+
+        // enemies). Trimmed to wave^1.1 so wave 50 ≈ 180 enemies, wave 30 ≈
+        // 110 — still feels swarm-y, no longer a slideshow.
+        let enemyCount = Math.floor(8 + game.wave * 2 + Math.pow(game.wave, 1.1));
         
         // Scale enemy count for multiplayer
         if (game.isMultiplayer) {
@@ -6471,6 +6491,72 @@ function drawDPSMeter(ctx) {
     ctx.restore();
 }
 
+// Draw all entries in game.bullets. Player bullets are Bullet instances with
+// a draw() method, but enemy bullets (e.g. boss phase-3 bursts and shooter
+// projectiles) are pushed as plain objects without one. We render those
+// inline so they are visible and never crash the renderer with
+// "b.draw is not a function".
+// Screen-space overlays drawn over the world view but under the HUD:
+//   - red full-screen damage flash whenever the player just took a hit
+//   - subtle dark vignette while a boss is alive (focuses the eye on action)
+function drawScreenOverlays(ctx) {
+    const W = CONFIG.CANVAS_WIDTH;
+    const H = CONFIG.CANVAS_HEIGHT;
+
+    // Boss vignette: subtle radial darkening at the corners while a boss
+    // is in play, gives the encounter a heavier "this is dangerous" feel.
+    const bossPresent = game.enemies && game.enemies.some(e => e && e.isBoss);
+    if (bossPresent) {
+        ctx.save();
+        const cx = W / 2;
+        const cy = H / 2;
+        const inner = Math.max(W, H) * 0.32;
+        const outer = Math.max(W, H) * 0.78;
+        const grad = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.45)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+        ctx.restore();
+    }
+
+    // Damage flash: 220 ms red overlay scaled by hit severity.
+    if (game.player && game.player._lastHitTime) {
+        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        const elapsed = now - game.player._lastHitTime;
+        const DURATION = 220;
+        if (elapsed >= 0 && elapsed < DURATION) {
+            const t = 1 - elapsed / DURATION; // 1 → 0
+            // Cap base alpha by hit severity vs. max HP, but always show at
+            // least a faint flash so even 1 HP scratches register.
+            const sev = Math.min(1, (game.player._lastHitDamage || 1) / Math.max(1, game.player.maxHealth * 0.25));
+            const alpha = (0.10 + 0.30 * sev) * t;
+            ctx.save();
+            ctx.fillStyle = `rgba(255, 40, 40, ${alpha.toFixed(3)})`;
+            ctx.fillRect(0, 0, W, H);
+            ctx.restore();
+        }
+    }
+}
+
+function drawBullets(ctx) {
+    for (const b of game.bullets) {
+        if (typeof b.draw === 'function') {
+            b.draw(ctx);
+        } else {
+            ctx.save();
+            const color = b.color || '#ff6b6b';
+            ctx.fillStyle = color;
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = color;
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, b.size || 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+}
+
 function drawBossHealthBar(ctx) {
     const boss = game.enemies.find(e => e.isBoss);
     if (!boss || game.state !== 'playing') return;
@@ -7065,43 +7151,93 @@ function updateAccountUI(profile) {
 let lastTime = 0;
 let timer = 0;
 
-// Initialize starfield
+// Initialize a multi-layer parallax starfield. Stars are stored in canvas
+// coordinates (0..CANVAS_WIDTH/HEIGHT) and rendered in screen space with a
+// per-layer parallax factor against the camera, so far stars barely move
+// when the player walks while near stars scroll quickly — gives real depth.
 function initStarfield() {
     game.stars = [];
-    for (let i = 0; i < 150; i++) {
-        game.stars.push({
-            x: Math.random() * CONFIG.WORLD_WIDTH,
-            y: Math.random() * CONFIG.WORLD_HEIGHT,
-            size: Math.random() * 2,
-            speed: 0.1 + Math.random() * 0.5,
-            twinkle: Math.random() * Math.PI * 2,
+    const W = CONFIG.CANVAS_WIDTH;
+    const H = CONFIG.CANVAS_HEIGHT;
+    // 3 layers: far (slow scroll, dim, small), mid, near (fast, bright, big).
+    const layers = [
+        { count: 100, parallax: 0.15, sizeMin: 0.4, sizeMax: 1.0, brightnessMin: 0.4, brightnessMax: 0.7, palette: ['#9bb6ff', '#c6d4ff', '#ffffff'] },
+        { count: 60,  parallax: 0.45, sizeMin: 0.8, sizeMax: 1.6, brightnessMin: 0.6, brightnessMax: 0.9, palette: ['#ffffff', '#fff7d6', '#d6e4ff'] },
+        { count: 30,  parallax: 0.85, sizeMin: 1.4, sizeMax: 2.4, brightnessMin: 0.85, brightnessMax: 1.0, palette: ['#ffffff', '#ffd6f5', '#d6fff0', '#ffe9b3'] },
+    ];
+    for (const layer of layers) {
+        for (let i = 0; i < layer.count; i++) {
+            game.stars.push({
+                x: Math.random() * W,
+                y: Math.random() * H,
+                size: layer.sizeMin + Math.random() * (layer.sizeMax - layer.sizeMin),
+                parallax: layer.parallax,
+                brightness: layer.brightnessMin + Math.random() * (layer.brightnessMax - layer.brightnessMin),
+                color: layer.palette[Math.floor(Math.random() * layer.palette.length)],
+                twinkle: Math.random() * Math.PI * 2,
+                twinkleSpeed: 0.02 + Math.random() * 0.06,
+            });
+        }
+    }
+    // A few large soft "nebula puff" sprites in the deepest layer for color depth.
+    game.nebulae = [];
+    const nebulaColors = ['rgba(138, 43, 226, 0.10)', 'rgba(78, 205, 196, 0.08)', 'rgba(255, 107, 107, 0.07)', 'rgba(0, 255, 136, 0.07)'];
+    for (let i = 0; i < 4; i++) {
+        game.nebulae.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            radius: 180 + Math.random() * 220,
+            parallax: 0.08 + Math.random() * 0.06,
+            color: nebulaColors[i % nebulaColors.length],
         });
     }
 }
 
 function updateStarfield() {
-    game.stars.forEach(star => {
-        star.y += star.speed;
-        star.twinkle += 0.05;
-        if (star.y > CONFIG.WORLD_HEIGHT) {
-            star.y = 0;
-            star.x = Math.random() * CONFIG.WORLD_WIDTH;
-        }
-    });
+    if (!game.stars) return;
+    for (const star of game.stars) {
+        star.twinkle += star.twinkleSpeed;
+    }
 }
 
+// Render the starfield + nebula puffs in screen space so we can apply
+// per-layer parallax against the camera. Called inside the camera-translated
+// block, so we temporarily reset the transform to draw screen-relative,
+// then restore it for the rest of the world rendering.
 function drawStarfield(ctx) {
+    if (!game.stars) return;
+    const W = CONFIG.CANVAS_WIDTH;
+    const H = CONFIG.CANVAS_HEIGHT;
     ctx.save();
-    game.stars.forEach(star => {
-        const alpha = 0.3 + Math.sin(star.twinkle) * 0.3;
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = '#fff';
-        ctx.shadowColor = '#fff';
-        ctx.shadowBlur = star.size * 2;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // Nebula puffs (deepest, behind stars)
+    if (game.nebulae) {
+        for (const n of game.nebulae) {
+            const sx = (((n.x - game.camera.x * n.parallax) % W) + W) % W;
+            const sy = (((n.y - game.camera.y * n.parallax) % H) + H) % H;
+            const grad = ctx.createRadialGradient(sx, sy, 0, sx, sy, n.radius);
+            grad.addColorStop(0, n.color);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(sx - n.radius, sy - n.radius, n.radius * 2, n.radius * 2);
+        }
+    }
+
+    // Stars per layer with parallax — modulo wraps around the viewport so
+    // they appear to scroll infinitely in any direction.
+    for (const star of game.stars) {
+        const sx = (((star.x - game.camera.x * star.parallax) % W) + W) % W;
+        const sy = (((star.y - game.camera.y * star.parallax) % H) + H) % H;
+        const twinkle = 0.55 + Math.sin(star.twinkle) * 0.45;
+        ctx.globalAlpha = Math.max(0.05, twinkle * star.brightness);
+        ctx.fillStyle = star.color;
+        ctx.shadowColor = star.color;
+        ctx.shadowBlur = star.size * 2.5;
         ctx.beginPath();
-        ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+        ctx.arc(sx, sy, star.size, 0, Math.PI * 2);
         ctx.fill();
-    });
+    }
     ctx.restore();
 }
 
@@ -7312,7 +7448,7 @@ function gameLoop(timestamp) {
         game.xpOrbs.forEach(orb => orb.draw(ctx));
         game.powerups.forEach(p => p.draw(ctx));
         game.enemies.forEach(e => e.draw(ctx));
-        game.bullets.forEach(b => b.draw(ctx));
+        drawBullets(ctx);
         game.player.draw(ctx);
         // Draw remote players (multiplayer)
         if (game.isMultiplayer) {
@@ -7379,6 +7515,9 @@ function gameLoop(timestamp) {
         // Draw HUD elements (outside camera transform)
         ctx.restore();
         ctx.save();
+        // Screen-space damage flash + boss vignette (drawn over the world,
+        // under the HUD so HUD text stays crisp).
+        drawScreenOverlays(ctx);
         drawNotifications(ctx);
         drawJoystick(ctx);
         drawActivePowerups(ctx);
@@ -7399,7 +7538,7 @@ function gameLoop(timestamp) {
         game.xpOrbs.forEach(orb => orb.draw(ctx));
         game.powerups.forEach(p => p.draw(ctx));
         game.enemies.forEach(e => e.draw(ctx));
-        game.bullets.forEach(b => b.draw(ctx));
+        drawBullets(ctx);
         game.player.draw(ctx);
         if (game.isMultiplayer) {
             for (const rp of game.remotePlayers.values()) {

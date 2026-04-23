@@ -254,3 +254,49 @@ curl https://cs.festas-builds.com/health
 # Multiplayer server health
 curl https://cs.festas-builds.com/api/health
 ```
+
+### Multiplayer WebSocket failing (`code=1006` in browser console)
+
+Symptoms in the browser:
+```
+WebSocket connection to 'wss://cs.festas-builds.com/ws' failed
+[MP] Disconnected from server (code=1006, reason=, wasClean=false)
+```
+
+The client now runs an HTTP health probe automatically after a failed
+WebSocket handshake and prints a more actionable diagnostic via
+`[MP][diag] …` in the console. Map that line to the fix:
+
+| Diagnostic phrase | Likely cause | Fix |
+|---|---|---|
+| "reachable over HTTPS but the WebSocket upgrade is failing" | Host reverse proxy (Link-in-Bio repo) is missing `Upgrade`/`Connection` headers for `/ws` | Re-apply the [Host Nginx WebSocket Setup](#host-nginx-websocket-setup) block in `cs.festas-builds.com.conf` and `nginx -s reload` on the host |
+| "returned HTTP 502/503/504" | Container nginx is up but the Node.js multiplayer server is not running | `docker compose logs cosmic-survivor`, then `docker compose restart cosmic-survivor` |
+| "timed out" / "is unreachable" | Container is not running, or host firewall is blocking 127.0.0.1:8200, or DNS is broken | `docker compose ps`, `docker compose up -d`, and verify the host nginx site is enabled |
+
+Quick host-side sanity check from the Hetzner host:
+```bash
+# 1. Container nginx + Node.js up?
+docker compose ps
+curl -i http://127.0.0.1:8200/health        # → 200 healthy
+curl -i http://127.0.0.1:8200/api/health    # → 200 {status:ok…}
+
+# 2. Container WS handshake works directly?
+curl -i -N \
+  -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  -H "Sec-WebSocket-Version: 13" \
+  http://127.0.0.1:8200/ws
+# → HTTP/1.1 101 Switching Protocols    ← if not 101, container nginx is broken
+
+# 3. Same handshake through the public host nginx (TLS)?
+curl -i -N --http1.1 \
+  -H "Connection: Upgrade" -H "Upgrade: websocket" \
+  -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+  -H "Sec-WebSocket-Version: 13" \
+  https://cs.festas-builds.com/ws
+# → HTTP/1.1 101 Switching Protocols    ← if not 101, host nginx /ws block is wrong
+```
+
+If step 2 returns 101 but step 3 doesn't, the container is fine and the
+fix is purely on the **host nginx** in the Link-in-Bio repo (see
+[Host Nginx WebSocket Setup](#host-nginx-websocket-setup)).
