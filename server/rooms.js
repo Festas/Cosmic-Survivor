@@ -75,7 +75,7 @@ export class Room {
             displayName,
             ws,
             isHost,
-            ready: isHost, // Host is always ready
+            ready: false,
             characterId: null,
             playerIndex,
             color: playerColors[playerIndex],

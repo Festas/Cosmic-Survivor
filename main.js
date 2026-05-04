@@ -5575,6 +5575,10 @@ function spawnWave() {
 }
 
 function nextWave() {
+    // Non-host multiplayer clients must wait for the host's wave_start event
+    if (game.isMultiplayer && window.MultiplayerClient && !window.MultiplayerClient.isHost()) {
+        return;
+    }
     // ===== Story Mode: did we just complete the final wave (boss killed)? =====
     if (game.gameMode === 'story' && game.activeStoryChapter) {
         const ch = game.activeStoryChapter;
@@ -6946,6 +6950,10 @@ function initMultiplayerCallbacks() {
         updateAccountUI(profile);
     };
 
+    mp.onError = (message) => {
+        showNotification('⚠️ ' + message, '#ff6b6b', 3000);
+    };
+
     mp.onAuthError = (message) => {
         showNotification(`Auth error: ${message}`, '#ff6b6b', 3000);
         const errorEl = document.getElementById('auth-error');
@@ -7037,7 +7045,7 @@ function updateLobbyUI(lobby) {
         const mp = window.MultiplayerClient;
         const isHost = mp && lobby.hostId === mp.localPlayerId;
         startBtn.style.display = isHost ? 'block' : 'none';
-        startBtn.disabled = !lobby.players.every(p => p.ready);
+        startBtn.disabled = !lobby.players.every(p => p.ready && p.characterId !== null);
     }
 }
 
@@ -7362,6 +7370,7 @@ function gameLoop(timestamp) {
                         openShop();
                     }
                     // Non-host clients wait for the host's wave_complete event
+                    game.timeLeft = 0; // clamp so the HUD doesn't show negative time
                 } else {
                     Sound.play('waveComplete');
                     openShop();
@@ -7999,8 +8008,8 @@ function showAccountModal() {
             <div class="modal-content account-modal">
                 <h2>👤 Account</h2>
                 <div class="account-profile">
-                    <p><strong>Name:</strong> ${profile.displayName}</p>
-                    <p><strong>Username:</strong> ${profile.username}</p>
+                    <p><strong>Name:</strong> <span id="account-display-name"></span></p>
+                    <p><strong>Username:</strong> <span id="account-username"></span></p>
                     <div class="account-stats">
                         <h3>📊 Career Stats</h3>
                         <p>👾 Total Kills: ${profile.stats?.total_kills || 0}</p>
@@ -8013,6 +8022,9 @@ function showAccountModal() {
                 <button class="btn-secondary" onclick="this.closest('.modal').classList.add('hidden')">Close</button>
             </div>
         `;
+        // Set user-supplied text via textContent to prevent stored XSS
+        modal.querySelector('#account-display-name').textContent = profile.displayName;
+        modal.querySelector('#account-username').textContent = profile.username;
     } else {
         // Show login/register form
         modal.innerHTML = `
