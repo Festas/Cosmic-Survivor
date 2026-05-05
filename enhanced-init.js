@@ -28,6 +28,8 @@ import { stanceSystem, Stance } from './js/systems/stanceSystem.js';
 import { weatherSystem, WEATHER_PROFILES } from './js/systems/weatherSystem.js';
 import { ENEMY_BEHAVIORS, applyShieldBuddyAbsorption, ensureShieldIds } from './js/systems/enemyBehaviors.js';
 import { applyCoopAura, notifyCoopBuff, COOP_AURA_RADIUS } from './js/systems/coopAura.js';
+import { registerPool, listPools } from './js/core/poolRegistry.js';
+import { installDebugOverlay } from './js/core/debugOverlay.js';
 
 window.rework = {
     ObjectPool,
@@ -44,7 +46,11 @@ window.rework = {
     applyShieldBuddyAbsorption,
     ensureShieldIds,
     coop: { applyAura: applyCoopAura, notify: notifyCoopBuff, radius: COOP_AURA_RADIUS },
+    registerPool,
+    listPools,
 };
+
+installDebugOverlay();
 
 // Flag to indicate enhanced mode
 window.ENHANCED_MODE = true;

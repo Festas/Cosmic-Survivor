@@ -34,6 +34,7 @@ export class ObjectPool {
         this._allocated = 0;
         this._highWater = 0;
         this.name = opts.name || 'ObjectPool';
+        this._exhaustEvents = 0;
 
         const initial = Math.min(opts.initialSize ?? 0, this._maxSize);
         for (let i = 0; i < initial; i++) {
@@ -57,6 +58,7 @@ export class ObjectPool {
             this._allocated++;
             if (this._allocated > this._highWater) this._highWater = this._allocated;
         } else {
+            this._exhaustEvents++;
             return null;
         }
         this._reset(obj, ...resetArgs);
@@ -92,6 +94,7 @@ export class ObjectPool {
             inUse: this._allocated - this._free.length,
             highWater: this._highWater,
             maxSize: this._maxSize,
+            exhaustEvents: this._exhaustEvents,
         };
     }
 }

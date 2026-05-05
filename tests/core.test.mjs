@@ -366,3 +366,63 @@ test('COOP_AURA_RADIUS is exposed', () => {
     assert.equal(typeof COOP_AURA_RADIUS, 'number');
     assert.ok(COOP_AURA_RADIUS > 0);
 });
+
+// ----- ObjectPool exhaustEvents & high-cycle regression -------------------------
+
+import { registerPool, listPools } from '../js/core/poolRegistry.js';
+
+test('ObjectPool: 10 000 acquire/release cycles on cap-256 pool — inUse===0, no exhausts', () => {
+    const pool = new ObjectPool(
+        () => ({ v: 0 }),
+        (o, v) => { o.v = v; },
+        { maxSize: 256, name: 'cycle-test' }
+    );
+    for (let i = 0; i < 10_000; i++) {
+        const obj = pool.acquire(i);
+        assert.notEqual(obj, null, `acquire should succeed at iteration ${i}`);
+        pool.release(obj);
+    }
+    const s = pool.stats();
+    assert.equal(s.inUse, 0, 'all objects must be returned to pool');
+    assert.ok(s.allocated <= 256, `allocated (${s.allocated}) must not exceed cap`);
+    assert.equal(s.exhaustEvents, 0, 'no exhaust events in normal cycling');
+});
+
+test('ObjectPool: acquire past cap returns null and increments exhaustEvents', () => {
+    const pool = new ObjectPool(() => ({}), () => {}, { maxSize: 3, name: 'exhaust-test' });
+    pool.acquire(); pool.acquire(); pool.acquire(); // fill to cap
+    const result = pool.acquire();
+    assert.equal(result, null, 'must return null when exhausted');
+    assert.equal(pool.stats().exhaustEvents, 1, 'exhaustEvents must be 1 after one exhaust');
+    // Two more
+    pool.acquire(); pool.acquire();
+    assert.equal(pool.stats().exhaustEvents, 3);
+});
+
+test('poolRegistry: registerPool / listPools round-trip', () => {
+    const poolA = new ObjectPool(() => ({}), () => {}, { maxSize: 10, name: 'reg-a' });
+    const poolB = new ObjectPool(() => ({}), () => {}, { maxSize: 20, name: 'reg-b' });
+
+    registerPool('reg-a', poolA);
+    registerPool('reg-b', poolB);
+
+    // Acquire a few from poolA so inUse > 0
+    poolA.acquire(); poolA.acquire();
+
+    const list = listPools();
+    const names = list.map(p => p.name);
+    assert.ok(names.includes('reg-a'), 'listPools must include reg-a');
+    assert.ok(names.includes('reg-b'), 'listPools must include reg-b');
+
+    const a = list.find(p => p.name === 'reg-a');
+    assert.equal(a.inUse, 2);
+    assert.equal(a.cap, 10);
+    assert.equal(a.exhaustEvents, 0);
+});
+
+test('poolRegistry: registerPool ignores null', () => {
+    // Must not throw
+    registerPool('null-pool', null);
+    const list = listPools();
+    assert.ok(!list.some(p => p.name === 'null-pool'));
+});

@@ -551,6 +551,11 @@ try { window.game = game; } catch {}
 // leaving an empty character-select modal — i.e. character selection breaks.
 try { window.CHARACTERS = CHARACTERS; } catch {}
 
+// --- Phase 1 rework: Object pools (feature-detected; created in init()) ---
+let _textParticlePool = null;
+let _particlePool = null;
+let _enemyBulletPool = null;
+
 function loadPersistentStats() {
     const defaults = { totalKills: 0, totalCredits: 0, maxWave: 0, upgradesPurchased: 0, weaponsUnlocked: 1 };
     try {
@@ -2641,16 +2646,12 @@ class Enemy {
                     const burstCount = 8 + Math.floor(Math.random() * 8);
                     for (let i = 0; i < burstCount; i++) {
                         const angle = (i / burstCount) * Math.PI * 2;
-                        game.bullets.push({
-                            x: this.x,
-                            y: this.y,
-                            angle,
-                            speed: 3 + Math.random() * 2,
-                            size: 6,
-                            damage: this.damage * 0.4,
-                            color: this.color,
-                            isEnemyBullet: true,
-                        });
+                        const speed = 3 + Math.random() * 2;
+                        let eb = _enemyBulletPool?.acquire(this.x, this.y, angle, speed, 6, this.damage * 0.4, this.color) ?? null;
+                        if (eb) { eb._pool = _enemyBulletPool; } else {
+                            eb = { x: this.x, y: this.y, angle, speed, size: 6, damage: this.damage * 0.4, color: this.color, isEnemyBullet: true };
+                        }
+                        game.bullets.push(eb);
                     }
                     this.specialAttackCooldown = this.phase >= 3 ? 180 : 300;
                     createExplosion(this.x, this.y, this.color, 25);
@@ -2983,16 +2984,11 @@ class Enemy {
 
     shootAtPlayer() {
         const angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
-        game.bullets.push({
-            x: this.x,
-            y: this.y,
-            angle,
-            speed: 4,
-            size: 8,
-            damage: this.damage * 0.5,
-            color: this.color,
-            isEnemyBullet: true,
-        });
+        let eb = _enemyBulletPool?.acquire(this.x, this.y, angle, 4, 8, this.damage * 0.5, this.color) ?? null;
+        if (eb) { eb._pool = _enemyBulletPool; } else {
+            eb = { x: this.x, y: this.y, angle, speed: 4, size: 8, damage: this.damage * 0.5, color: this.color, isEnemyBullet: true };
+        }
+        game.bullets.push(eb);
     }
     
     healNearbyEnemies() {
@@ -4796,16 +4792,19 @@ function createParticles(x, y, color, count) {
     for (let i = 0; i < count; i++) {
         const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.3;
         const speed = 2 + Math.random() * 4;
-        game.particles.push({
-            x, y,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed - 2,
-            color,
-            life: 30 + Math.random() * 20,
-            maxLife: 50,
-            size: 2 + Math.random() * 2,
-            type: 'particle',
-        });
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed - 2;
+        const pLife = 30 + Math.random() * 20;
+        const pSize = 2 + Math.random() * 2;
+        let p = null;
+        if (_particlePool) {
+            p = _particlePool.acquire(x, y, vx, vy, color, pLife, pSize);
+            if (p) p._pool = _particlePool;
+        }
+        if (!p) {
+            p = { x, y, vx, vy, color, life: pLife, maxLife: 50, size: pSize, type: 'particle' };
+        }
+        game.particles.push(p);
     }
 }
 
@@ -4832,14 +4831,15 @@ function createExplosion(x, y, color, count = 30) {
 }
 
 function createTextParticle(x, y, text, color, size = 16) {
-    game.particles.push({ 
-        x, y, text, color, 
-        life: 60, maxLife: 60, 
-        vy: -1.5, 
-        scale: 1, 
-        fontSize: size,
-        type: 'text' 
-    });
+    let p = null;
+    if (_textParticlePool) {
+        p = _textParticlePool.acquire(x, y, text, color, size);
+        if (p) p._pool = _textParticlePool;
+    }
+    if (!p) {
+        p = { x, y, text, color, life: 60, maxLife: 60, vy: -1.5, scale: 1, fontSize: size, type: 'text' };
+    }
+    game.particles.push(p);
 }
 
 function updateParticles() {
@@ -4857,27 +4857,35 @@ function updateParticles() {
             p.vy *= 0.95; // Slow down
             p.scale = 1 + (1 - p.life / p.maxLife) * 0.3; // Pop effect
             p.life--;
-            return p.life > 0;
+            if (p.life > 0) return true;
+            p._pool?.release(p);
+            return false;
         } else if (p.type === 'explosion') {
             p.x += p.vx;
             p.y += p.vy;
             p.vx *= 0.96;
             p.vy *= 0.96;
             p.life--;
-            return p.life > 0;
+            if (p.life > 0) return true;
+            p._pool?.release(p);
+            return false;
         } else if (p.type === 'fire_trail') {
             p.life--;
             p.size *= 0.98;
             if (p.life % 15 === 0) {
                 game.enemies.forEach(e => { if (Math.hypot(e.x - p.x, e.y - p.y) < p.size + e.size) e.takeDamage(p.damage, false); });
             }
-            return p.life > 0;
+            if (p.life > 0) return true;
+            p._pool?.release(p);
+            return false;
         } else {
             p.x += p.vx;
             p.y += p.vy;
             p.vy += 0.2;
             p.life--;
-            return p.life > 0;
+            if (p.life > 0) return true;
+            p._pool?.release(p);
+            return false;
         }
     });
 }
@@ -7767,6 +7775,7 @@ function gameLoop(timestamp) {
                 const distPlayer = Math.hypot(game.player.x - b.x, game.player.y - b.y);
                 if (distPlayer < game.player.size + b.size) {
                     game.player.takeDamage(b.damage);
+                    b._pool?.release(b);
                     return false;
                 }
                 
@@ -7785,12 +7794,15 @@ function gameLoop(timestamp) {
                             if (drone.health <= 0) {
                                 createTextParticle(droneX, droneY, 'DESTROYED!', '#ff6b6b', 14);
                             }
+                            b._pool?.release(b);
                             return false;
                         }
                     }
                 }
                 
-                return b.x >= 0 && b.x <= CONFIG.WORLD_WIDTH && b.y >= 0 && b.y <= CONFIG.WORLD_HEIGHT;
+                const alive = b.x >= 0 && b.x <= CONFIG.WORLD_WIDTH && b.y >= 0 && b.y <= CONFIG.WORLD_HEIGHT;
+                if (!alive) b._pool?.release(b);
+                return alive;
             }
             return b.update();
         });
@@ -8186,7 +8198,40 @@ function showDifficultySelect() {
 function init() {
     game.canvas = document.getElementById('gameCanvas');
     game.ctx = game.canvas.getContext('2d');
-    
+
+    // Initialise object pools if the rework ESM bundle has run.
+    if (window.rework?.ObjectPool) {
+        _textParticlePool = new window.rework.ObjectPool(
+            () => ({ type: 'text', x: 0, y: 0, text: '', color: '#fff', life: 0, maxLife: 60, vy: 0, scale: 1, fontSize: 16, _pool: null }),
+            (p, x, y, text, color, size) => {
+                p.x = x; p.y = y; p.text = text; p.color = color;
+                p.life = 60; p.maxLife = 60; p.vy = -1.5; p.scale = 1; p.fontSize = size || 16;
+            },
+            { maxSize: 256, name: 'textParticle' }
+        );
+        window.rework.registerPool?.('textParticle', _textParticlePool);
+
+        _particlePool = new window.rework.ObjectPool(
+            () => ({ type: 'particle', x: 0, y: 0, vx: 0, vy: 0, color: '#fff', life: 0, maxLife: 50, size: 2, _pool: null }),
+            (p, x, y, vx, vy, color, life, size) => {
+                p.x = x; p.y = y; p.vx = vx; p.vy = vy; p.color = color;
+                p.life = life; p.maxLife = 50; p.size = size;
+            },
+            { maxSize: 512, name: 'particle' }
+        );
+        window.rework.registerPool?.('particle', _particlePool);
+
+        _enemyBulletPool = new window.rework.ObjectPool(
+            () => ({ x: 0, y: 0, angle: 0, speed: 0, size: 0, damage: 0, color: '#fff', isEnemyBullet: true, _pool: null }),
+            (b, x, y, angle, speed, size, damage, color) => {
+                b.x = x; b.y = y; b.angle = angle; b.speed = speed;
+                b.size = size; b.damage = damage; b.color = color;
+            },
+            { maxSize: 256, name: 'enemyBullet' }
+        );
+        window.rework.registerPool?.('enemyBullet', _enemyBulletPool);
+    }
+
     // Initialize loading screen
     showLoadingScreen();
     
