@@ -169,6 +169,11 @@ export class WeatherSystem {
             ctx.strokeStyle = w.id === 'storm' ? 'rgba(180,200,255,0.55)' : 'rgba(180,200,255,0.40)';
             ctx.lineWidth = 1;
             const count = w.id === 'storm' ? 120 : 70;
+            // Note: rain visuals scroll using wall-clock time. This is
+            // intentionally non-deterministic — the rendering layer is
+            // allowed to differ across clients/replays. Only the
+            // *simulation* (RNG, weather selection, lightning targets) is
+            // deterministic; cosmetic streak positions are not.
             const seed = (Date.now() * 0.4) | 0;
             for (let i = 0; i < count; i++) {
                 // Deterministic pseudo-random streak positions that scroll

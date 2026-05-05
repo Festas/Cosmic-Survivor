@@ -4530,7 +4530,11 @@ class Bullet {
         this.color = weapon.color;
         this.explosion = weapon.explosion;
         this.piercing = 1;
-        this.pierce = 1; // alias used by coop aura; see js/systems/coopAura.js
+        // `pierce` is the name used by the Phase 6 co-op aura system; we
+        // mirror it onto `piercing` (the legacy field consumed by the hit
+        // loop below) so a +pierce buff actually increases the legacy
+        // hit-count cap. Keep them in sync via the helper below.
+        this.pierce = 1;
         this.hitEnemies = [];
         // Remember the source weapon so per-bullet effects (e.g. split shot)
         // can spawn matching projectiles regardless of which orbiting weapon
@@ -4550,6 +4554,11 @@ class Bullet {
         if (this._isLocalPlayerBullet && window.rework && window.rework.coop) {
             if (window.rework.coop.applyAura(this, game)) {
                 window.rework.coop.notify(this);
+                // Coop aura mutates `this.pierce`; mirror onto the legacy
+                // `piercing` field that the hit loop actually checks.
+                if (typeof this.pierce === 'number' && this.pierce > this.piercing) {
+                    this.piercing = this.pierce;
+                }
             }
         }
 
@@ -7619,7 +7628,10 @@ function gameLoop(timestamp) {
         traumaRot = window.rework.juice.shake.rotation;
     }
     ctx.save();
-    if (traumaRot !== 0) {
+    // Skip the canvas rotate when the trauma rotation is below ~0.06° —
+    // imperceptible visually and avoids unnecessary save/restore cost in the
+    // (very common) no-shake-active case.
+    if (Math.abs(traumaRot) > 0.001) {
         ctx.translate(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
         ctx.rotate(traumaRot);
         ctx.translate(-CONFIG.CANVAS_WIDTH / 2, -CONFIG.CANVAS_HEIGHT / 2);

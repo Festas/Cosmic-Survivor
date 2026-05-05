@@ -43,7 +43,13 @@ export class SpatialHash {
     }
 
     _key(cx, cy) {
-        // Pack cell coords (fits comfortably in 32 bits for our world sizes).
+        // Pack signed cell coordinates into a single 32-bit key. The +0x8000
+        // bias maps the signed [-32768, 32767] range into the unsigned
+        // [0, 65535] range so each axis fits cleanly in 16 bits and the
+        // resulting key is non-negative (cheaper Map hashing in V8).
+        // World coordinates well outside ±32768 cells (~3 million world
+        // units at the default cellSize) would alias — we never approach
+        // that in this game, but tighten the bias if you raise WORLD_*.
         return ((cx + 0x8000) << 16) | ((cy + 0x8000) & 0xffff);
     }
 

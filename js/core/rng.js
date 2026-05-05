@@ -19,6 +19,9 @@
 export class XoshiroRng {
     constructor(a, b, c, d) {
         // Avoid the all-zero initial state; xoshiro requires non-zero seeds.
+        // 0x9e3779b9 is the 32-bit fractional part of the golden ratio
+        // (2^32 / φ) — a well-known seeding constant used widely in hash
+        // and PRNG initialisation because its bits are well-distributed.
         if ((a | b | c | d) === 0) a = 0x9e3779b9;
         this._a = a >>> 0;
         this._b = b >>> 0;

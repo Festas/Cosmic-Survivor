@@ -49,9 +49,14 @@ function extractTableSource(source, name) {
     return null;
 }
 
-// Parse a JS object literal source into a plain JS value. We use Function to
-// evaluate — this validator runs in a controlled local context (CI / dev),
-// not on user input.
+// Parse a JS object literal source into a plain JS value.
+//
+// Security note: this validator is a *developer / CI tool* invoked via
+// `npm run validate:content` against files committed to this repository.
+// It does NOT process user input or third-party files. The Function-eval
+// approach is intentionally chosen over a full AST parser (e.g. acorn /
+// @babel/parser) to keep this script dependency-free; the trade-off is
+// that we must NEVER point this validator at untrusted source files.
 function evalObject(literal) {
     // eslint-disable-next-line no-new-func
     return new Function(`"use strict"; return (${literal});`)();

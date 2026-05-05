@@ -59,6 +59,11 @@ export function applyCoopAura(bullet, game) {
  * @param {{ x:number, y:number }} bullet
  */
 export function notifyCoopBuff(bullet) {
+    // performance.now() and Date.now() use different epochs (since-load vs
+    // since-Unix) but we only ever subtract two readings from the *same*
+    // source within one process — so the absolute epoch doesn't matter,
+    // only the delta does. The fallback to Date.now() exists for the
+    // node:test environment where `performance` may be unavailable.
     const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
     if (now - lastBroadcastAt < BROADCAST_INTERVAL_MS) return;
     lastBroadcastAt = now;
