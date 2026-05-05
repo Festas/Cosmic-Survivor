@@ -9,6 +9,10 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: festas/cosmic-survivor
+  WS_ENDPOINT: https://cs.festas-builds.com/ws
+  # Seconds to wait after nginx -s reload before running the smoke test.
+  # nginx reload is near-instant; 2 s covers any slow worker drain.
+  NGINX_RELOAD_WAIT: 2
 
 jobs:
   build-and-deploy:
@@ -94,3 +98,32 @@ jobs:
             
             # Clean up old images
             docker image prune -af
+            
+            # Reload host nginx so any config changes in the Link-in-Bio repo
+            # take effect immediately (prevents stale /ws proxy config causing
+            # WebSocket upgrade failures with close code 1006)
+            sudo nginx -t && sudo nginx -s reload
+            
+            # Give nginx a moment to complete the reload (worker processes finish
+            # draining existing connections; 2 s is well within the typical
+            # graceful-shutdown window and keeps total deploy time minimal)
+            sleep "${{ env.NGINX_RELOAD_WAIT }}"
+            
+            # Smoke-test the WebSocket handshake through the public endpoint.
+            # A working reverse-proxy returns HTTP 101; anything else (e.g. 400,
+            # 502) indicates the Upgrade headers are not being forwarded.
+            # The || true keeps the step green so a transient blip doesn't block
+            # the deploy, but the response code is printed for visibility.
+            # Note: Sec-WebSocket-Key is the sample value from RFC 6455 §11.3
+            # (base64 of "the sample nonce") — it is a standard test token, not
+            # a secret or production key.
+            WS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              --http1.1 \
+              -H "Connection: Upgrade" -H "Upgrade: websocket" \
+              -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
+              -H "Sec-WebSocket-Version: 13" \
+              "${{ env.WS_ENDPOINT }}" || true)
+            echo "WebSocket smoke-test HTTP status: ${WS_STATUS}"
+            if [ "${WS_STATUS}" != "101" ]; then
+              echo "WARNING: WebSocket handshake did not return 101 (got ${WS_STATUS}). Check host nginx /ws config."
+            fi

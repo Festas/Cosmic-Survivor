@@ -96,6 +96,8 @@ GitHub Actions workflow that:
 - SSHs to server and deploys via docker-compose
 - Includes a `cosmic-data` Docker volume for SQLite database persistence
 - Uses repository secrets: `HOST`, `SSH_PRIVATE_KEY`, `USERNAME`
+- **Runs `sudo nginx -t && sudo nginx -s reload`** after every deploy so that any host nginx config changes (managed in the Link-in-Bio repo) take effect immediately and WebSocket upgrades never fail due to a stale config
+- Runs a WebSocket smoke test (`curl` 101 handshake check) against the public endpoint and prints a warning if the handshake fails
 
 ## Repository Secrets
 
@@ -269,9 +271,20 @@ WebSocket handshake and prints a more actionable diagnostic via
 
 | Diagnostic phrase | Likely cause | Fix |
 |---|---|---|
-| "reachable over HTTPS but the WebSocket upgrade is failing" | Host reverse proxy (Link-in-Bio repo) is missing `Upgrade`/`Connection` headers for `/ws` | Re-apply the [Host Nginx WebSocket Setup](#host-nginx-websocket-setup) block in `cs.festas-builds.com.conf` and `nginx -s reload` on the host |
+| "reachable over HTTPS but the WebSocket upgrade is failing" | Host nginx is either missing `Upgrade`/`Connection` headers for `/ws`, or the config was updated in the Link-in-Bio repo but **never reloaded on the server** | See **"Reload host nginx"** box below |
 | "returned HTTP 502/503/504" | Container nginx is up but the Node.js multiplayer server is not running | `docker compose logs cosmic-survivor`, then `docker compose restart cosmic-survivor` |
 | "timed out" / "is unreachable" | Container is not running, or host firewall is blocking 127.0.0.1:8200, or DNS is broken | `docker compose ps`, `docker compose up -d`, and verify the host nginx site is enabled |
+
+> **⚠️ Reload host nginx after any config change**
+>
+> Any time you update `cs.festas-builds.com.conf` in the Link-in-Bio repo and apply it to the server, you **must** run the following on the Hetzner host or WebSocket connections will continue to fail with `code=1006`:
+>
+> ```bash
+> sudo nginx -t          # validate config — fix any errors before proceeding
+> sudo nginx -s reload   # hot-reload: zero downtime, takes effect immediately
+> ```
+>
+> The deploy workflow now runs these two commands automatically after every deployment, but if you apply a config change manually (outside of a deploy), you must run them yourself.
 
 Quick host-side sanity check from the Hetzner host:
 ```bash
