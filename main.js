@@ -868,6 +868,23 @@ function showLevelUpModal() {
 // ==================== VISUAL FEEDBACK HELPERS ====================
 function screenShake(intensity = CONFIG.SCREEN_SHAKE_INTENSITY) {
     game.camera.shake = Math.max(game.camera.shake, intensity);
+    // Phase 2 rework: also feed the trauma-model shake when present so the
+    // new juice system layers on top of legacy shake without changing
+    // any callsites. Trauma is squared internally so we normalize the
+    // legacy intensity (0..25-ish) to the trauma scale (0..1).
+    if (window.rework && window.rework.juice) {
+        window.rework.juice.shake.add(Math.min(1, intensity / 25));
+    }
+}
+
+/**
+ * Phase 2 rework — pause sim for short windows on heavy hits. Safe no-op
+ * when the rework module hasn't loaded.
+ */
+function hitStop(durationMs) {
+    if (window.rework && window.rework.juice) {
+        window.rework.juice.hitStop.trigger(durationMs);
+    }
 }
 
 function updateCamera() {
@@ -1377,6 +1394,13 @@ class Player {
             if (this.walkTimer >= ARENA_CONSTANTS.WALK_ANIM_FRAME_DURATION) { this.walkTimer = 0; this.walkFrame = this.walkFrame === 0 ? 1 : 0; }
         } else { this.walkTimer = 0; this.walkFrame = 0; }
 
+        // Phase 4 rework — Stance switching. Updates the global stance
+        // singleton based on whether the local player is moving. Other
+        // systems read `window.rework.stance.modifiers` to apply the buff.
+        if (window.rework && window.rework.stance) {
+            window.rework.stance.update(this.isMoving);
+        }
+
         // Advance the orbit angle for the orbiting weapon orbs.
         this.weaponOrbitAngle += this.weaponOrbitSpeed;
         if (this.weaponOrbitAngle > Math.PI * 2) this.weaponOrbitAngle -= Math.PI * 2;
@@ -1769,7 +1793,20 @@ class Player {
         // Old `100/(100+armor)` made 10 armor a measly 9% reduction, which
         // made Tank/Juggernaut/Engineer not actually feel tanky.
         const armorReduction = Math.min(0.60, this.armor / (this.armor + 30));
-        const finalDamage = Math.max(1, Math.floor(amount * (1 - armorReduction)));
+        let finalDamage = Math.max(1, Math.floor(amount * (1 - armorReduction)));
+        // Phase 4 rework — Focus stance reduces incoming damage. Weather
+        // also adjusts defense (e.g. storm grants +5% reduction).
+        if (window.rework) {
+            let defMult = 1;
+            if (window.rework.stance) defMult *= window.rework.stance.modifiers.defenseMultiplier;
+            if (window.rework.weather && window.rework.weather.current) {
+                // Weather profiles store playerDefenseMultiplier where >1 = MORE
+                // damage-reduction (rare). Convert to a damage-taken multiplier.
+                const w = window.rework.weather.current.playerDefenseMultiplier;
+                if (w && w > 0) defMult *= (2 - w); // 1.05 -> 0.95 incoming dmg
+            }
+            finalDamage = Math.max(1, Math.floor(finalDamage * defMult));
+        }
         this.health -= finalDamage;
         game.stats.damageTaken += finalDamage;
         // Track when the player was last actually hit so the renderer can
@@ -1796,6 +1833,15 @@ class Player {
         createTextParticle(this.x, this.y, `-${finalDamage}`, '#ff6b6b', 18);
         createParticles(this.x, this.y, '#ff6b6b', 5);
         screenShake(finalDamage * 0.5);
+        // Phase 2 rework — red hit-flash overlay on player damage. Bigger
+        // hits = brighter pulse. Capped at 0.4 alpha so the screen never
+        // becomes unreadable.
+        if (window.rework && window.rework.juice) {
+            const peak = Math.min(0.4, 0.10 + finalDamage * 0.012);
+            window.rework.juice.flash.pulse('#ff2244', peak, 220);
+            // Brief hit-stop (~30ms) on heavy hits so they register.
+            if (finalDamage >= 15) hitStop(30);
+        }
         
         // Berserker rage
         if (this.characterId === 'berserker' && !this.rageActive) {
@@ -4461,23 +4507,51 @@ class Bullet {
         this.angle = angle;
         this.speed = CONFIG.BULLET_SPEED;
         this.size = CONFIG.BULLET_SIZE;
-        this.damage = owner.damage * (weapon.damage || 1);
+        // Phase 4 rework — stance + weather damage multipliers. Critical: only
+        // apply when this bullet originates from the local player (so AI
+        // turrets and split-shots driven by ENEMY damage don't get the boost).
+        let stanceMult = 1;
+        if (window.rework && owner === game.player) {
+            if (window.rework.stance) {
+                stanceMult *= window.rework.stance.modifiers.damageMultiplier;
+            }
+            if (window.rework.weather && window.rework.weather.current) {
+                stanceMult *= window.rework.weather.current.playerDamageMultiplier || 1;
+            }
+        }
+        this.damage = owner.damage * (weapon.damage || 1) * stanceMult;
         this.critChance = owner.critChance;
+        // Stance grants a small flat crit-chance bonus (additive).
+        if (window.rework && owner === game.player && window.rework.stance) {
+            this.critChance = Math.min(1, this.critChance + window.rework.stance.modifiers.critChanceBonus);
+        }
         this.critDamage = owner.critDamage;
         this.lifeSteal = owner.lifeSteal;
         this.color = weapon.color;
         this.explosion = weapon.explosion;
         this.piercing = 1;
+        this.pierce = 1; // alias used by coop aura; see js/systems/coopAura.js
         this.hitEnemies = [];
         // Remember the source weapon so per-bullet effects (e.g. split shot)
         // can spawn matching projectiles regardless of which orbiting weapon
         // fired this bullet.
         this.weapon = weapon;
+        // Mark whether this bullet is locally-owned (coop aura only buffs
+        // bullets that *I* fired).
+        this._isLocalPlayerBullet = (owner === game.player);
     }
 
     update() {
         this.x += Math.cos(this.angle) * this.speed;
         this.y += Math.sin(this.angle) * this.speed;
+
+        // Phase 6 rework — co-op aura: passing near an ally buffs damage/pierce.
+        // Cheap early-out for solo runs.
+        if (this._isLocalPlayerBullet && window.rework && window.rework.coop) {
+            if (window.rework.coop.applyAura(this, game)) {
+                window.rework.coop.notify(this);
+            }
+        }
 
         for (let i = game.enemies.length - 1; i >= 0; i--) {
             const enemy = game.enemies[i];
@@ -4488,7 +4562,14 @@ class Bullet {
                 // Apply damage powerup
                 const damageMult = getPowerupMultiplier('damage');
                 const isCrit = Math.random() < this.critChance;
-                const finalDamage = Math.floor(this.damage * damageMult * (isCrit ? this.critDamage : 1));
+                let finalDamage = Math.floor(this.damage * damageMult * (isCrit ? this.critDamage : 1));
+                // Phase 5 rework — shielder buddy absorbs a fraction of damage.
+                if (window.rework && window.rework.applyShieldBuddyAbsorption) {
+                    finalDamage = Math.floor(window.rework.applyShieldBuddyAbsorption(
+                        enemy, finalDamage, { enemies: game.enemies, absorbFraction: 0.5 }
+                    ));
+                    if (finalDamage < 1) finalDamage = 1;
+                }
                 game.playerDPS.damage += finalDamage;
                 
                 if (this.explosion) {
@@ -4523,6 +4604,9 @@ class Bullet {
                 if (isCrit) {
                     createExplosion(enemy.x, enemy.y, '#ffd93d', 10);
                     Sound.play('crit');
+                    // Phase 2 rework — short hit-stop on crits adds the
+                    // classic "thwack" feel from the brief.
+                    hitStop(35);
                 }
                 
                 this.hitEnemies.push(enemy);
@@ -5780,6 +5864,21 @@ function nextWave() {
     }
     game.state = 'playing';
     document.getElementById('shop-modal').classList.add('hidden');
+
+    // Phase 4 rework — roll new weather for the wave. Boss waves get the
+    // dramatic eclipse profile every 10th wave.
+    if (window.rework && window.rework.weather) {
+        const isBossWave = (game.wave % CONFIG.BOSS_WAVE_INTERVAL) === 0;
+        const w = window.rework.weather.rollForWave(game.wave, isBossWave);
+        if (w && w.id !== 'clear') {
+            showNotification(`${w.label}`, '#a5b4fc', 2200);
+        }
+    }
+    // Phase 5 rework — tag enemies with stable shield-ids for shielder
+    // absorption targeting.
+    if (window.rework && window.rework.ensureShieldIds) {
+        window.rework.ensureShieldIds(game.enemies);
+    }
     
     // Reset shop state for next wave
     shopState.currentOfferings = [];
@@ -5810,6 +5909,14 @@ function softResetForMenu() {
     game.hazards = [];
     game.wave = 1;
     game.timeLeft = 60;
+    // Phase 4 rework — reset stance/weather/juice on soft reset.
+    if (window.rework) {
+        if (window.rework.stance) window.rework.stance.reset();
+        if (window.rework.weather) window.rework.weather.current = window.rework.WEATHER_PROFILES.clear;
+        if (window.rework.juice) {
+            window.rework.juice.flash.clear();
+        }
+    }
     game.stats = {
         enemiesKilled: 0, damageDealt: 0, damageTaken: 0,
         bossesDefeated: 0, waveStartDamage: 0, comboKills: 0, comboTimer: 0,
@@ -6502,6 +6609,72 @@ function drawComboCounter(ctx) {
     ctx.fillRect(x - 30, y + 22, 60 * timerPercent, 4);
     
     ctx.restore();
+}
+
+// Phase 3 rework — Stance + Weather HUD badges. Compact top-center pill row
+// surfacing the two new gameplay modifiers so the player can see what's
+// active at a glance.
+function drawStanceWeatherHUD(ctx) {
+    if (game.state !== 'playing') return;
+    if (!window.rework) return;
+    const items = [];
+    const stance = window.rework.stance;
+    if (stance) {
+        items.push({
+            label: stance.isFocused ? '🎯 FOCUS' : '🏃 MOVING',
+            color: stance.isFocused ? '#ffd93d' : '#94a3b8',
+            charge: stance.isFocused ? 1 : stance.focusCharge,
+            chargeColor: '#ffd93d',
+        });
+    }
+    const weather = window.rework.weather;
+    if (weather && weather.current && weather.current.id !== 'clear') {
+        items.push({ label: weather.current.label, color: '#a5b4fc', charge: 0 });
+    }
+    if (items.length === 0) return;
+
+    ctx.save();
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const padX = 10, h = 22, gap = 8;
+    const widths = items.map(it => ctx.measureText(it.label).width + padX * 2);
+    const total = widths.reduce((s, w) => s + w, 0) + gap * (items.length - 1);
+    let x = (CONFIG.CANVAS_WIDTH - total) / 2;
+    const y = 56;
+    for (let i = 0; i < items.length; i++) {
+        const it = items[i];
+        const w = widths[i];
+        // Background pill
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+        roundRect(ctx, x, y, w, h, 11); ctx.fill();
+        // Charge fill (Focus charge-up progress)
+        if (it.charge > 0) {
+            ctx.fillStyle = it.chargeColor || it.color;
+            ctx.globalAlpha = 0.18;
+            roundRect(ctx, x, y, w * it.charge, h, 11); ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+        // Border
+        ctx.strokeStyle = it.color;
+        ctx.lineWidth = 1.5;
+        roundRect(ctx, x, y, w, h, 11); ctx.stroke();
+        // Label
+        ctx.fillStyle = it.color;
+        ctx.fillText(it.label, x + w / 2, y + h / 2 + 1);
+        x += w + gap;
+    }
+    ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
 }
 
 function drawXPBar(ctx) {
@@ -7427,10 +7600,31 @@ function gameLoop(timestamp) {
     
     // Update camera shake
     updateCamera();
-    
-    // Apply camera offset
+
+    // Phase 2 rework — advance trauma shake / hit-flash. Use real frame
+    // delta in seconds so it's framerate-independent.
+    if (window.rework && window.rework.juice) {
+        window.rework.juice.update(Math.min(0.05, deltaTime / 1000));
+    }
+    // Phase 4 rework — drive weather (random lightning, etc).
+    if (window.rework && window.rework.weather && game.state === 'playing' && !game.paused) {
+        window.rework.weather.update(game.enemies, game.player);
+    }
+
+    // Apply camera offset (legacy shake + trauma-model shake stacked).
+    let traumaOffX = 0, traumaOffY = 0, traumaRot = 0;
+    if (window.rework && window.rework.juice) {
+        traumaOffX = window.rework.juice.shake.offsetX;
+        traumaOffY = window.rework.juice.shake.offsetY;
+        traumaRot = window.rework.juice.shake.rotation;
+    }
     ctx.save();
-    ctx.translate(-game.camera.x + game.camera.offsetX, -game.camera.y + game.camera.offsetY);
+    if (traumaRot !== 0) {
+        ctx.translate(CONFIG.CANVAS_WIDTH / 2, CONFIG.CANVAS_HEIGHT / 2);
+        ctx.rotate(traumaRot);
+        ctx.translate(-CONFIG.CANVAS_WIDTH / 2, -CONFIG.CANVAS_HEIGHT / 2);
+    }
+    ctx.translate(-game.camera.x + game.camera.offsetX + traumaOffX, -game.camera.y + game.camera.offsetY + traumaOffY);
     
     // Background
     const theme = game.arenaTheme || getCurrentTheme();
@@ -7621,6 +7815,29 @@ function gameLoop(timestamp) {
         game.enemies.forEach(e => e.draw(ctx));
         drawBullets(ctx);
         game.player.draw(ctx);
+        // Phase 4 rework — visualize Focus stance progress + active state
+        // as a ring around the player. While charging it sweeps clockwise;
+        // once active it pulses solid.
+        if (window.rework && window.rework.stance && game.player) {
+            const s = window.rework.stance;
+            const cx = game.player.x, cy = game.player.y, r = game.player.size + 10;
+            ctx.save();
+            if (s.isFocused) {
+                const pulse = 0.55 + Math.sin(Date.now() * 0.008) * 0.25;
+                ctx.strokeStyle = `rgba(255, 217, 61, ${pulse})`;
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                ctx.stroke();
+            } else if (s.focusCharge > 0.05) {
+                ctx.strokeStyle = 'rgba(255, 217, 61, 0.45)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * s.focusCharge);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
         // Draw remote players (multiplayer)
         if (game.isMultiplayer) {
             for (const rp of game.remotePlayers.values()) {
@@ -7628,8 +7845,29 @@ function gameLoop(timestamp) {
             }
         }
         drawParticles(ctx);
-        
-        // Multiplayer extras: emotes, pings, downed indicators (in-world, with camera)
+        // Phase 4 rework — weather world overlay (rain streaks, lightning).
+        if (window.rework && window.rework.weather) {
+            window.rework.weather.drawWorldLayer(ctx, {
+                x: game.camera.x, y: game.camera.y,
+                w: CONFIG.CANVAS_WIDTH, h: CONFIG.CANVAS_HEIGHT,
+            });
+        }
+        // Phase 6 rework — co-op aura ring around remote players when local
+        // player is shooting (visible cue that they're buffing my bullets).
+        if (game.isMultiplayer && window.rework && window.rework.coop && game.remotePlayers && game.remotePlayers.size > 0) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(167, 139, 250, 0.35)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 6]);
+            for (const rp of game.remotePlayers.values()) {
+                if (!rp || rp.isDowned) continue;
+                ctx.beginPath();
+                ctx.arc(rp.x, rp.y, window.rework.coop.radius, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
         if (game.isMultiplayer && window.MultiplayerExtras) {
             const ex = window.MultiplayerExtras;
             ex.updatePings();
@@ -7686,6 +7924,15 @@ function gameLoop(timestamp) {
         // Draw HUD elements (outside camera transform)
         ctx.restore();
         ctx.save();
+        // Phase 4 rework — weather screen wash (outside camera xform so
+        // colour grade applies uniformly to the viewport).
+        if (window.rework && window.rework.weather) {
+            window.rework.weather.drawScreenLayer(ctx, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        }
+        // Phase 2 rework — hit-flash overlay (player damage, level-ups).
+        if (window.rework && window.rework.juice) {
+            window.rework.juice.flash.draw(ctx, CONFIG.CANVAS_WIDTH, CONFIG.CANVAS_HEIGHT);
+        }
         // Screen-space damage flash + boss vignette (drawn over the world,
         // under the HUD so HUD text stays crisp).
         drawScreenOverlays(ctx);
@@ -7702,6 +7949,8 @@ function gameLoop(timestamp) {
         drawCorruptionIndicator(game.ctx);
         drawBossHealthBar(game.ctx);
         drawComboCounter(game.ctx);
+        // Phase 3 rework — Stance + Weather HUD badges (top-center).
+        drawStanceWeatherHUD(game.ctx);
         updateDPS();
     } else if (game.paused) {
         // Still draw everything when paused
