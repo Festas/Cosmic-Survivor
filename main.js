@@ -2649,7 +2649,7 @@ class Enemy {
                         const speed = 3 + Math.random() * 2;
                         let eb = _enemyBulletPool?.acquire(this.x, this.y, angle, speed, 6, this.damage * 0.4, this.color) ?? null;
                         if (eb) { eb._pool = _enemyBulletPool; } else {
-                            eb = { x: this.x, y: this.y, angle, speed, size: 6, damage: this.damage * 0.4, color: this.color, isEnemyBullet: true };
+                            eb = { x: this.x, y: this.y, angle, speed, size: 6, damage: this.damage * 0.4, color: this.color, isEnemyBullet: true, _pool: null };
                         }
                         game.bullets.push(eb);
                     }
@@ -2986,7 +2986,7 @@ class Enemy {
         const angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
         let eb = _enemyBulletPool?.acquire(this.x, this.y, angle, 4, 8, this.damage * 0.5, this.color) ?? null;
         if (eb) { eb._pool = _enemyBulletPool; } else {
-            eb = { x: this.x, y: this.y, angle, speed: 4, size: 8, damage: this.damage * 0.5, color: this.color, isEnemyBullet: true };
+            eb = { x: this.x, y: this.y, angle, speed: 4, size: 8, damage: this.damage * 0.5, color: this.color, isEnemyBullet: true, _pool: null };
         }
         game.bullets.push(eb);
     }
@@ -4802,7 +4802,7 @@ function createParticles(x, y, color, count) {
             if (p) p._pool = _particlePool;
         }
         if (!p) {
-            p = { x, y, vx, vy, color, life: pLife, maxLife: 50, size: pSize, type: 'particle' };
+            p = { x, y, vx, vy, color, life: pLife, maxLife: 50, size: pSize, type: 'particle', _pool: null };
         }
         game.particles.push(p);
     }
@@ -4837,7 +4837,7 @@ function createTextParticle(x, y, text, color, size = 16) {
         if (p) p._pool = _textParticlePool;
     }
     if (!p) {
-        p = { x, y, text, color, life: 60, maxLife: 60, vy: -1.5, scale: 1, fontSize: size, type: 'text' };
+        p = { x, y, text, color, life: 60, maxLife: 60, vy: -1.5, scale: 1, fontSize: size, type: 'text', _pool: null };
     }
     game.particles.push(p);
 }

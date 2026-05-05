@@ -10,6 +10,8 @@ jobs:
   test:
     name: Test & Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -56,6 +58,8 @@ jobs:
     name: Bundle Size
     runs-on: ubuntu-latest
     continue-on-error: true
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -98,24 +102,23 @@ jobs:
           echo "| dist/main.js | $(numfmt --to=iec-i --suffix=B $MAIN_SIZE) ($MAIN_SIZE bytes) |" >> "$GITHUB_STEP_SUMMARY"
           echo "| dist/ (total) | $(numfmt --to=iec-i --suffix=B $DIST_SIZE) ($DIST_SIZE bytes) |" >> "$GITHUB_STEP_SUMMARY"
 
-          # Compare against origin/main if in a PR context
-          if [ "${{ github.event_name }}" = "pull_request" ] && git show origin/main:package.json &>/dev/null; then
-            git stash --include-untracked || true
+          # Compare against origin/main if in a PR context and dist/main.js is tracked there.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE_MAIN_SIZE=$(git show origin/main:dist/main.js 2>/dev/null | wc -c || echo 0)
-            git stash pop || true
-
             if [ "$BASE_MAIN_SIZE" -gt 0 ] && [ "$MAIN_SIZE" -gt 0 ]; then
               PCT=$(echo "scale=2; ($MAIN_SIZE - $BASE_MAIN_SIZE) * 100 / $BASE_MAIN_SIZE" | bc)
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "**Change vs base branch:** ${PCT}%" >> "$GITHUB_STEP_SUMMARY"
-
               THRESHOLD=5
               OVER=$(echo "$PCT > $THRESHOLD" | bc)
               if [ "$OVER" = "1" ]; then
                 echo "⚠️ dist/main.js grew more than ${THRESHOLD}% (soft-fail, CI still green)" >> "$GITHUB_STEP_SUMMARY"
               fi
+            else
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "_dist/main.js not present on base branch — skipping size comparison._" >> "$GITHUB_STEP_SUMMARY"
             fi
           else
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "_Base branch comparison not available outside PR context or dist/main.js not tracked._" >> "$GITHUB_STEP_SUMMARY"
+            echo "_Base branch comparison only runs in PR context._" >> "$GITHUB_STEP_SUMMARY"
           fi
