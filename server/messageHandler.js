@@ -495,6 +495,8 @@ const GAME_EVENT_LIMITS = {
     'revive_complete': 128,
     'boss_down': 128,
     'match_stats': 256,
+    // Phase 6 rework — co-op aura buff notifications (small VFX-only payload).
+    'coop_buff': 64,
 };
 
 function handleGameEvent(ws, client, msg) {

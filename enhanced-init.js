@@ -14,6 +14,38 @@ import './js/systems/storyMode.js';
 import './js/systems/multiplayerExtras.js';
 import './js/systems/dailyChallenge.js';
 
+// ===== Rework systems (Phases 1, 2, 4, 5, 6) =====
+// These modules are intentionally additive: main.js looks for them on
+// `window.rework` and falls back to its existing behavior if absent. This
+// keeps the legacy game working at every commit during the migration.
+import { ObjectPool } from './js/core/objectPool.js';
+import { gameBus } from './js/core/eventBus.js';
+import { rngFromSeed, XoshiroRng } from './js/core/rng.js';
+import { SpatialHash } from './js/core/spatialHash.js';
+import { FixedClock } from './js/core/fixedClock.js';
+import { juice } from './js/render/juice.js';
+import { stanceSystem, Stance } from './js/systems/stanceSystem.js';
+import { weatherSystem, WEATHER_PROFILES } from './js/systems/weatherSystem.js';
+import { ENEMY_BEHAVIORS, applyShieldBuddyAbsorption, ensureShieldIds } from './js/systems/enemyBehaviors.js';
+import { applyCoopAura, notifyCoopBuff, COOP_AURA_RADIUS } from './js/systems/coopAura.js';
+
+window.rework = {
+    ObjectPool,
+    gameBus,
+    rng: { fromSeed: rngFromSeed, Xoshiro: XoshiroRng },
+    SpatialHash,
+    FixedClock,
+    juice,
+    stance: stanceSystem,
+    Stance,
+    weather: weatherSystem,
+    WEATHER_PROFILES,
+    enemyBehaviors: ENEMY_BEHAVIORS,
+    applyShieldBuddyAbsorption,
+    ensureShieldIds,
+    coop: { applyAura: applyCoopAura, notify: notifyCoopBuff, radius: COOP_AURA_RADIUS },
+};
+
 // Flag to indicate enhanced mode
 window.ENHANCED_MODE = true;
 

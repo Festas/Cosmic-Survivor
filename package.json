@@ -11,7 +11,9 @@
     "serve": "vite preview",
     "server": "cd server && node index.js",
     "server:install": "cd server && npm install",
-    "dev:all": "npm run server:install && concurrently \"npm run dev\" \"npm run server\""
+    "dev:all": "npm run server:install && concurrently \"npm run dev\" \"npm run server\"",
+    "test": "node --test tests/",
+    "validate:content": "node tools/content-validator/validate.mjs"
   },
   "keywords": [
     "game",
