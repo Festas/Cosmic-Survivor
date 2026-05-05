@@ -5830,6 +5830,10 @@ function softResetForMenu() {
 
 // ==================== GAME OVER & RESTART ====================
 function gameOver() {
+    // Guard against re-entrant calls. In multiplayer every client that receives
+    // the 'game_over' game_event calls gameOver(), which would in turn broadcast
+    // another 'game_over' event — creating an infinite relay loop.
+    if (game.state === 'gameOver') return;
     game.state = 'gameOver';
     savePersistentStats();
     checkAchievements();
@@ -8238,7 +8242,11 @@ function showAccountModal() {
         // Clear the "connecting…" error once the WebSocket actually opens,
         // so the user isn't left staring at a stale message after the
         // background reconnect succeeds.
-        if (mp) {
+        // Guard with a flag so we only install this hook once — reopening the
+        // modal while not logged in would otherwise keep wrapping onConnected
+        // indefinitely, growing a callback chain that never shrinks.
+        if (mp && !mp._clearConnectingMsgHooked) {
+            mp._clearConnectingMsgHooked = true;
             const prevConnected = mp.onConnected;
             mp.onConnected = () => {
                 if (prevConnected) { try { prevConnected(); } catch {} }
