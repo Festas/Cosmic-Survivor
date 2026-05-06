@@ -16,7 +16,7 @@ import { SpatialHash } from '../js/core/spatialHash.js';
 const ENEMY_COUNT  = 300;
 const BULLET_COUNT = 80;
 const FRAMES       = 60;
-const CELL_SIZE    = 40;   // matches BROADPHASE_CELL_SIZE in main.js
+const CELL_SIZE    = 40;   // must match BROADPHASE_CELL_SIZE in main.js (CONFIG.BULLET_SIZE × 8)
 const WORLD_W      = 3000;
 const WORLD_H      = 2000;
 const BULLET_R     = 5;

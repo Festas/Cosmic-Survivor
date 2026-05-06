@@ -23,6 +23,10 @@
 
 import { SpatialHash } from '../spatialHash.js';
 
+// Cache the high-resolution timer once at module load (avoids recreating the
+// ternary on every handleMessage call).
+const _perf = typeof performance !== 'undefined' ? performance : { now: () => Date.now() };
+
 /**
  * Pure message-handler — operates on a mutable state object.
  * Extracted so node --test can import it without a Worker context.
@@ -33,8 +37,6 @@ import { SpatialHash } from '../spatialHash.js';
  */
 export function handleMessage(state, msg) {
     if (!msg || typeof msg !== 'object') return null;
-
-    const now = (typeof performance !== 'undefined') ? () => performance.now() : () => Date.now();
 
     switch (msg.type) {
         case 'init': {
@@ -48,7 +50,7 @@ export function handleMessage(state, msg) {
 
         case 'rebuild': {
             if (!state.hash) return null;
-            const t0 = now();
+            const t0 = _perf.now();
             state.hash.clear();
 
             if (msg.positions instanceof Float32Array && msg.ids instanceof Int32Array) {
@@ -69,7 +71,7 @@ export function handleMessage(state, msg) {
                 }
             }
 
-            const buildMs = now() - t0;
+            const buildMs = _perf.now() - t0;
             return { type: 'rebuilt', tick: msg.tick ?? 0, buildMs };
         }
 
@@ -102,9 +104,9 @@ export function handleMessage(state, msg) {
 }
 
 // Self-registration only runs inside a Worker context, not in Node.js.
-// Guard with WorkerGlobalScope so node --test can import this file without
-// registering a global message handler (which would throw in Node).
-if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope) {
+// Guard with a postMessage existence check — more reliable than
+// `self instanceof WorkerGlobalScope` in polyfilled or non-standard envs.
+if (typeof self !== 'undefined' && typeof self.postMessage === 'function') {
     const _state = { hash: null };
     self.onmessage = (ev) => {
         const reply = handleMessage(_state, ev.data);

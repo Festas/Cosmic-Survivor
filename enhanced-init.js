@@ -45,10 +45,11 @@ const _params = (() => {
 const _broadphaseNaive = _params.get('broadphase') === 'naive';
 
 // Part F: ?worker=1 promotes broadphase off-thread (default OFF).
-// Auto-disabled on Safari (postMessage overhead historically not worth it).
+// Auto-disabled on Safari (postMessage overhead historically not worth it for
+// this workload; revisit if Apple improves structured-clone throughput).
+// The regex matches Safari but excludes Chrome and Android (which both embed
+// "Safari" in their UA strings). Source: https://stackoverflow.com/a/23522755
 const _workerWanted = _params.get('worker') === '1';
-// Safari UA sniff — document in comments; can be overridden by ?worker=1 if
-// Apple ever improves their Worker postMessage throughput.
 const _isSafari = typeof navigator !== 'undefined' &&
     /^((?!chrome|android).)*safari/i.test(navigator.userAgent ?? '');
 const _workerEnabled = _workerWanted && !_isSafari &&
@@ -66,7 +67,9 @@ const _fixedStepEnabled = _params.get('fixedstep') === '1';
 const _interpEnabled = _params.get('interp') !== '0';
 
 // Part D: broadphase cell size must match BROADPHASE_CELL_SIZE in main.js.
-// Both are CONFIG.BULLET_SIZE * 8 = 40 px.
+// Both are CONFIG.BULLET_SIZE * 8 = 40 px. These two constants are kept in
+// sync manually; if you change one, change the other and update the comment in
+// REWORK.md. A future refactor can extract them to a shared js/config.js.
 const _BROADPHASE_CELL_SIZE = 40;
 
 // Part D: main-thread spatial hash (always built as synchronous fallback).

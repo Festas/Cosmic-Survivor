@@ -4554,6 +4554,8 @@ class Bullet {
         // Part D rework — monotonic id for worker broadphase batch-query
         // tracking. Assigned from the shared counter on window.rework.broadphase
         // so it's stable across frames for as long as the bullet lives.
+        // JavaScript is single-threaded on the main thread, so this increment
+        // is always synchronous — no race conditions possible.
         this._bpId = (window.rework?.broadphase?._nextBulletId != null)
             ? window.rework.broadphase._nextBulletId++
             : 0;
@@ -4627,6 +4629,12 @@ class Bullet {
         for (let i = _candidates.length - 1; i >= 0; i--) {
             const enemy = _candidates[i];
             if (this.hitEnemies.includes(enemy)) continue;
+            // Guard: hash candidates can contain enemies already killed this
+            // frame by a previous bullet (they've been removed from game.enemies
+            // but still exist in the hash's scratch buffer). All Enemy instances
+            // in game.enemies are guaranteed to have a `health` property, so no
+            // undefined check is needed.
+            if (_useHashIndex && enemy.health <= 0) continue;
             
             const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
             if (dist < enemy.size + this.size) {
@@ -7896,11 +7904,13 @@ function gameLoop(timestamp) {
             _rw.clock.lastAlpha = _interpAlpha;
         }
 
-        let _needsInterpRestore = false;
+        let _needsInterpRestore = _fixedStepActive;
         for (let _si = 0; _si < _simSteps; _si++) {
             // Part E: snapshot entity positions at the start of each fixed sim
             // step so the render pass can lerp between prev and current state.
-            if (_fixedStepActive) { _snapshotEntityPositions(); _needsInterpRestore = true; }
+            // _needsInterpRestore is pre-set to _fixedStepActive above; the
+            // snapshot call is guarded here to keep the two in sync.
+            if (_fixedStepActive) { _snapshotEntityPositions(); }
 
             timer += _simDtMs;   // was: timer += deltaTime (legacy variable dt)
             if (timer >= 1000) {
