@@ -43,6 +43,12 @@ const CONFIG = {
     },
 };
 
+// Part D rework — broadphase cell size (≈ playerBulletRadius × 8).
+// CONFIG.BULLET_SIZE = 5 → cell = 40 px. Larger cells reduce cell count but
+// increase average candidates per query; 40 is a good balance for typical
+// enemy/bullet sizes in Cosmic Survivor. Must match enhanced-init.js.
+const BROADPHASE_CELL_SIZE = CONFIG.BULLET_SIZE * 8; // 40
+
 // Helper function for time conversion
 function msToFrames(ms) {
     return ms / (1000 / CONFIG.TARGET_FPS);
@@ -1275,6 +1281,12 @@ class Player {
         this.isMoving = false;
         this.facingRight = true;
         this.aimAngle = 0;
+        // Part E rework — fixed-timestep interpolation snapshot fields.
+        // Snapshotted at the start of each sim step; render lerps between
+        // _interpPrevX/Y and x/y by alpha. Separate from Enemy.prevX/prevY
+        // (which are used for walk animation).
+        this._interpPrevX = this.x;
+        this._interpPrevY = this.y;
         // Multi-weapon system - all weapons stay simultaneously active and
         // orbit the player like Vampire Survivors / Brotato / Binding of Isaac orbs.
         this.weaponSlots = [{ type: 'basic', cooldown: 0, level: 1, xp: 0, evolved: false }];
@@ -4539,6 +4551,17 @@ class Bullet {
         // Mark whether this bullet is locally-owned (coop aura only buffs
         // bullets that *I* fired).
         this._isLocalPlayerBullet = (owner === game.player);
+        // Part D rework — monotonic id for worker broadphase batch-query
+        // tracking. Assigned from the shared counter on window.rework.broadphase
+        // so it's stable across frames for as long as the bullet lives.
+        // JavaScript is single-threaded on the main thread, so this increment
+        // is always synchronous — no race conditions possible.
+        this._bpId = (window.rework?.broadphase?._nextBulletId != null)
+            ? window.rework.broadphase._nextBulletId++
+            : 0;
+        // Part E rework — fixed-timestep interpolation snapshot fields.
+        this._interpPrevX = this.x;
+        this._interpPrevY = this.y;
     }
 
     update() {
@@ -4558,9 +4581,60 @@ class Bullet {
             }
         }
 
-        for (let i = game.enemies.length - 1; i >= 0; i--) {
-            const enemy = game.enemies[i];
+        // Part D rework — broadphase-aware collision loop.
+        // Default: hash (or worker) broadphase — O(query) instead of O(N×M).
+        // Fallback: ?broadphase=naive keeps the exact legacy O(N×M) scan.
+        //
+        // Worker path (Part F): use last frame's batchResult if available and
+        // from the matching tick; otherwise fall back to main-thread hash.
+        const _bp = window.rework?.broadphase;
+        let _candidates;
+        let _useHashIndex = false; // true → candidates are from hash (not game.enemies)
+        if (_bp && _bp.kind !== 'naive' && _bp._hash) {
+            const _qT0 = performance.now();
+
+            if (_bp.kind === 'worker' && _bp._workerTick === _bp._currentTick) {
+                // Part F: use worker results from the previous tick's batchResult.
+                const _wRes = _bp._workerResults[this._bpId];
+                if (_wRes instanceof Int32Array && _wRes.length > 0) {
+                    // Convert Int32Array of enemy indices to enemy objects.
+                    const _eim = _bp._enemyIndexMap;
+                    const _arr = [];
+                    for (let _wi = 0; _wi < _wRes.length; _wi++) {
+                        const _eobj = _eim[_wRes[_wi]];
+                        if (_eobj) _arr.push(_eobj);
+                    }
+                    _candidates = _arr;
+                    _useHashIndex = true;
+                } else {
+                    // Worker had no result for this bullet — fall through to hash.
+                    _bp.staleResults = (_bp.staleResults || 0) + 1;
+                }
+            }
+
+            if (!_candidates) {
+                // Hash fallback (also the default 'hash' path).
+                _candidates = _bp._hash.query(this.x, this.y, this.size + _bp._maxEnemyRadius);
+                _useHashIndex = true;
+            }
+
+            _bp.lastQueryCount = (_bp.lastQueryCount || 0) + _candidates.length;
+            _bp.lastQueryMs = (_bp.lastQueryMs || 0) + (performance.now() - _qT0);
+        } else {
+            // Naive O(N×M) path (?broadphase=naive or no window.rework).
+            _candidates = game.enemies;
+            _useHashIndex = false;
+        }
+
+        for (let i = _candidates.length - 1; i >= 0; i--) {
+            const enemy = _candidates[i];
             if (this.hitEnemies.includes(enemy)) continue;
+            // Guard: hash candidates can contain enemies already killed this
+            // frame by a previous bullet (they've been removed from game.enemies
+            // but still exist in the hash's scratch buffer). All Enemy instances
+            // in game.enemies are guaranteed to have a `health` property, so no
+            // undefined check is needed.
+            if (_useHashIndex && enemy.health <= 0) continue;
             
             const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
             if (dist < enemy.size + this.size) {
@@ -4583,7 +4657,14 @@ class Bullet {
                 }
                 
                 if (enemy.takeDamage(finalDamage, isCrit)) {
-                    game.enemies.splice(i, 1);
+                    // When iterating hash candidates we don't have the enemy's
+                    // game.enemies index directly — find it via indexOf.
+                    if (_useHashIndex) {
+                        const idx = game.enemies.indexOf(enemy);
+                        if (idx !== -1) game.enemies.splice(idx, 1);
+                    } else {
+                        game.enemies.splice(i, 1);
+                    }
                     if (this.lifeSteal > 0) {
                         game.player.heal(Math.floor(finalDamage * this.lifeSteal));
                     }
@@ -7601,6 +7682,80 @@ function drawStarfield(ctx) {
     ctx.restore();
 }
 
+// ─── Part E rework: entity-interpolation helpers ─────────────────────────────
+// These functions snapshot and restore entity world positions for the
+// fixed-timestep interpolation path (?fixedstep=1). The swap approach keeps
+// draw() methods untouched: before render we temporarily move entities to
+// their lerped render positions; after render we put the simulation positions
+// back so the next sim tick starts from the correct state.
+//
+// Only runs when fixedStepEnabled AND interpEnabled are both true.
+// Enemy._interpPrevX/Y are separate from the existing Enemy.prevX/prevY fields
+// (which are used for walk-animation direction detection).
+
+function _snapshotEntityPositions() {
+    const p = game.player;
+    if (p) { p._interpPrevX = p.x; p._interpPrevY = p.y; }
+    for (let i = 0; i < game.enemies.length; i++) {
+        const e = game.enemies[i];
+        e._interpPrevX = e.x; e._interpPrevY = e.y;
+    }
+    for (let i = 0; i < game.bullets.length; i++) {
+        const b = game.bullets[i];
+        if (!b.isEnemyBullet) { b._interpPrevX = b.x; b._interpPrevY = b.y; }
+    }
+}
+
+function _applyEntityInterp(alpha) {
+    // Temporarily replace x/y with lerped render position.
+    // Saves actual sim positions in _interpSaveX/Y for _restoreEntityInterp().
+    const p = game.player;
+    if (p && p._interpPrevX !== undefined) {
+        p._interpSaveX = p.x; p._interpSaveY = p.y;
+        p.x = p._interpPrevX + (p.x - p._interpPrevX) * alpha;
+        p.y = p._interpPrevY + (p.y - p._interpPrevY) * alpha;
+    }
+    for (let i = 0; i < game.enemies.length; i++) {
+        const e = game.enemies[i];
+        if (e._interpPrevX !== undefined) {
+            e._interpSaveX = e.x; e._interpSaveY = e.y;
+            e.x = e._interpPrevX + (e.x - e._interpPrevX) * alpha;
+            e.y = e._interpPrevY + (e.y - e._interpPrevY) * alpha;
+        }
+    }
+    for (let i = 0; i < game.bullets.length; i++) {
+        const b = game.bullets[i];
+        if (!b.isEnemyBullet && b._interpPrevX !== undefined) {
+            b._interpSaveX = b.x; b._interpSaveY = b.y;
+            b.x = b._interpPrevX + (b.x - b._interpPrevX) * alpha;
+            b.y = b._interpPrevY + (b.y - b._interpPrevY) * alpha;
+        }
+    }
+}
+
+function _restoreEntityInterp() {
+    const p = game.player;
+    if (p && p._interpSaveX !== undefined) {
+        p.x = p._interpSaveX; p.y = p._interpSaveY;
+        p._interpSaveX = undefined; p._interpSaveY = undefined;
+    }
+    for (let i = 0; i < game.enemies.length; i++) {
+        const e = game.enemies[i];
+        if (e._interpSaveX !== undefined) {
+            e.x = e._interpSaveX; e.y = e._interpSaveY;
+            e._interpSaveX = undefined; e._interpSaveY = undefined;
+        }
+    }
+    for (let i = 0; i < game.bullets.length; i++) {
+        const b = game.bullets[i];
+        if (!b.isEnemyBullet && b._interpSaveX !== undefined) {
+            b.x = b._interpSaveX; b.y = b._interpSaveY;
+            b._interpSaveX = undefined; b._interpSaveY = undefined;
+        }
+    }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function gameLoop(timestamp) {
     const deltaTime = timestamp - lastTime;
     lastTime = timestamp;
@@ -7732,107 +7887,199 @@ function gameLoop(timestamp) {
     }
     
     if (game.state === 'playing' && !game.paused) {
-        timer += deltaTime;
-        if (timer >= 1000) {
-            timer = 0;
-            game.timeLeft--;
-            if (game.timeLeft <= 0) {
-                if (game.isMultiplayer) {
-                    // In multiplayer, only the host triggers wave completion
-                    const mp = window.MultiplayerClient;
-                    if (mp && mp.isHost()) {
-                        mp.sendGameEvent('wave_complete', { wave: game.wave });
+        // Part E rework — FixedClock dual-path.
+        // ?fixedstep=1: drives sim at 60 Hz, render interpolates with alpha.
+        // Multiplayer is excluded from fixed step to avoid fighting the
+        // server-authoritative wave timer (see REWORK.md Part E note).
+        const _rw = window.rework;
+        const _fixedStepActive = _rw?.clock?.fixedStepEnabled &&
+            !(game.isMultiplayer && window.MultiplayerClient?.isActive?.());
+        let _simSteps = 1, _simDtMs = deltaTime, _interpAlpha = 0;
+        if (_fixedStepActive) {
+            const { steps, alpha } = _rw.clock._fixedClock.advance(timestamp);
+            _simSteps = steps;
+            _simDtMs = 1000 / 60;
+            _interpAlpha = alpha;
+            _rw.clock.simTicksThisFrame = _simSteps;
+            _rw.clock.lastAlpha = _interpAlpha;
+        }
+
+        let _needsInterpRestore = _fixedStepActive;
+        for (let _si = 0; _si < _simSteps; _si++) {
+            // Part E: snapshot entity positions at the start of each fixed sim
+            // step so the render pass can lerp between prev and current state.
+            // _needsInterpRestore is pre-set to _fixedStepActive above; the
+            // snapshot call is guarded here to keep the two in sync.
+            if (_fixedStepActive) { _snapshotEntityPositions(); }
+
+            timer += _simDtMs;   // was: timer += deltaTime (legacy variable dt)
+            if (timer >= 1000) {
+                timer = 0;
+                game.timeLeft--;
+                if (game.timeLeft <= 0) {
+                    if (game.isMultiplayer) {
+                        // In multiplayer, only the host triggers wave completion
+                        const mp = window.MultiplayerClient;
+                        if (mp && mp.isHost()) {
+                            mp.sendGameEvent('wave_complete', { wave: game.wave });
+                            Sound.play('waveComplete');
+                            openShop();
+                        }
+                        // Non-host clients wait for the host's wave_complete event
+                        game.timeLeft = 0; // clamp so the HUD doesn't show negative time
+                    } else {
                         Sound.play('waveComplete');
                         openShop();
                     }
-                    // Non-host clients wait for the host's wave_complete event
-                    game.timeLeft = 0; // clamp so the HUD doesn't show negative time
-                } else {
-                    Sound.play('waveComplete');
-                    openShop();
                 }
             }
-        }
-        
-        game.player.update();
-        
-        // Update remote players (multiplayer)
-        if (game.isMultiplayer) {
-            for (const rp of game.remotePlayers.values()) {
-                rp.update();
-            }
-            // Send local player state to server
-            sendLocalPlayerState();
-        }
-        
-        game.enemies.forEach(e => e.update());
-        game.bullets = game.bullets.filter(b => {
-            if (b.isEnemyBullet) {
-                b.x += Math.cos(b.angle) * b.speed;
-                b.y += Math.sin(b.angle) * b.speed;
-                
-                // Check collision with local player
-                const distPlayer = Math.hypot(game.player.x - b.x, game.player.y - b.y);
-                if (distPlayer < game.player.size + b.size) {
-                    game.player.takeDamage(b.damage);
-                    b._pool?.release(b);
-                    return false;
+            
+            game.player.update();
+            
+            // Update remote players (multiplayer)
+            if (game.isMultiplayer) {
+                for (const rp of game.remotePlayers.values()) {
+                    rp.update();
                 }
-                
-                // Check collision with drones (Summoner ability)
-                if (game.player.drones && game.player.drones.length > 0) {
-                    for (let i = 0; i < game.player.drones.length; i++) {
-                        const drone = game.player.drones[i];
-                        const orbitRadius = 60;
-                        const droneX = game.player.x + Math.cos(drone.angle) * orbitRadius;
-                        const droneY = game.player.y + Math.sin(drone.angle) * orbitRadius;
-                        const distDrone = Math.hypot(droneX - b.x, droneY - b.y);
-                        
-                        if (distDrone < 8 + b.size) {
-                            drone.health -= b.damage;
-                            createParticles(droneX, droneY, '#a855f7', 5);
-                            if (drone.health <= 0) {
-                                createTextParticle(droneX, droneY, 'DESTROYED!', '#ff6b6b', 14);
+                // Send local player state to server
+                sendLocalPlayerState();
+            }
+            
+            game.enemies.forEach(e => e.update());
+
+            // Part D rework — build broadphase spatial hash once per sim step
+            // (after enemies update, before bullets are processed).
+            // Part F rework — also transmit rebuild + batch query to the
+            // off-thread worker (?worker=1, default OFF).
+            {
+                const _bp = _rw?.broadphase;
+                if (_bp && _bp.kind !== 'naive') {
+                    const _bpT0 = performance.now();
+                    const _h = _bp._hash;
+                    _h.clear();
+                    let _maxR = 0;
+                    for (let _i = 0; _i < game.enemies.length; _i++) {
+                        const _e = game.enemies[_i];
+                        if (_e.size > _maxR) _maxR = _e.size;
+                        _h.insert(_e.x, _e.y, _e);
+                    }
+                    _bp._maxEnemyRadius = _maxR;
+                    // Snapshot enemy index → object for worker-result id lookup.
+                    _bp._enemyIndexMap = game.enemies.slice();
+                    _bp.lastBuildMs = performance.now() - _bpT0;
+                    _bp.lastQueryCount = 0;
+                    _bp.lastQueryMs = 0;
+
+                    // Part F: transmit positions to worker and queue batch query.
+                    // Auto-disabled on Safari (UA sniff in enhanced-init.js) and
+                    // when typeof Worker === 'undefined' (SSR / node tests).
+                    if (_bp.kind === 'worker' && _bp._worker && _bp._workerReady) {
+                        const _cnt = game.enemies.length;
+                        const _pos = new Float32Array(_cnt * 3);
+                        const _ids = new Int32Array(_cnt);
+                        for (let _i = 0; _i < _cnt; _i++) {
+                            const _e = game.enemies[_i];
+                            _pos[_i * 3]     = _e.x;
+                            _pos[_i * 3 + 1] = _e.y;
+                            _pos[_i * 3 + 2] = _e.size;
+                            _ids[_i] = _i;
+                        }
+                        const _tick = game.frameCount;
+                        _bp._currentTick = _tick;
+                        _bp._worker.postMessage(
+                            { type: 'rebuild', tick: _tick, count: _cnt, positions: _pos, ids: _ids },
+                            [_pos.buffer, _ids.buffer]
+                        );
+                        // Batch all bullet queries into one message round-trip.
+                        const _queries = [];
+                        for (let _bi = 0; _bi < game.bullets.length; _bi++) {
+                            const _b = game.bullets[_bi];
+                            if (!_b.isEnemyBullet) {
+                                _queries.push({ bulletId: _b._bpId, x: _b.x, y: _b.y, r: _b.size + _maxR });
                             }
-                            b._pool?.release(b);
-                            return false;
+                        }
+                        if (_queries.length > 0) {
+                            _bp._worker.postMessage({ type: 'batchQuery', tick: _tick, queries: _queries });
+                            _bp.pendingQueries = _queries.length;
                         }
                     }
                 }
-                
-                const alive = b.x >= 0 && b.x <= CONFIG.WORLD_WIDTH && b.y >= 0 && b.y <= CONFIG.WORLD_HEIGHT;
-                if (!alive) b._pool?.release(b);
-                return alive;
             }
-            return b.update();
-        });
-        updateParticles();
-        updateNotifications();
-        updatePowerups();
-        collectPowerups();
-        // Update black holes
-        if (game.blackHoles) {
-            game.blackHoles = game.blackHoles.filter(bh => {
-                bh.life--;
-                // Pull enemies toward center
-                game.enemies.forEach(e => {
-                    const dist = Math.hypot(e.x - bh.x, e.y - bh.y);
-                    if (dist < bh.radius && dist > 5) {
-                        const pull = bh.pullStrength * (1 - dist / bh.radius);
-                        e.x += (bh.x - e.x) / dist * pull;
-                        e.y += (bh.y - e.y) / dist * pull;
-                        // Damage enemies at center
-                        if (dist < 30 && bh.life % 10 === 0) {
-                            e.takeDamage(game.player.damage * 0.2, false);
+
+            game.bullets = game.bullets.filter(b => {
+                if (b.isEnemyBullet) {
+                    b.x += Math.cos(b.angle) * b.speed;
+                    b.y += Math.sin(b.angle) * b.speed;
+                    
+                    // Check collision with local player
+                    const distPlayer = Math.hypot(game.player.x - b.x, game.player.y - b.y);
+                    if (distPlayer < game.player.size + b.size) {
+                        game.player.takeDamage(b.damage);
+                        b._pool?.release(b);
+                        return false;
+                    }
+                    
+                    // Check collision with drones (Summoner ability)
+                    if (game.player.drones && game.player.drones.length > 0) {
+                        for (let i = 0; i < game.player.drones.length; i++) {
+                            const drone = game.player.drones[i];
+                            const orbitRadius = 60;
+                            const droneX = game.player.x + Math.cos(drone.angle) * orbitRadius;
+                            const droneY = game.player.y + Math.sin(drone.angle) * orbitRadius;
+                            const distDrone = Math.hypot(droneX - b.x, droneY - b.y);
+                            
+                            if (distDrone < 8 + b.size) {
+                                drone.health -= b.damage;
+                                createParticles(droneX, droneY, '#a855f7', 5);
+                                if (drone.health <= 0) {
+                                    createTextParticle(droneX, droneY, 'DESTROYED!', '#ff6b6b', 14);
+                                }
+                                b._pool?.release(b);
+                                return false;
+                            }
                         }
                     }
-                });
-                return bh.life > 0;
+                    
+                    const alive = b.x >= 0 && b.x <= CONFIG.WORLD_WIDTH && b.y >= 0 && b.y <= CONFIG.WORLD_HEIGHT;
+                    if (!alive) b._pool?.release(b);
+                    return alive;
+                }
+                return b.update();
             });
-        }
-        // Update XP orbs
-        game.xpOrbs = game.xpOrbs.filter(orb => orb.update());
-        
+            updateParticles();
+            updateNotifications();
+            updatePowerups();
+            collectPowerups();
+            // Update black holes
+            if (game.blackHoles) {
+                game.blackHoles = game.blackHoles.filter(bh => {
+                    bh.life--;
+                    // Pull enemies toward center
+                    game.enemies.forEach(e => {
+                        const dist = Math.hypot(e.x - bh.x, e.y - bh.y);
+                        if (dist < bh.radius && dist > 5) {
+                            const pull = bh.pullStrength * (1 - dist / bh.radius);
+                            e.x += (bh.x - e.x) / dist * pull;
+                            e.y += (bh.y - e.y) / dist * pull;
+                            // Damage enemies at center
+                            if (dist < 30 && bh.life % 10 === 0) {
+                                e.takeDamage(game.player.damage * 0.2, false);
+                            }
+                        }
+                    });
+                    return bh.life > 0;
+                });
+            }
+            // Update XP orbs
+            game.xpOrbs = game.xpOrbs.filter(orb => orb.update());
+        } // end sim loop
+
+        // Part E: apply position interpolation before the render pass.
+        // Positions are temporarily lerped; _restoreEntityInterp() puts them
+        // back after draw calls so the next sim step starts from true state.
+        const _doInterp = _needsInterpRestore && (_rw?.clock?.interpEnabled ?? true);
+        if (_doInterp) _applyEntityInterp(_interpAlpha);
+
         game.pickups.forEach(p => p.draw(ctx));
         game.xpOrbs.forEach(orb => orb.draw(ctx));
         game.powerups.forEach(p => p.draw(ctx));
@@ -7912,6 +8159,10 @@ function gameLoop(timestamp) {
         }
         
         updateUI();
+
+        // Part E: restore simulation positions now that rendering is done.
+        // This must happen before the next sim tick starts.
+        if (_doInterp) _restoreEntityInterp();
         
         // Fog of war overlay
         if (game.fogOfWar && game.player) {

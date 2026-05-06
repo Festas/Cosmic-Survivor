@@ -104,7 +104,38 @@ export function installDebugOverlay() {
                 }
             } catch { /* ignore */ }
 
-            panel.textContent = [fpsLine, stanceLine, weatherLine, rngLine].join('\n') + poolLines;
+            // Part D — broadphase telemetry
+            let bpLines = '';
+            try {
+                const bp = rw?.broadphase;
+                if (bp) {
+                    bpLines = '\n─ broadphase ─\n';
+                    bpLines += `kind: ${bp.kind}\n`;
+                    bpLines += `build: ${bp.lastBuildMs.toFixed(2)}ms\n`;
+                    bpLines += `query: ${bp.lastQueryMs.toFixed(2)}ms  candidates: ${bp.lastQueryCount}`;
+                    if (bp.kind === 'worker') {
+                        bpLines += `\nroundtrip: ${bp.roundtripMs.toFixed(1)}ms`;
+                        bpLines += `  pending: ${bp.pendingQueries}`;
+                        bpLines += `  stale: ${bp.staleResults}`;
+                    }
+                }
+            } catch { /* ignore */ }
+
+            // Part E — clock telemetry
+            let clockLines = '';
+            try {
+                const clk = rw?.clock;
+                if (clk) {
+                    clockLines = '\n─ clock ─\n';
+                    clockLines += `mode: ${clk.mode}\n`;
+                    if (clk.fixedStepEnabled) {
+                        clockLines += `simHz: ${clk.simHz}  steps/frame: ${clk.simTicksThisFrame}\n`;
+                        clockLines += `alpha: ${clk.lastAlpha.toFixed(3)}  interp: ${clk.interpEnabled}`;
+                    }
+                }
+            } catch { /* ignore */ }
+
+            panel.textContent = [fpsLine, stanceLine, weatherLine, rngLine].join('\n') + poolLines + bpLines + clockLines;
         }
 
         function loop(now) {
