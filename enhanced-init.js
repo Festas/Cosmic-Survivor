@@ -30,9 +30,14 @@ import { ENEMY_BEHAVIORS, applyShieldBuddyAbsorption, ensureShieldIds } from './
 import { applyCoopAura, notifyCoopBuff, COOP_AURA_RADIUS } from './js/systems/coopAura.js';
 import { registerPool, listPools } from './js/core/poolRegistry.js';
 import { installDebugOverlay } from './js/core/debugOverlay.js';
-// Part G/H — renderer
+// Part G/H/I — renderer
 import { Canvas2DRenderer } from './js/render/Canvas2DRenderer.js';
-import { WebGLRenderer, webglAvailable } from './js/render/WebGLRenderer.js';
+import { WebGLRenderer, webglAvailable, isIOSSafari } from './js/render/WebGLRenderer.js';
+// Part 5 — entity modules (§9 entity peeling)
+// These assign window.Player / window.Bullet / window.EnemyBullet at load time
+// so main.js (classic script) resolves the names at runtime.
+import './js/entities/Player.js';
+import './js/entities/Bullet.js';
 
 // ===== Part D/E/F URL-flag parsing =====
 // All flags are read at module-load time (before init()) so window.rework is
@@ -85,6 +90,16 @@ const _bpHash = new SpatialHash({
 // Part E: FixedClock instance (shared with main.js via window.rework.clock).
 const _fixedClock = new FixedClock({ stepSeconds: 1 / 60, maxFrameSeconds: 0.25 });
 
+// Part I — renderer selection.
+// Default: Canvas2D (no URL flag needed).  Pass ?renderer=webgl to opt in.
+// WebGL is automatically suppressed on iOS Safari (see isIOSSafari docs).
+// DOM guard: only wire the renderer when document + canvas are available.
+const _wantWebGL  = _params.get('renderer') === 'webgl';
+const _iosGuard   = isIOSSafari();
+if (_wantWebGL && _iosGuard) {
+    console.info('[renderer] WebGL requested but disabled on iOS Safari — using Canvas2D.');
+}
+
 window.rework = {
     ObjectPool,
     gameBus,
@@ -135,9 +150,32 @@ window.rework = {
         simTicksThisFrame: 0,
         droppedFrames: 0,
     },
+
+    // Part I — renderer (populated below after DOM is available)
+    renderer: null,
 };
 
 installDebugOverlay();
+
+// ===== Part I — Renderer bootstrap =====
+// DOM-guarded: only runs in a browser context with a real canvas element.
+// Tests import this module with no document, so the guard prevents errors.
+if (typeof document !== 'undefined') {
+    const _bootstrapRenderer = () => {
+        const canvas = document.getElementById('gameCanvas');
+        if (!canvas) return; // Canvas not in DOM yet — wait for DOMContentLoaded.
+        const _useWebGL = _wantWebGL && !_iosGuard && webglAvailable();
+        const renderer = _useWebGL
+            ? new WebGLRenderer(canvas)
+            : new Canvas2DRenderer(canvas);
+        window.rework.renderer = renderer;
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', _bootstrapRenderer);
+    } else {
+        _bootstrapRenderer();
+    }
+}
 
 // ===== Part F — Worker initialisation =====
 // Only runs when ?worker=1 and Worker is available (not Safari, not SSR/Node).

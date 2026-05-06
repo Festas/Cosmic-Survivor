@@ -20,9 +20,36 @@ export class Canvas2DRenderer {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
+        this.kind = 'canvas2d';
+        this.drawCalls = 0;
+        this.layers = 2; // world + HUD (two ctx.save/restore blocks per frame)
+
+        // Wrap the raw ctx so every beginPath / fillRect / drawImage / fillText
+        // increments drawCalls. We wrap once here so leaf modules stay clean.
+        const self = this;
+        const raw = this.ctx;
+        this.ctx = new Proxy(raw, {
+            get(target, prop) {
+                const v = target[prop];
+                if (prop === 'beginPath' || prop === 'fillRect' ||
+                    prop === 'drawImage' || prop === 'fillText') {
+                    return function(...args) {
+                        self.drawCalls++;
+                        return v.apply(target, args);
+                    };
+                }
+                if (typeof v === 'function') return v.bind(target);
+                return v;
+            },
+            set(target, prop, value) {
+                target[prop] = value;
+                return true;
+            },
+        });
     }
 
     render(game, timestamp) {
+        this.drawCalls = 0;
         const ctx = this.ctx;
         const CONFIG = window.CONFIG || {};
         ctx.save();
