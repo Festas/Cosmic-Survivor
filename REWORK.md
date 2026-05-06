@@ -137,13 +137,15 @@ as a small PR:
 4. **Promote `js/core/workers/broadphase.worker.js`** — once main thread is
    pool-aware, hand collision broadphase off-thread.
 5. **WebGL renderer (PixiJS)** — `js/render/WebGLRenderer.js` (PixiJS v8 backend)
-   ships behind `?renderer=webgl`. Enable with:
+   ships as the **default renderer**. Use `?renderer=canvas2d` to opt out.
    ```bash
-   # open http://localhost:3000/index-enhanced.html?renderer=webgl
+   # open http://localhost:3000/index-enhanced.html            # WebGL (default)
+   # open http://localhost:3000/index-enhanced.html?renderer=canvas2d  # Canvas2D escape hatch
    ```
-   ✅ **Shipped** (PR #43): WebGL backend wired, Canvas2D remains default.
+   ✅ **Shipped** (PR #43): WebGL backend wired, Canvas2D fallback available.
+   ✅ **PR-J**: WebGL is now default; `?renderer=canvas2d` is the escape hatch.
    Known limitation: auto-disabled on iOS Safari (UA sniff, console.info logged).
-   The default WebGL flip is deferred to PR-J after dogfooding.
+   `window.rework.rendererKind` reflects the resolved renderer (`'webgl'` or `'canvas2d'`).
 6. **TypeScript-first new modules** — keep adding under `js/core/**` and
    `js/render/**` where `checkJs` already enforces JSDoc types; once enough
    surface is annotated, switch the `tsconfig` to a real TS compile that
@@ -168,7 +170,7 @@ npm run dev:all           # vite + multiplayer server
 
 ```bash
 npm install
-npm test                  # 83/83 pass (includes renderer + entity tests)
+npm test                  # 92/92 pass (entity peeling + camera + input + wave tests)
 npm run validate:content  # OK + advisory boss warnings
 npm run build             # vite build succeeds; dist/ contains pixi chunk
 npm run dev:all           # vite + multiplayer server
@@ -183,8 +185,9 @@ ring — they'll punch harder.
 
 To test the WebGL renderer:
 ```
-index-enhanced.html?renderer=webgl           # PixiJS WebGL backend
-index-enhanced.html?renderer=webgl&broadphase=hash&fixedstep=1  # all flags compose
+index-enhanced.html                                              # WebGL (default)
+index-enhanced.html?renderer=canvas2d                           # Canvas2D escape hatch
+index-enhanced.html?renderer=canvas2d&broadphase=hash&fixedstep=1  # all flags compose
 ```
 
 ---
@@ -197,7 +200,12 @@ Entities extracted from `main.js` and moved to `js/entities/`:
 | --- | --- | --- |
 | Player | `js/entities/Player.js` | ✅ Done (PR #43) |
 | Bullet + EnemyBullet | `js/entities/Bullet.js` | ✅ Done (PR #43) |
-| Enemy, Wave, Pickup, Particle, HUD | — | 🔜 Next slices |
+| Enemy | `js/entities/Enemy.js` | ✅ Shipped (PR-J) |
+| Pickup + XPOrb + Powerup | `js/entities/Pickup.js` | ✅ Shipped (PR-J) |
+| spawnWave (Wave logic) | `js/systems/waveSystem.js` | ✅ Shipped (PR-J) |
+| Camera | `js/core/camera.js` | ✅ Shipped (PR-J) |
+| Input handlers | `js/core/input.js` | ✅ Shipped (PR-J) |
+| Particle, HUD | — | 🔜 Next slices |
 
 Each extracted class:
 - Exports the class as a named export

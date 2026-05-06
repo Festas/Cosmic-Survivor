@@ -985,25 +985,8 @@ function drawNotifications(ctx) {
 }
 
 // ==================== POWERUP SYSTEM ====================
-class Powerup {
-    constructor(x, y, type) {
-        this.x = x;
-        this.y = y;
-        this.size = CONFIG.PICKUP_SIZE * 1.5;
-        this.type = type;
-        this.data = POWERUP_TYPES[type];
-        this.life = msToFrames(10000); // 10 seconds
-        this.bobOffset = Math.random() * Math.PI * 2;
-    }
-
-    update() {
-        this.life--;
-        return this.life > 0;
-    }
-
-    draw(ctx) {
-    }
-}
+// Powerup class extracted to js/entities/Pickup.js (§9 entity peeling)
+// window.Powerup is set by enhanced-init.js before init() runs.
 
 function spawnPowerup(x, y) {
     // Chance to spawn a powerup based on CONFIG
@@ -1221,7 +1204,8 @@ function getRandomAlivePlayer() {
     return players[Math.floor(Math.random() * players.length)];
 }
 
-// ==================== ENEMY CLASS ====================
+// Enemy class extracted to js/entities/Enemy.js (§9 entity peeling)
+// window.Enemy is set by enhanced-init.js before init() runs.
 class Enemy {
     constructor(x, y, wave, type, isBoss = false) {
         this.x = x;
@@ -2259,72 +2243,8 @@ class Enemy {
 // window.Bullet / window.EnemyBullet are set by enhanced-init.js before init() runs.
 
 // ==================== PICKUP & PARTICLES ====================
-class Pickup {
-    constructor(x, y, value) {
-        this.x = x;
-        this.y = y;
-        this.size = CONFIG.PICKUP_SIZE;
-        this.value = value;
-        this.bob = Math.random() * Math.PI * 2;
-    }
-
-    draw(ctx) {
-    }
-}
-
-class XPOrb {
-    constructor(x, y, value) {
-        this.x = x;
-        this.y = y;
-        this.value = value;
-        this.size = value >= 25 ? 8 : value >= 5 ? 6 : 4;
-        this.color = value >= 25 ? '#a855f7' : value >= 5 ? '#7c3aed' : '#6366f1';
-        this.glowColor = value >= 25 ? '#c084fc' : value >= 5 ? '#a78bfa' : '#818cf8';
-        this.bobOffset = Math.random() * Math.PI * 2;
-        this.magnetSpeed = 0;
-        this.life = 1800; // 30 seconds before despawn
-    }
-    
-    update() {
-        this.life--;
-        // Magnet effect - accelerate toward player when in range
-        if (game.player) {
-            const dist = Math.hypot(game.player.x - this.x, game.player.y - this.y);
-            const magnetRange = game.player.pickupRange * 2.5;
-            
-            if (dist < magnetRange) {
-                this.magnetSpeed = Math.min(this.magnetSpeed + 0.5, 8);
-                const angle = Math.atan2(game.player.y - this.y, game.player.x - this.x);
-                this.x += Math.cos(angle) * this.magnetSpeed;
-                this.y += Math.sin(angle) * this.magnetSpeed;
-            } else {
-                this.magnetSpeed = Math.max(0, this.magnetSpeed - 0.3);
-            }
-            
-            // Collect when close
-            if (dist < game.player.pickupRange) {
-                game.stats.xp += this.value;
-                game.stats.totalXpEarned += this.value;
-                
-                // Check level up
-                while (game.stats.xp >= game.stats.xpToNext) {
-                    game.stats.xp -= game.stats.xpToNext;
-                    game.stats.level++;
-                    game.stats.xpToNext = Math.floor(CONFIG.XP_BASE * Math.pow(CONFIG.XP_SCALING, game.stats.level - 1));
-                    triggerLevelUp();
-                }
-                
-                createParticles(this.x, this.y, this.color, 3);
-                return false; // Remove this orb
-            }
-        }
-        
-        return this.life > 0;
-    }
-    
-    draw(ctx) {
-    }
-}
+// Pickup, XPOrb classes extracted to js/entities/Pickup.js (§9 entity peeling)
+// window.Pickup / window.XPOrb are set by enhanced-init.js before init() runs.
 
 // ==================== VISUAL EFFECTS ====================
 // Enhanced particle system
@@ -3128,140 +3048,8 @@ function drawArenaObstacles(ctx) {
 }
 
 // ==================== WAVE SYSTEM ====================
-function spawnWave() {
-    generateArenaObstacles();
-    
-    // ===== Story Mode: override wave behavior =====
-    const storyChapter = game.gameMode === 'story' ? game.activeStoryChapter : null;
-    const isStoryFinalWave = !!(storyChapter && game.wave >= storyChapter.waves);
-    
-    // Variable wave duration
-    let waveDuration;
-    if (game.wave <= 3) waveDuration = 35;
-    else if (game.wave <= 8) waveDuration = 45;
-    else if (game.wave <= 15) waveDuration = 55;
-    else if (game.wave <= 20) waveDuration = 70;
-    else waveDuration = 80;
-    
-    // Boss waves are always 90 seconds
-    let isBoss = game.wave % CONFIG.BOSS_WAVE_INTERVAL === 0;
-    // In story mode, the chapter's last wave is always a boss wave with the chapter's final boss
-    if (isStoryFinalWave) {
-        isBoss = true;
-    }
-    if (isBoss) waveDuration = 90;
-    
-    game.timeLeft = waveDuration;
-    
-    // Reset wave-specific state
-    game.fogOfWar = false;
-    game.creditMultiplier = 1;
-    game.waveModifier = null;
-    
-    // Apply wave modifier (starting wave 3, not on boss waves, not in story mode)
-    if (game.wave >= 3 && !isBoss && !storyChapter) {
-        const modKeys = Object.keys(WAVE_MODIFIERS);
-        const modKey = modKeys[Math.floor(Math.random() * modKeys.length)];
-        game.waveModifier = { key: modKey, ...WAVE_MODIFIERS[modKey] };
-        showNotification(`${game.waveModifier.name}: ${game.waveModifier.desc}`, game.waveModifier.color, 3000);
-    }
-    
-    showWaveAnnouncement();
-    
-    if (isBoss) {
-        Sound.play('boss');
-        let bossType;
-        if (isStoryFinalWave && storyChapter.finalBoss && BOSS_TYPES[storyChapter.finalBoss]) {
-            bossType = storyChapter.finalBoss;
-            game.storyChapterFinalBossSpawned = true;
-        } else {
-            const bossTypes = Object.keys(BOSS_TYPES);
-            bossType = bossTypes[Math.floor(game.wave / CONFIG.BOSS_WAVE_INTERVAL) % bossTypes.length];
-        }
-        const spawnTarget = getRandomAlivePlayer();
-        const boss = new Enemy(spawnTarget.x + 300, spawnTarget.y - 300, game.wave, bossType, true);
-        game.enemies.push(boss);
-        showNotification(`BOSS WAVE: ${boss.name}`);
-    } else {
-        // Enemy count: was wave^1.2 which made wave 50+ unrenderable (220+
-        // enemies). Trimmed to wave^1.1 so wave 50 ≈ 180 enemies, wave 30 ≈
-        // 110 — still feels swarm-y, no longer a slideshow.
-        let enemyCount = Math.floor(8 + game.wave * 2 + Math.pow(game.wave, 1.1));
-        
-        // Scale enemy count for multiplayer
-        if (game.isMultiplayer) {
-            const playerCount = 1 + game.remotePlayers.size;
-            enemyCount = Math.floor(enemyCount * (1 + (playerCount - 1) * game.coopSettings.enemyScalePerPlayer));
-        }
-        
-        // Apply wave modifier to enemy count
-        if (game.waveModifier && game.waveModifier.enemyCountMult) {
-            enemyCount = Math.floor(enemyCount * game.waveModifier.enemyCountMult);
-        }
-        
-        for (let i = 0; i < enemyCount; i++) {
-            setTimeout(() => {
-                // Spawn around a random alive player
-                const spawnTarget = getRandomAlivePlayer();
-                const px = spawnTarget ? spawnTarget.x : CONFIG.WORLD_WIDTH / 2;
-                const py = spawnTarget ? spawnTarget.y : CONFIG.WORLD_HEIGHT / 2;
-                const spawnDist = 500 + Math.random() * 200;
-                const spawnAngle = Math.random() * Math.PI * 2;
-                let x = px + Math.cos(spawnAngle) * spawnDist;
-                let y = py + Math.sin(spawnAngle) * spawnDist;
-                x = Math.max(50, Math.min(CONFIG.WORLD_WIDTH - 50, x));
-                y = Math.max(50, Math.min(CONFIG.WORLD_HEIGHT - 50, y));
-                
-                let typeKeys = Object.keys(ENEMY_TYPES).filter(t => {
-                    if (t === 'tank') return game.wave >= 3;
-                    if (t === 'swarm') return game.wave >= 5;
-                    if (t === 'teleporter') return game.wave >= 7;
-                    if (t === 'shooter') return game.wave >= 10;
-                    if (t === 'healer') return game.wave >= 12;
-                    if (t === 'splitter') return game.wave >= 15;
-                    if (t === 'freezer') return game.wave >= 18;
-                    if (t === 'berserker') return game.wave >= 20;
-                    if (t === 'bomber') return game.wave >= 8;
-                    if (t === 'parasite') return game.wave >= 14;
-                    if (t === 'shielder') return game.wave >= 16;
-                    if (t === 'necro') return game.wave >= 22;
-                    return true;
-                });
-                
-                // Story mode: restrict to chapter's enemy pool (intersected with currently-unlocked types)
-                if (storyChapter && Array.isArray(storyChapter.enemyPool) && storyChapter.enemyPool.length > 0) {
-                    const allowed = typeKeys.filter(t => storyChapter.enemyPool.includes(t));
-                    if (allowed.length > 0) typeKeys = allowed;
-                    else typeKeys = storyChapter.enemyPool.filter(t => ENEMY_TYPES[t]);
-                }
-                
-                // Wave modifier spawn bias
-                if (game.waveModifier && game.waveModifier.spawnBias && typeKeys.includes(game.waveModifier.spawnBias)) {
-                    if (Math.random() < 0.4) {
-                        typeKeys = [game.waveModifier.spawnBias];
-                    }
-                }
-                
-                const type = typeKeys[Math.floor(Math.random() * typeKeys.length)];
-                const enemy = new Enemy(x, y, game.wave, type, false);
-                
-                // Apply wave modifier to spawned enemy
-                if (game.waveModifier && game.waveModifier.onSpawn) {
-                    game.waveModifier.onSpawn(enemy);
-                }
-                
-                game.enemies.push(enemy);
-            }, i * 150); // Slightly faster spawn interval
-        }
-    }
-    
-    // Apply wave modifier to existing enemies
-    if (game.waveModifier && game.waveModifier.apply) {
-        setTimeout(() => game.waveModifier.apply(), 500);
-    }
-    
-    game.stats.waveStartDamage = game.stats.damageTaken;
-}
+// spawnWave extracted to js/systems/waveSystem.js (§9 entity peeling)
+// window.spawnWave is set by enhanced-init.js before init() runs.
 
 function nextWave() {
     // Non-host multiplayer clients must wait for the host's wave_start event

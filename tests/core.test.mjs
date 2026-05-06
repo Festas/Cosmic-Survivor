@@ -814,3 +814,71 @@ test('FixedClock: deterministic — same timestamps produce same step+alpha sequ
         assert.equal(s.exhaustEvents, 0, 'no exhaust events expected for serial acquire+release');
     });
 }
+
+// ----- Enemy entity ----------------------------------------------------------
+import { Enemy } from '../js/entities/Enemy.js';
+
+test('Enemy: module exports Enemy class', () => {
+    assert.equal(typeof Enemy, 'function', 'Enemy must be a class/constructor');
+});
+
+test('Enemy: window.Enemy alias is set', () => {
+    assert.equal(typeof globalThis.Enemy, 'function', 'window.Enemy must be set');
+    assert.equal(globalThis.Enemy, Enemy);
+});
+
+// ----- Pickup / XPOrb / Powerup entities ------------------------------------
+import { Pickup, XPOrb, Powerup } from '../js/entities/Pickup.js';
+
+test('Pickup: module exports all three classes', () => {
+    assert.equal(typeof Pickup, 'function');
+    assert.equal(typeof XPOrb, 'function');
+    assert.equal(typeof Powerup, 'function');
+});
+
+test('Pickup: window aliases are set', () => {
+    assert.equal(globalThis.Pickup, Pickup);
+    assert.equal(globalThis.XPOrb, XPOrb);
+    assert.equal(globalThis.Powerup, Powerup);
+});
+
+// ----- Camera ----------------------------------------------------------------
+import { Camera } from '../js/core/camera.js';
+
+test('Camera: constructs with world/canvas dimensions', () => {
+    const cam = new Camera(3000, 2000, 1200, 800);
+    assert.equal(cam.x, 0);
+    assert.equal(cam.zoom, 1);
+});
+
+test('Camera: getTransform() returns {x, y, rotation, zoom}', () => {
+    const cam = new Camera(3000, 2000, 1200, 800);
+    const t = cam.getTransform();
+    assert.ok('x' in t && 'y' in t && 'rotation' in t && 'zoom' in t);
+});
+
+test('Camera: applyTrauma(1.0) then 60 updates decays to near zero', () => {
+    const cam = new Camera(3000, 2000, 1200, 800);
+    cam.applyTrauma(1.0);
+    for (let i = 0; i < 60; i++) cam.update(1/60, null);
+    assert.ok(cam.shake < 1, `shake should decay (got ${cam.shake})`);
+});
+
+// ----- Input -----------------------------------------------------------------
+import { installInputHandlers } from '../js/core/input.js';
+
+test('installInputHandlers: returns object with expected fields', () => {
+    const stubCanvas = { addEventListener: () => {} };
+    const state = installInputHandlers(stubCanvas, {});
+    assert.ok('keys' in state);
+    assert.ok('mouse' in state);
+    assert.ok('touch' in state);
+    assert.ok('gamepad' in state);
+});
+
+// ----- waveSystem ------------------------------------------------------------
+import { spawnWave } from '../js/systems/waveSystem.js';
+
+test('waveSystem: exports spawnWave function', () => {
+    assert.equal(typeof spawnWave, 'function');
+});
