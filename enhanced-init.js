@@ -33,11 +33,17 @@ import { installDebugOverlay } from './js/core/debugOverlay.js';
 // Part G/H/I — renderer
 import { Canvas2DRenderer } from './js/render/Canvas2DRenderer.js';
 import { WebGLRenderer, webglAvailable, isIOSSafari } from './js/render/WebGLRenderer.js';
-// Part 5 — entity modules (§9 entity peeling)
-// These assign window.Player / window.Bullet / window.EnemyBullet at load time
-// so main.js (classic script) resolves the names at runtime.
+// Part 5/6 — entity modules (§9 entity peeling)
+// These assign window.Player / window.Bullet / window.EnemyBullet / window.Enemy /
+// window.Pickup / window.XPOrb / window.Powerup at load time so main.js
+// (classic script) resolves the names at runtime.
 import './js/entities/Player.js';
 import './js/entities/Bullet.js';
+import './js/entities/Enemy.js';
+import './js/entities/Pickup.js';
+import './js/systems/waveSystem.js';
+import { Camera } from './js/core/camera.js';
+import { installInputHandlers } from './js/core/input.js';
 
 // ===== Part D/E/F URL-flag parsing =====
 // All flags are read at module-load time (before init()) so window.rework is
@@ -90,15 +96,22 @@ const _bpHash = new SpatialHash({
 // Part E: FixedClock instance (shared with main.js via window.rework.clock).
 const _fixedClock = new FixedClock({ stepSeconds: 1 / 60, maxFrameSeconds: 0.25 });
 
-// Part I — renderer selection.
-// Default: Canvas2D (no URL flag needed).  Pass ?renderer=webgl to opt in.
-// WebGL is automatically suppressed on iOS Safari (see isIOSSafari docs).
-// DOM guard: only wire the renderer when document + canvas are available.
-const _wantWebGL  = _params.get('renderer') === 'webgl';
-const _iosGuard   = isIOSSafari();
-if (_wantWebGL && _iosGuard) {
-    console.info('[renderer] WebGL requested but disabled on iOS Safari — using Canvas2D.');
+// Part J — renderer selection (WebGL is default; ?renderer=canvas2d is the escape hatch)
+const _requestedRenderer = _params.get('renderer'); // 'webgl' | 'canvas2d' | null
+const _iosGuard = isIOSSafari();
+let _rendererKind;
+if (_requestedRenderer === 'canvas2d') {
+    _rendererKind = 'canvas2d';
+} else if (_requestedRenderer === 'webgl') {
+    _rendererKind = (webglAvailable() && !_iosGuard) ? 'webgl' : 'canvas2d';
+} else {
+    // NEW DEFAULT: webgl with auto-fallback to canvas2d
+    _rendererKind = (webglAvailable() && !_iosGuard) ? 'webgl' : 'canvas2d';
 }
+console.info('[rework] renderer:', _rendererKind, '(requested:', _requestedRenderer ?? 'default', ')');
+// NOTE: ?renderer=canvas2d is the one-release escape hatch (PR-J).
+// TODO (PR-K): Once no Canvas2D regressions are reported, delete the Canvas2DRenderer
+//   bootstrap path in _bootstrapRenderer() below and the ?renderer=canvas2d flag docs.
 
 window.rework = {
     ObjectPool,
@@ -117,6 +130,10 @@ window.rework = {
     coop: { applyAura: applyCoopAura, notify: notifyCoopBuff, radius: COOP_AURA_RADIUS },
     registerPool,
     listPools,
+    rendererKind: _rendererKind,
+    rendererRequested: _requestedRenderer ?? 'default',
+    Camera,
+    installInputHandlers,
 
     // Part D — broadphase telemetry (read by main.js and debugOverlay.js)
     broadphase: {
@@ -164,8 +181,7 @@ if (typeof document !== 'undefined') {
     const _bootstrapRenderer = () => {
         const canvas = document.getElementById('gameCanvas');
         if (!canvas) return; // Canvas not in DOM yet — wait for DOMContentLoaded.
-        const _useWebGL = _wantWebGL && !_iosGuard && webglAvailable();
-        const renderer = _useWebGL
+        const renderer = _rendererKind === 'webgl'
             ? new WebGLRenderer(canvas)
             : new Canvas2DRenderer(canvas);
         window.rework.renderer = renderer;
