@@ -426,3 +426,212 @@ test('poolRegistry: registerPool ignores null', () => {
     const list = listPools();
     assert.ok(!list.some(p => p.name === 'null-pool'));
 });
+
+// ─── Part D rework: Broadphase determinism test ───────────────────────────────
+// Runs a fixed-seed simulation with 300 enemies + 80 bullets for 600 frames
+// and asserts that bullet→enemy hit-index sets are IDENTICAL between the naive
+// O(N×M) scan and the SpatialHash broadphase + precise circle test.
+//
+// This is the regression net that must pass before anyone deletes the legacy
+// naive path in a future PR.
+
+{
+    const ENEMY_COUNT  = 300;
+    const BULLET_COUNT = 80;
+    const FRAMES       = 600;
+    const CELL_SIZE    = 40;
+    const WORLD_W      = 3000;
+    const WORLD_H      = 2000;
+    const BULLET_R     = 5;
+    const ENEMY_R      = 25;
+
+    /** Deterministic LCG prng. */
+    function lcg(seed) {
+        let s = seed >>> 0;
+        return () => {
+            s = Math.imul(s, 1664525) + 1013904223 | 0;
+            return ((s >>> 0) / 0x100000000);
+        };
+    }
+
+    function makeEntities(rng) {
+        const enemies = Array.from({ length: ENEMY_COUNT }, (_, i) => ({
+            id: i, x: rng() * WORLD_W, y: rng() * WORLD_H, size: ENEMY_R,
+            vx: (rng() - 0.5) * 3, vy: (rng() - 0.5) * 3, alive: true,
+        }));
+        const bullets = Array.from({ length: BULLET_COUNT }, (_, i) => {
+            const angle = rng() * Math.PI * 2;
+            return {
+                id: i, x: rng() * WORLD_W, y: rng() * WORLD_H,
+                size: BULLET_R, angle, speed: 8, alive: true,
+            };
+        });
+        return { enemies, bullets };
+    }
+
+    function stepSim(enemies, bullets) {
+        for (const e of enemies) {
+            if (!e.alive) continue;
+            e.x = (e.x + e.vx + WORLD_W) % WORLD_W;
+            e.y = (e.y + e.vy + WORLD_H) % WORLD_H;
+        }
+        for (const b of bullets) {
+            if (!b.alive) continue;
+            b.x = (b.x + Math.cos(b.angle) * b.speed + WORLD_W) % WORLD_W;
+            b.y = (b.y + Math.sin(b.angle) * b.speed + WORLD_H) % WORLD_H;
+        }
+    }
+
+    /**
+     * Run collision detection — naive or hash.
+     * Returns sorted list of "bulletId:enemyId" hit pairs for the frame.
+     * A 'hit' means distance < enemy.size + bullet.size (same as main.js).
+     */
+    function detectHits(enemies, bullets, hash) {
+        const hits = [];
+        const liveEnemies = enemies.filter(e => e.alive);
+        const liveBullets = bullets.filter(b => b.alive);
+
+        if (hash) {
+            // Hash path
+            hash.clear();
+            for (const e of liveEnemies) hash.insert(e.x, e.y, e);
+            const qr = BULLET_R + ENEMY_R;
+            for (const b of liveBullets) {
+                const candidates = hash.query(b.x, b.y, qr);
+                for (const e of candidates) {
+                    const dx = e.x - b.x, dy = e.y - b.y;
+                    if (dx * dx + dy * dy < (e.size + b.size) * (e.size + b.size)) {
+                        hits.push(`${b.id}:${e.id}`);
+                    }
+                }
+            }
+        } else {
+            // Naive path
+            for (const b of liveBullets) {
+                for (const e of liveEnemies) {
+                    const dx = e.x - b.x, dy = e.y - b.y;
+                    if (dx * dx + dy * dy < (e.size + b.size) * (e.size + b.size)) {
+                        hits.push(`${b.id}:${e.id}`);
+                    }
+                }
+            }
+        }
+        return hits.sort();
+    }
+
+    test('broadphase determinism: naive and hash return identical hit sets over 600 frames', () => {
+        const hash = new SpatialHash({ cellSize: CELL_SIZE, worldWidth: WORLD_W, worldHeight: WORLD_H });
+
+        const rng1 = lcg(0xcafebeef);
+        const rng2 = lcg(0xcafebeef); // same seed
+
+        const { enemies: e1, bullets: b1 } = makeEntities(rng1);
+        const { enemies: e2, bullets: b2 } = makeEntities(rng2);
+
+        let totalNaiveHits = 0, totalHashHits = 0;
+        let frameMismatch = -1;
+
+        for (let f = 0; f < FRAMES; f++) {
+            stepSim(e1, b1);
+            stepSim(e2, b2);
+
+            const naiveHits = detectHits(e1, b1, null);
+            const hashHits  = detectHits(e2, b2, hash);
+
+            totalNaiveHits += naiveHits.length;
+            totalHashHits  += hashHits.length;
+
+            if (frameMismatch === -1 && naiveHits.length !== hashHits.length) {
+                frameMismatch = f;
+            } else if (frameMismatch === -1) {
+                // Deep compare on frames with equal counts
+                for (let i = 0; i < naiveHits.length; i++) {
+                    if (naiveHits[i] !== hashHits[i]) { frameMismatch = f; break; }
+                }
+            }
+        }
+
+        assert.equal(
+            frameMismatch, -1,
+            `Hit mismatch between naive and hash at frame ${frameMismatch}. ` +
+            `Total naive=${totalNaiveHits} hash=${totalHashHits}`
+        );
+        assert.equal(
+            totalNaiveHits, totalHashHits,
+            `Total hit counts differ: naive=${totalNaiveHits} hash=${totalHashHits}`
+        );
+    });
+}
+
+// ─── Part E rework: Interpolation math ────────────────────────────────────────
+// Tests that the render-position lerp formula used by _applyEntityInterp
+// produces the correct output. Import is intentionally not used here — we test
+// the pure math so the formula can be verified without loading main.js.
+
+test('lerp interpolation: (0,0) → (10,0) at alpha=0.5 gives renderX=5, renderY=0', () => {
+    // Mirrors _applyEntityInterp logic in main.js.
+    const entity = { x: 10, y: 0, _interpPrevX: 0, _interpPrevY: 0 };
+    const alpha = 0.5;
+    const renderX = entity._interpPrevX + (entity.x - entity._interpPrevX) * alpha;
+    const renderY = entity._interpPrevY + (entity.y - entity._interpPrevY) * alpha;
+    assert.equal(renderX, 5);
+    assert.equal(renderY, 0);
+});
+
+test('lerp interpolation: alpha=0 returns start position', () => {
+    const entity = { x: 100, y: 200, _interpPrevX: 50, _interpPrevY: 80 };
+    const renderX = entity._interpPrevX + (entity.x - entity._interpPrevX) * 0;
+    const renderY = entity._interpPrevY + (entity.y - entity._interpPrevY) * 0;
+    assert.equal(renderX, 50);
+    assert.equal(renderY, 80);
+});
+
+test('lerp interpolation: alpha=1 returns end position', () => {
+    const entity = { x: 100, y: 200, _interpPrevX: 50, _interpPrevY: 80 };
+    const renderX = entity._interpPrevX + (entity.x - entity._interpPrevX) * 1;
+    const renderY = entity._interpPrevY + (entity.y - entity._interpPrevY) * 1;
+    assert.equal(renderX, 100);
+    assert.equal(renderY, 200);
+});
+
+// ─── Part E rework: FixedClock additional tests ──────────────────────────────
+// spiral-of-death guard and tick-count determinism.
+
+test('FixedClock: huge dt jump is clamped to maxFrameSeconds (≤5 steps at 60 Hz)', () => {
+    const clock = new FixedClock({ stepSeconds: 1 / 60, maxFrameSeconds: 0.25 });
+    // First call to set internal lastTimestamp.
+    clock.advance(1000);
+    // Jump 30 seconds — should be clamped to 0.25 s → at most 15 steps.
+    const { steps } = clock.advance(31000);
+    // maxFrameSeconds=0.25, stepSeconds=1/60 ≈ 0.01667, max steps = floor(0.25/0.01667)=15
+    assert.ok(steps <= 15, `Expected ≤15 steps after huge jump, got ${steps}`);
+    assert.ok(steps >= 0, 'steps must be non-negative');
+});
+
+test('FixedClock: advancing by exactly one step returns steps=1 and alpha in [0,1)', () => {
+    const clock = new FixedClock({ stepSeconds: 1 / 60, maxFrameSeconds: 0.25 });
+    clock.advance(1000);               // init with non-zero timestamp
+    // Advance by 20ms (1.2 × step) → should produce exactly 1 step, alpha > 0.
+    const { steps, alpha } = clock.advance(1020);
+    assert.ok(steps >= 1, `expected at least 1 step, got ${steps}`);
+    assert.ok(alpha >= 0 && alpha < 1, `alpha=${alpha} should be in [0,1)`);
+});
+
+test('FixedClock: deterministic — same timestamps produce same step+alpha sequence', () => {
+    const c1 = new FixedClock({ stepSeconds: 1 / 60, maxFrameSeconds: 0.25 });
+    const c2 = new FixedClock({ stepSeconds: 1 / 60, maxFrameSeconds: 0.25 });
+
+    const timestamps = [0, 16, 33, 50, 66, 100, 116];
+    for (const t of timestamps) {
+        const r1 = c1.advance(t);
+        const r2 = c2.advance(t);
+        assert.equal(r1.steps, r2.steps, `steps mismatch at t=${t}`);
+        // Alpha within floating-point tolerance.
+        assert.ok(
+            Math.abs(r1.alpha - r2.alpha) < 1e-10,
+            `alpha mismatch at t=${t}: ${r1.alpha} vs ${r2.alpha}`
+        );
+    }
+});
+

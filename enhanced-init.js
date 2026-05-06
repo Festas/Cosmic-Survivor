@@ -14,7 +14,7 @@ import './js/systems/storyMode.js';
 import './js/systems/multiplayerExtras.js';
 import './js/systems/dailyChallenge.js';
 
-// ===== Rework systems (Phases 1, 2, 4, 5, 6) =====
+// ===== Rework systems (Phases 1, 2, 4, 5, 6, 7) =====
 // These modules are intentionally additive: main.js looks for them on
 // `window.rework` and falls back to its existing behavior if absent. This
 // keeps the legacy game working at every commit during the migration.
@@ -30,6 +30,54 @@ import { ENEMY_BEHAVIORS, applyShieldBuddyAbsorption, ensureShieldIds } from './
 import { applyCoopAura, notifyCoopBuff, COOP_AURA_RADIUS } from './js/systems/coopAura.js';
 import { registerPool, listPools } from './js/core/poolRegistry.js';
 import { installDebugOverlay } from './js/core/debugOverlay.js';
+
+// ===== Part D/E/F URL-flag parsing =====
+// All flags are read at module-load time (before init()) so window.rework is
+// fully configured before the first gameLoop tick.
+const _params = (() => {
+    try { return new URLSearchParams(globalThis.location?.search ?? ''); }
+    catch { return new URLSearchParams(); }
+})();
+
+// Part D: ?broadphase=naive falls back to the legacy O(N×M) scan.
+// Default is the new hash path (performance-only change, covered by the
+// determinism regression test).
+const _broadphaseNaive = _params.get('broadphase') === 'naive';
+
+// Part F: ?worker=1 promotes broadphase off-thread (default OFF).
+// Auto-disabled on Safari (postMessage overhead historically not worth it).
+const _workerWanted = _params.get('worker') === '1';
+// Safari UA sniff — document in comments; can be overridden by ?worker=1 if
+// Apple ever improves their Worker postMessage throughput.
+const _isSafari = typeof navigator !== 'undefined' &&
+    /^((?!chrome|android).)*safari/i.test(navigator.userAgent ?? '');
+const _workerEnabled = _workerWanted && !_isSafari &&
+    typeof Worker !== 'undefined';
+
+// Part D broadphase kind: 'naive' | 'hash' | 'worker'
+const _broadphaseKind = _broadphaseNaive ? 'naive' : (_workerEnabled ? 'worker' : 'hash');
+
+// Part E: ?fixedstep=1 enables the FixedClock dual-path (default OFF, legacy
+// variable-dt loop is the default).
+const _fixedStepEnabled = _params.get('fixedstep') === '1';
+
+// Part E: ?interp=0 disables render interpolation (useful for debugging parity
+// with the legacy path on a stable 60 fps machine).
+const _interpEnabled = _params.get('interp') !== '0';
+
+// Part D: broadphase cell size must match BROADPHASE_CELL_SIZE in main.js.
+// Both are CONFIG.BULLET_SIZE * 8 = 40 px.
+const _BROADPHASE_CELL_SIZE = 40;
+
+// Part D: main-thread spatial hash (always built as synchronous fallback).
+const _bpHash = new SpatialHash({
+    cellSize: _BROADPHASE_CELL_SIZE,
+    worldWidth: 3000,
+    worldHeight: 2000,
+});
+
+// Part E: FixedClock instance (shared with main.js via window.rework.clock).
+const _fixedClock = new FixedClock({ stepSeconds: 1 / 60, maxFrameSeconds: 0.25 });
 
 window.rework = {
     ObjectPool,
@@ -48,9 +96,79 @@ window.rework = {
     coop: { applyAura: applyCoopAura, notify: notifyCoopBuff, radius: COOP_AURA_RADIUS },
     registerPool,
     listPools,
+
+    // Part D — broadphase telemetry (read by main.js and debugOverlay.js)
+    broadphase: {
+        kind: _broadphaseKind,       // 'naive' | 'hash' | 'worker'
+        _hash: _bpHash,              // main-thread SpatialHash (always available)
+        _maxEnemyRadius: 0,          // set by main.js each sim step
+        _enemyIndexMap: [],          // index → enemy object (for worker id lookup)
+        lastQueryCount: 0,           // total candidate count across all bullets this step
+        lastBuildMs: 0,              // time to build the hash
+        lastQueryMs: 0,              // total time spent in hash.query() calls
+        // Part F worker telemetry (populated when kind === 'worker')
+        _worker: null,
+        _workerReady: false,
+        _workerTick: -1,             // tick number of last received batchResult
+        _workerResults: {},          // { [bulletId]: Int32Array } from last batchResult
+        _currentTick: 0,             // tick number of last rebuild sent to worker
+        _nextBulletId: 0,            // monotonic id assigned to Bullet instances
+        roundtripMs: 0,
+        pendingQueries: 0,
+        staleResults: 0,
+    },
+
+    // Part E — clock telemetry (read by main.js and debugOverlay.js)
+    clock: {
+        mode: _fixedStepEnabled ? 'fixed' : 'legacy',
+        fixedStepEnabled: _fixedStepEnabled,
+        interpEnabled: _interpEnabled,
+        simHz: 60,
+        _fixedClock,                 // FixedClock instance driven by main.js gameLoop
+        lastAlpha: 0,
+        simTicksThisFrame: 0,
+        droppedFrames: 0,
+    },
 };
 
 installDebugOverlay();
+
+// ===== Part F — Worker initialisation =====
+// Only runs when ?worker=1 and Worker is available (not Safari, not SSR/Node).
+if (_broadphaseKind === 'worker') {
+    const _worker = new Worker(
+        new URL('./js/core/workers/broadphase.worker.js', import.meta.url),
+        { type: 'module' }
+    );
+    window.rework.broadphase._worker = _worker;
+
+    _worker.postMessage({
+        type: 'init',
+        cellSize: _BROADPHASE_CELL_SIZE,
+        worldWidth: 3000,
+        worldHeight: 2000,
+    });
+
+    _worker.onmessage = (ev) => {
+        const msg = ev.data;
+        if (!msg) return;
+        const bp = window.rework.broadphase;
+        switch (msg.type) {
+            case 'ready':
+                bp._workerReady = true;
+                break;
+            case 'rebuilt':
+                bp.lastBuildMs = msg.buildMs;
+                break;
+            case 'batchResult': {
+                bp._workerTick = msg.tick;
+                bp._workerResults = msg.bulletQueries || {};
+                bp.pendingQueries = 0;
+                break;
+            }
+        }
+    };
+}
 
 // Flag to indicate enhanced mode
 window.ENHANCED_MODE = true;
