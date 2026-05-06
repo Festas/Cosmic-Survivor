@@ -109,7 +109,9 @@ if (_requestedRenderer === 'canvas2d') {
     _rendererKind = (webglAvailable() && !_iosGuard) ? 'webgl' : 'canvas2d';
 }
 console.info('[rework] renderer:', _rendererKind, '(requested:', _requestedRenderer ?? 'default', ')');
-// TODO: After PR-K, remove Canvas2D-only startup paths if no regressions arrive.
+// NOTE: ?renderer=canvas2d is the one-release escape hatch (PR-J).
+// TODO (PR-K): Once no Canvas2D regressions are reported, delete the Canvas2DRenderer
+//   bootstrap path in _bootstrapRenderer() below and the ?renderer=canvas2d flag docs.
 
 window.rework = {
     ObjectPool,

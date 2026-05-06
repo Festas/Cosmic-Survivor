@@ -7,7 +7,8 @@
  *   createExplosion, createParticles, createTextParticle, screenShake,
  *   showNotification, getNearestPlayerTarget, getRandomAlivePlayer,
  *   _enemyBulletPool, XPOrb, Pickup, spawnPowerup, checkAchievements,
- *   WEAPON_TYPES, checkWeaponEvolution, WAVE_MODIFIERS
+ *   WEAPON_TYPES, checkWeaponEvolution, WAVE_MODIFIERS,
+ *   msToFrames (main.js classic-script function declaration → on window automatically)
  *
  * window.Enemy is set at bottom for main.js backward-compat.
  */
