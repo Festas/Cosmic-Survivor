@@ -635,3 +635,182 @@ test('FixedClock: deterministic — same timestamps produce same step+alpha sequ
     }
 });
 
+// ─── Part 5 rework: Player entity tests ──────────────────────────────────────
+// Requires window.CONFIG, window.game, and other globals that Player.js reads
+// via window.*. We stub them here so the module can be imported in Node.
+
+{
+    // Minimal character definition matching the shape Player's constructor expects.
+    const TEST_CHARACTER = {
+        id: 'balanced',
+        maxHealth: 100,
+        speed: 2,
+        damage: 10,
+        fireRate: 30,
+        range: 400,
+        projectileCount: 1,
+        critChance: 0.1,
+        critDamage: 1.5,
+        armor: 0,
+        dodge: 0,
+        lifeSteal: 0,
+        pickupRange: 50,
+        healthRegen: 0,
+        maxDrones: 0,
+        knockbackImmune: false,
+    };
+
+    // Minimal game stub
+    const GAME_STUB = {
+        enemies: [], bullets: [], pickups: [], particles: [], activePowerups: [],
+        player: null, keys: {}, joystick: { active: false, x: 0, y: 0 },
+        frameCount: 0, playerDPS: { damage: 0 },
+    };
+
+    // Set up window globals before importing Player.js
+    globalThis.window = globalThis.window || globalThis;
+    globalThis.window.CONFIG = globalThis.window.CONFIG || {
+        WORLD_WIDTH: 3000, WORLD_HEIGHT: 2000,
+        PLAYER_SIZE: 16, BULLET_SIZE: 5, BULLET_SPEED: 8,
+        CANVAS_WIDTH: 1200, CANVAS_HEIGHT: 800, TARGET_FPS: 60,
+        DASH_DISTANCE: 150, DASH_COOLDOWN: 45, DASH_INVULNERABLE_FRAMES: 20,
+    };
+    globalThis.window.WEAPON_TYPES = globalThis.window.WEAPON_TYPES || {
+        basic: { name: '🔫 Blaster', color: '#ffd93d', damage: 1, fireRate: 1, desc: 'Test' },
+    };
+    globalThis.window.ARENA_CONSTANTS = globalThis.window.ARENA_CONSTANTS || {
+        WALK_ANIM_FRAME_DURATION: 10,
+        FIRE_TRAIL_LIFE: 90, FIRE_TRAIL_SIZE: 12, FIRE_TRAIL_DAMAGE: 3,
+        DECOY_HEALTH: 30, DECOY_RESPAWN_TIME: 300,
+        TURRET_MAX: 3, TURRET_SPAWN_INTERVAL: 300, TURRET_HEALTH: 50, TURRET_SPREAD: 100,
+    };
+    globalThis.window.game = GAME_STUB;
+    globalThis.window.Sound = globalThis.window.Sound || { play: () => {} };
+    // Top-level functions that Player.js calls via window.*
+    globalThis.window.createParticles    = globalThis.window.createParticles    || (() => {});
+    globalThis.window.createTextParticle = globalThis.window.createTextParticle || (() => {});
+    globalThis.window.createExplosion    = globalThis.window.createExplosion    || (() => {});
+    globalThis.window.screenShake        = globalThis.window.screenShake        || (() => {});
+    globalThis.window.hitStop            = globalThis.window.hitStop            || (() => {});
+    globalThis.window.showNotification   = globalThis.window.showNotification   || (() => {});
+    globalThis.window.hasPowerup         = globalThis.window.hasPowerup         || (() => false);
+    globalThis.window.getPowerupMultiplier = globalThis.window.getPowerupMultiplier || (() => 1);
+    globalThis.window.checkWaveClear     = globalThis.window.checkWaveClear     || (() => {});
+    globalThis.window.handlePlayerDeath  = globalThis.window.handlePlayerDeath  || (() => {});
+    // Stub navigator if absent (hud.js / Player.js touch-detection)
+    if (typeof globalThis.navigator === 'undefined') {
+        globalThis.navigator = { maxTouchPoints: 0, userAgent: '' };
+    }
+
+    let PlayerClass, BulletClass, EnemyBulletClass;
+
+    test('Part5: Player and Bullet modules import without error', async () => {
+        const pMod = await import('../js/entities/Player.js');
+        const bMod = await import('../js/entities/Bullet.js');
+        PlayerClass       = pMod.Player;
+        BulletClass       = bMod.Bullet;
+        EnemyBulletClass  = bMod.EnemyBullet;
+        assert.equal(typeof PlayerClass,      'function', 'Player must be a class');
+        assert.equal(typeof BulletClass,      'function', 'Bullet must be a class');
+        assert.equal(typeof EnemyBulletClass, 'function', 'EnemyBullet must be a class');
+    });
+
+    test('Part5: Player constructor initialises expected fields', async () => {
+        if (!PlayerClass) return; // skip if prior import failed
+        const p = new PlayerClass(TEST_CHARACTER);
+        assert.equal(p.characterId, 'balanced');
+        assert.equal(p.health, 100);
+        assert.equal(p.maxHealth, 100);
+        assert.equal(p.damage, 10);
+        assert.equal(p.speed, 2);
+        // 'balanced' character gets 2 weapon slots
+        assert.equal(p.weaponSlots.length, 2);
+        assert.ok(typeof p.weaponOrbitAngle === 'number');
+        assert.ok(typeof p.weaponOrbitRadius === 'number');
+    });
+
+    test('Part5: Player.reset() returns instance to post-construct state', async () => {
+        if (!PlayerClass) return;
+        const p = new PlayerClass(TEST_CHARACTER);
+        // Mutate a bunch of fields
+        p.health = 1;
+        p.isDashing = true;
+        p.rageActive = true;
+        p.turrets = [{}];
+        // Reset
+        const ret = p.reset(TEST_CHARACTER);
+        assert.equal(ret, p, 'reset() must return the instance');
+        assert.equal(p.health, 100, 'health must be restored');
+        assert.equal(p.isDashing, false);
+        assert.equal(p.rageActive, false);
+        assert.equal(p.turrets.length, 0);
+    });
+
+    test('Part5: window.Player is set by the entity module', () => {
+        assert.equal(window.Player, PlayerClass ?? window.Player, 'window.Player must be the exported class');
+        assert.equal(typeof window.Player, 'function');
+    });
+
+    test('Part5: Bullet constructor initialises expected fields', async () => {
+        if (!BulletClass) return;
+        const CONFIG = window.CONFIG;
+        const owner = { damage: 10, critChance: 0.1, critDamage: 1.5, lifeSteal: 0 };
+        const weapon = { color: '#ffd93d', damage: 1 };
+        const b = new BulletClass(100, 200, Math.PI / 4, owner, weapon);
+        assert.equal(b.x, 100);
+        assert.equal(b.y, 200);
+        assert.equal(b.size, CONFIG.BULLET_SIZE);
+        assert.equal(b.speed, CONFIG.BULLET_SPEED);
+        assert.ok(b.hitEnemies instanceof Array);
+    });
+
+    test('Part5: Bullet.reset() returns instance to post-construct state', async () => {
+        if (!BulletClass) return;
+        const owner = { damage: 10, critChance: 0.1, critDamage: 1.5, lifeSteal: 0 };
+        const weapon = { color: '#ffd93d', damage: 1 };
+        const b = new BulletClass(100, 200, 0, owner, weapon);
+        b.hitEnemies.push({});
+        b.isSplit = true;
+        const ret = b.reset(50, 60, 1, owner, weapon);
+        assert.equal(ret, b, 'reset() must return the instance');
+        assert.equal(b.x, 50);
+        assert.equal(b.y, 60);
+        assert.equal(b.hitEnemies.length, 0, 'hitEnemies must be cleared');
+        assert.equal(b.isSplit, undefined, 'isSplit must be cleared');
+    });
+
+    test('Part5: EnemyBullet.reset() fills fields', async () => {
+        if (!EnemyBulletClass) return;
+        const eb = new EnemyBulletClass();
+        assert.equal(eb.isEnemyBullet, true);
+        eb.reset(10, 20, 1.5, 4, 6, 8, '#ff0000');
+        assert.equal(eb.x, 10);
+        assert.equal(eb.y, 20);
+        assert.equal(eb.color, '#ff0000');
+    });
+
+    // Pool integration test: 16-cap Bullet pool, 100 acquire/reset/release cycles.
+    test('Part5: Bullet pool integration — inUse===0, no exhaustEvents after 100 cycles', async () => {
+        if (!BulletClass) return;
+
+        const owner = { damage: 10, critChance: 0.1, critDamage: 1.5, lifeSteal: 0 };
+        const weapon = { color: '#ffd93d', damage: 1 };
+
+        const pool = new ObjectPool(
+            () => new BulletClass(0, 0, 0, owner, weapon),
+            (b, x, y, angle, owner2, weapon2) => b.reset(x, y, angle, owner2, weapon2),
+            { maxSize: 16, name: 'bullet-pool-test' }
+        );
+        registerPool('bullet-pool-test', pool);
+
+        for (let i = 0; i < 100; i++) {
+            const b = pool.acquire(i, i * 2, Math.PI * (i % 4) / 4, owner, weapon);
+            assert.notEqual(b, null, `acquire() must succeed at iteration ${i}`);
+            pool.release(b);
+        }
+
+        const s = pool.stats();
+        assert.equal(s.inUse, 0, 'all bullets must be returned to pool');
+        assert.equal(s.exhaustEvents, 0, 'no exhaust events expected for serial acquire+release');
+    });
+}

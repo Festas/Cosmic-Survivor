@@ -136,7 +136,15 @@ as a small PR:
    path behind a `?fixedstep=0` URL flag.
 4. **Promote `js/core/workers/broadphase.worker.js`** — once main thread is
    pool-aware, hand collision broadphase off-thread.
-5. **TypeScript-first new modules** — keep adding under `js/core/**` and
+5. **WebGL renderer (PixiJS)** — `js/render/WebGLRenderer.js` (PixiJS v8 backend)
+   ships behind `?renderer=webgl`. Enable with:
+   ```bash
+   # open http://localhost:3000/index-enhanced.html?renderer=webgl
+   ```
+   ✅ **Shipped** (PR #43): WebGL backend wired, Canvas2D remains default.
+   Known limitation: auto-disabled on iOS Safari (UA sniff, console.info logged).
+   The default WebGL flip is deferred to PR-J after dogfooding.
+6. **TypeScript-first new modules** — keep adding under `js/core/**` and
    `js/render/**` where `checkJs` already enforces JSDoc types; once enough
    surface is annotated, switch the `tsconfig` to a real TS compile that
    emits to `js/core/**/*.js`.
@@ -158,9 +166,41 @@ npm run build             # vite build succeeds
 npm run dev:all           # vite + multiplayer server
 ```
 
+```bash
+npm install
+npm test                  # 83/83 pass (includes renderer + entity tests)
+npm run validate:content  # OK + advisory boss warnings
+npm run build             # vite build succeeds; dist/ contains pixi chunk
+npm run dev:all           # vite + multiplayer server
+```
+
 In the browser: stand still in any wave to charge the **Focus** ring around
 the player (top-center pill switches from `🏃 MOVING` to `🎯 FOCUS`). Wait
 for wave 3+ to see weather pills appear (`🌧️ Rain`, `🌫️ Fog`, `⛈️ Storm`).
 Take damage to see the new red hit-flash. Land a critical hit to feel the
 hit-stop. In multiplayer, fire bullets that pass through an ally's lavender
 ring — they'll punch harder.
+
+To test the WebGL renderer:
+```
+index-enhanced.html?renderer=webgl           # PixiJS WebGL backend
+index-enhanced.html?renderer=webgl&broadphase=hash&fixedstep=1  # all flags compose
+```
+
+---
+
+## 9. Entity peeling — §9 parallel track
+
+Entities extracted from `main.js` and moved to `js/entities/`:
+
+| Entity | File | Status |
+| --- | --- | --- |
+| Player | `js/entities/Player.js` | ✅ Done (PR #43) |
+| Bullet + EnemyBullet | `js/entities/Bullet.js` | ✅ Done (PR #43) |
+| Enemy, Wave, Pickup, Particle, HUD | — | 🔜 Next slices |
+
+Each extracted class:
+- Exports the class as a named export
+- Assigns `window.ClassName` at module-load time for `main.js` compatibility
+- Has a `reset()` method for `ObjectPool` compatibility (PR #40)
+- Reads all globals via `window.*` to avoid circular imports

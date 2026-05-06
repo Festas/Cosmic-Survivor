@@ -135,7 +135,16 @@ export function installDebugOverlay() {
                 }
             } catch { /* ignore */ }
 
-            panel.textContent = [fpsLine, stanceLine, weatherLine, rngLine].join('\n') + poolLines + bpLines + clockLines;
+            // Part I — renderer telemetry
+            let rendererLine = '';
+            try {
+                const rdr = rw?.renderer;
+                if (rdr) {
+                    rendererLine = `\nrenderer:   ${rdr.kind}  drawCalls=${rdr.drawCalls}  layers=${rdr.layers}`;
+                }
+            } catch { /* ignore */ }
+
+            panel.textContent = [fpsLine, stanceLine, weatherLine, rngLine].join('\n') + rendererLine + poolLines + bpLines + clockLines;
         }
 
         function loop(now) {
