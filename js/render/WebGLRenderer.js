@@ -153,7 +153,7 @@ export class WebGLRenderer {
             antialias: false,
             autoDensity: true,
             autoStart: false, // We drive the render loop ourselves
-            // manageImports is not a v8 option but autoStart:false covers it
+            // Note: manageImports was removed in PixiJS v8; autoStart:false achieves the same goal.
         });
 
         this._app = app;

@@ -179,4 +179,5 @@ test('canvas2d: drawCalls resets to 0 at start of each render()', async () => {
     // Both renders should produce the same (non-zero) count for identical state.
     assert.ok(first > 0);
     assert.ok(second > 0);
+    assert.equal(first, second, 'drawCalls should be consistent across identical renders');
 });

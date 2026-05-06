@@ -19,25 +19,31 @@ import {
 export class Canvas2DRenderer {
     constructor(canvas) {
         this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
         this.kind = 'canvas2d';
         this.drawCalls = 0;
         this.layers = 2; // world + HUD (two ctx.save/restore blocks per frame)
 
+        const raw = canvas.getContext('2d');
+
         // Wrap the raw ctx so every beginPath / fillRect / drawImage / fillText
         // increments drawCalls. We wrap once here so leaf modules stay clean.
+        // The wrapped functions are cached (not re-created per-get) to avoid
+        // hot-path overhead.
         const self = this;
-        const raw = this.ctx;
+        const _beginPath = raw.beginPath ? raw.beginPath.bind(raw) : () => {};
+        const _fillRect  = raw.fillRect  ? raw.fillRect.bind(raw)  : () => {};
+        const _drawImage = raw.drawImage ? raw.drawImage.bind(raw) : () => {};
+        const _fillText  = raw.fillText  ? raw.fillText.bind(raw)  : () => {};
+        const _wrapped = {
+            beginPath(...args) { self.drawCalls++; return _beginPath(...args); },
+            fillRect(...args)  { self.drawCalls++; return _fillRect(...args);  },
+            drawImage(...args) { self.drawCalls++; return _drawImage(...args); },
+            fillText(...args)  { self.drawCalls++; return _fillText(...args);  },
+        };
         this.ctx = new Proxy(raw, {
             get(target, prop) {
+                if (prop in _wrapped) return _wrapped[prop];
                 const v = target[prop];
-                if (prop === 'beginPath' || prop === 'fillRect' ||
-                    prop === 'drawImage' || prop === 'fillText') {
-                    return function(...args) {
-                        self.drawCalls++;
-                        return v.apply(target, args);
-                    };
-                }
                 if (typeof v === 'function') return v.bind(target);
                 return v;
             },

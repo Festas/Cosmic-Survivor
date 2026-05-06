@@ -798,7 +798,7 @@ test('FixedClock: deterministic — same timestamps produce same step+alpha sequ
 
         const pool = new ObjectPool(
             () => new BulletClass(0, 0, 0, owner, weapon),
-            (b, x, y, angle, o, w) => b.reset(x, y, angle, o, w),
+            (b, x, y, angle, owner2, weapon2) => b.reset(x, y, angle, owner2, weapon2),
             { maxSize: 16, name: 'bullet-pool-test' }
         );
         registerPool('bullet-pool-test', pool);

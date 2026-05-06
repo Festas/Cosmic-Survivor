@@ -47,9 +47,9 @@ function makeWebGL2StubCanvas() {
 
 test('webgl: WebGLRenderer module imports without throwing', async () => {
     const mod = await import('../js/render/WebGLRenderer.js');
-    assert.equal(typeof mod.WebGLRenderer,   'function', 'WebGLRenderer must be exported');
-    assert.equal(typeof mod.webglAvailable,  'function', 'webglAvailable must be exported');
-    assert.equal(typeof mod.isIOSSafari,     'function', 'isIOSSafari must be exported');
+    assert.equal(typeof mod.WebGLRenderer,   'function', 'WebGLRenderer must be exported as a function');
+    assert.equal(typeof mod.webglAvailable,  'function', 'webglAvailable must be exported as a function');
+    assert.equal(typeof mod.isIOSSafari,     'function', 'isIOSSafari must be exported as a function');
 });
 
 test('webgl: webglAvailable() returns false in Node (no document)', async () => {
