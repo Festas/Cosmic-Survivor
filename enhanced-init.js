@@ -30,6 +30,9 @@ import { ENEMY_BEHAVIORS, applyShieldBuddyAbsorption, ensureShieldIds } from './
 import { applyCoopAura, notifyCoopBuff, COOP_AURA_RADIUS } from './js/systems/coopAura.js';
 import { registerPool, listPools } from './js/core/poolRegistry.js';
 import { installDebugOverlay } from './js/core/debugOverlay.js';
+// Part G/H — renderer
+import { Canvas2DRenderer } from './js/render/Canvas2DRenderer.js';
+import { WebGLRenderer, webglAvailable } from './js/render/WebGLRenderer.js';
 
 // ===== Part D/E/F URL-flag parsing =====
 // All flags are read at module-load time (before init()) so window.rework is
