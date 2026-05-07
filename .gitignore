@@ -34,3 +34,7 @@ server/*.db
 server/*.db-shm
 server/*.db-wal
 server/node_modules/
+
+# TypeScript build info
+*.tsbuildinfo
+.tsc.log

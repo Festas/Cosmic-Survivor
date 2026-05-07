@@ -1,49 +1,49 @@
 // Enhanced Game Entry Point - Cosmic Survivor
 // This file integrates all the new game enhancement systems
 
-import { MetaProgressionSystem } from './js/systems/metaProgression.js';
-import { SynergySystem } from './js/systems/synergySystem.js';
-import { CosmicEventsSystem } from './js/systems/cosmicEvents.js';
-import { MusicSystem } from './js/systems/musicSystem.js';
-import { VisualEffectsSystem } from './js/systems/visualEffects.js';
-import { SettingsSystem } from './js/systems/settingsSystem.js';
-import { PowerupSystem } from './js/systems/powerupSystem.js';
+import { MetaProgressionSystem } from './js/systems/metaProgression.ts';
+import { SynergySystem } from './js/systems/synergySystem.ts';
+import { CosmicEventsSystem } from './js/systems/cosmicEvents.ts';
+import { MusicSystem } from './js/systems/musicSystem.ts';
+import { VisualEffectsSystem } from './js/systems/visualEffects.ts';
+import { SettingsSystem } from './js/systems/settingsSystem.ts';
+import { PowerupSystem } from './js/systems/powerupSystem.ts';
 // New systems for the rework: i18n, story mode, multiplayer extras, daily challenge
-import './js/systems/i18n.js';
-import './js/systems/storyMode.js';
-import './js/systems/multiplayerExtras.js';
-import './js/systems/dailyChallenge.js';
+import './js/systems/i18n.ts';
+import './js/systems/storyMode.ts';
+import './js/systems/multiplayerExtras.ts';
+import './js/systems/dailyChallenge.ts';
 
 // ===== Rework systems (Phases 1, 2, 4, 5, 6, 7) =====
 // These modules are intentionally additive: main.js looks for them on
 // `window.rework` and falls back to its existing behavior if absent. This
 // keeps the legacy game working at every commit during the migration.
-import { ObjectPool } from './js/core/objectPool.js';
-import { gameBus } from './js/core/eventBus.js';
-import { rngFromSeed, XoshiroRng } from './js/core/rng.js';
-import { SpatialHash } from './js/core/spatialHash.js';
-import { FixedClock } from './js/core/fixedClock.js';
-import { juice } from './js/render/juice.js';
-import { stanceSystem, Stance } from './js/systems/stanceSystem.js';
-import { weatherSystem, WEATHER_PROFILES } from './js/systems/weatherSystem.js';
-import { ENEMY_BEHAVIORS, applyShieldBuddyAbsorption, ensureShieldIds } from './js/systems/enemyBehaviors.js';
-import { applyCoopAura, notifyCoopBuff, COOP_AURA_RADIUS } from './js/systems/coopAura.js';
-import { registerPool, listPools } from './js/core/poolRegistry.js';
-import { installDebugOverlay } from './js/core/debugOverlay.js';
+import { ObjectPool } from './js/core/objectPool.ts';
+import { gameBus } from './js/core/eventBus.ts';
+import { rngFromSeed, XoshiroRng } from './js/core/rng.ts';
+import { SpatialHash } from './js/core/spatialHash.ts';
+import { FixedClock } from './js/core/fixedClock.ts';
+import { juice } from './js/render/juice.ts';
+import { stanceSystem, Stance } from './js/systems/stanceSystem.ts';
+import { weatherSystem, WEATHER_PROFILES } from './js/systems/weatherSystem.ts';
+import { ENEMY_BEHAVIORS, applyShieldBuddyAbsorption, ensureShieldIds } from './js/systems/enemyBehaviors.ts';
+import { applyCoopAura, notifyCoopBuff, COOP_AURA_RADIUS } from './js/systems/coopAura.ts';
+import { registerPool, listPools } from './js/core/poolRegistry.ts';
+import { installDebugOverlay } from './js/core/debugOverlay.ts';
 // Part G/H/I — renderer
-import { Canvas2DRenderer } from './js/render/Canvas2DRenderer.js';
-import { WebGLRenderer, webglAvailable, isIOSSafari } from './js/render/WebGLRenderer.js';
+import { Canvas2DRenderer } from './js/render/Canvas2DRenderer.ts';
+import { WebGLRenderer, webglAvailable, isIOSSafari } from './js/render/WebGLRenderer.ts';
 // Part 5/6 — entity modules (§9 entity peeling)
 // These assign window.Player / window.Bullet / window.EnemyBullet / window.Enemy /
 // window.Pickup / window.XPOrb / window.Powerup at load time so main.js
 // (classic script) resolves the names at runtime.
-import './js/entities/Player.js';
-import './js/entities/Bullet.js';
-import './js/entities/Enemy.js';
-import './js/entities/Pickup.js';
-import './js/systems/waveSystem.js';
-import { Camera } from './js/core/camera.js';
-import { installInputHandlers } from './js/core/input.js';
+import './js/entities/Player.ts';
+import './js/entities/Bullet.ts';
+import './js/entities/Enemy.ts';
+import './js/entities/Pickup.ts';
+import './js/systems/waveSystem.ts';
+import { Camera } from './js/core/camera.ts';
+import { installInputHandlers } from './js/core/input.ts';
 
 // ===== Part D/E/F URL-flag parsing =====
 // All flags are read at module-load time (before init()) so window.rework is
@@ -197,7 +197,7 @@ if (typeof document !== 'undefined') {
 // Only runs when ?worker=1 and Worker is available (not Safari, not SSR/Node).
 if (_broadphaseKind === 'worker') {
     const _worker = new Worker(
-        new URL('./js/core/workers/broadphase.worker.js', import.meta.url),
+        new URL('./js/core/workers/broadphase.worker.ts', import.meta.url),
         { type: 'module' }
     );
     window.rework.broadphase._worker = _worker;

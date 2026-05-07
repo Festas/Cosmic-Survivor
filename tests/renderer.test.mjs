@@ -87,7 +87,7 @@ test('Renderer interface: REQUIRED_METHODS matches Renderer.js typedef', async (
 
     const __filename = fileURLToPath(import.meta.url);
     const __dirname  = dirname(__filename);
-    const src = readFileSync(join(__dirname, '../js/render/Renderer.js'), 'utf8');
+    const src = readFileSync(join(__dirname, '../js/render/Renderer.ts'), 'utf8');
 
     // Extract every @property line: "@property {…} drawXxx"
     const re = /@property\s+\{[^}]+\}\s+(\w+)/g;

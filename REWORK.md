@@ -150,6 +150,13 @@ as a small PR:
    `js/render/**` where `checkJs` already enforces JSDoc types; once enough
    surface is annotated, switch the `tsconfig` to a real TS compile that
    emits to `js/core/**/*.js`.
+   ✅ **PR-K**: `js/core/**`, `js/render/**`, `js/entities/**`, `js/systems/**`
+   are now `.ts` (allowJs/strict tsconfig, ambient.d.ts for `window.*`,
+   vite-plugin-checker, `npm run typecheck`, CI typecheck step,
+   `tests/typecheck.test.mjs`). Files carry `// @ts-nocheck` as a transitional
+   stop-gap so runtime is byte-for-byte equivalent; tightening (removing
+   `@ts-nocheck` per file, replacing `any` shapes in `ambient.d.ts`) ships in
+   follow-up PRs. `main.js`, `server/`, `tools/` remain JavaScript.
 6. **Renderer migration** — once `main.js` no longer touches `ctx`
    directly outside `js/render/**`, swap the 2D backend for PixiJS or
    regl-based WebGL behind a `Renderer` interface.
