@@ -14,7 +14,11 @@
     "server:install": "cd server && npm install",
     "dev:all": "npm run server:install && concurrently \"npm run dev\" \"npm run server\"",
     "test": "node --import tsx --test tests/",
-    "validate:content": "node tools/content-validator/validate.mjs"
+    "validate:content": "node tools/content-validator/validate.mjs",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:icon": "tauri icon"
   },
   "keywords": [
     "game",
@@ -26,6 +30,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@tauri-apps/cli": "^2.11.1",
     "@types/node": "^20.19.39",
     "concurrently": "^9.1.2",
     "copyfiles": "^2.4.1",
@@ -35,6 +40,7 @@
     "vite-plugin-checker": "^0.13.0"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.0",
     "pixi.js": "^8.18.1",
     "ws": "^8.20.0"
   }

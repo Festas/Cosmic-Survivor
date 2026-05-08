@@ -17,6 +17,6 @@
     "forceConsistentCasingInFileNames": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"]
   },
-  "include": ["js/core/**/*", "js/render/**/*", "js/entities/**/*", "js/systems/**/*", "ambient.d.ts"],
+  "include": ["js/core/**/*", "js/render/**/*", "js/entities/**/*", "js/systems/**/*", "js/desktop/**/*", "ambient.d.ts"],
   "exclude": ["node_modules", "dist", "tests/**/*", "tools/**/*", "server/**/*", "main.js", "js/entities/player.ts"]
 }

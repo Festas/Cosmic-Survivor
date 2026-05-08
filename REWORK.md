@@ -162,6 +162,11 @@ as a small PR:
    regl-based WebGL behind a `Renderer` interface.
 7. **Native shell** — wrap the existing PWA in Tauri once renderer + sim
    are stable. No code change needed; only a build pipeline addition.
+   ✅ **PR-L**: Tauri v2 native shell shipped. `src-tauri/` scaffold
+   (Cargo.toml, tauri.conf.json, build.rs, src/main.rs, capabilities/default.json,
+   icons/). `npm run tauri:dev` / `npm run tauri:build`. F11 fullscreen wired via
+   `js/desktop/fullscreen.ts` (dynamic import, web bundle unaffected).
+   `tauri-release.yml` workflow builds Windows/macOS/Linux installers on `v*` tags.
 
 ---
 
@@ -181,6 +186,12 @@ npm test                  # 92/92 pass (entity peeling + camera + input + wave t
 npm run validate:content  # OK + advisory boss warnings
 npm run build             # vite build succeeds; dist/ contains pixi chunk
 npm run dev:all           # vite + multiplayer server
+```
+
+```bash
+# PR-L — Tauri native shell
+npm run tauri:build  # produces installer in src-tauri/target/release/bundle/
+npm run tauri:dev    # opens native window with hot reload (requires rustup)
 ```
 
 In the browser: stand still in any wave to charge the **Focus** ring around
@@ -219,3 +230,24 @@ Each extracted class:
 - Assigns `window.ClassName` at module-load time for `main.js` compatibility
 - Has a `reset()` method for `ObjectPool` compatibility (PR #40)
 - Reads all globals via `window.*` to avoid circular imports
+
+---
+
+## 10. Tauri native shell — capability hygiene
+
+Tauri v2 uses a capability-based permission model. `src-tauri/capabilities/default.json`
+grants **only** `core:default` to the main window by design.
+
+Any future feature that needs OS-level access must explicitly add the required
+permission to that file, following the principle of least privilege:
+
+| Feature | Permission |
+|---|---|
+| File save / load dialogs | `dialog:open`, `dialog:save` |
+| System tray | `tray-icon:*` |
+| Auto-updater | `updater:*` |
+| Desktop notifications | `notification:default` |
+
+Do not add permissions speculatively. Open-ended permissions such as
+`fs:allow-read-recursive` or `shell:execute` must not be added without a
+concrete, reviewed feature rationale.

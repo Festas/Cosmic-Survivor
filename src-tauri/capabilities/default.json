@@ -1,0 +1,9 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema/capability-schema.json",
+  "identifier": "default",
+  "description": "Minimal capability set for the main window. Grants only core:default (window management, basic IPC). No filesystem, shell, dialog, HTTP, or other plugin permissions are granted intentionally — the game wraps the existing PWA as-is and does not need OS-level access. Future features that require file save/load dialogs, system tray, or auto-updater must explicitly extend this file.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default"
+  ]
+}
