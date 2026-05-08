@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import checker from 'vite-plugin-checker';
 
 // Plugin to inject build timestamp into service worker
 function injectServiceWorkerVersion() {
@@ -40,7 +41,7 @@ export default defineConfig({
   },
   // Public directory for static assets that should be copied as-is
   publicDir: 'public',
-  plugins: [injectServiceWorkerVersion()],
+  plugins: [checker({ typescript: true }), injectServiceWorkerVersion()],
   server: {
     port: 3000,
     open: '/index-enhanced.html',

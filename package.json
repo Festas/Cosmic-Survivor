@@ -5,14 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && npm run copy-assets",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build && npm run copy-assets",
     "copy-assets": "copyfiles -f main.js game.js multiplayer-client.js game-integration.js dist",
     "preview": "vite preview",
     "serve": "vite preview",
     "server": "cd server && node index.js",
     "server:install": "cd server && npm install",
     "dev:all": "npm run server:install && concurrently \"npm run dev\" \"npm run server\"",
-    "test": "node --test tests/",
+    "test": "node --import tsx --test tests/",
     "validate:content": "node tools/content-validator/validate.mjs"
   },
   "keywords": [
@@ -25,9 +26,13 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@types/node": "^20.19.39",
     "concurrently": "^9.1.2",
     "copyfiles": "^2.4.1",
-    "vite": "^5.0.0"
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^5.0.0",
+    "vite-plugin-checker": "^0.13.0"
   },
   "dependencies": {
     "pixi.js": "^8.18.1",
