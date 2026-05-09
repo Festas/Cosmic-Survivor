@@ -38,3 +38,7 @@ server/node_modules/
 # TypeScript build info
 *.tsbuildinfo
 .tsc.log
+
+# Tauri native-shell build artifacts (Rust compilation output and generated code)
+src-tauri/target/
+src-tauri/gen/

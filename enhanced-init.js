@@ -1,6 +1,10 @@
 // Enhanced Game Entry Point - Cosmic Survivor
 // This file integrates all the new game enhancement systems
 
+// Part L — Tauri native shell: F11 fullscreen toggle (no-op on web/PWA).
+import { installTauriFullscreenToggle } from './js/desktop/fullscreen.ts';
+installTauriFullscreenToggle();
+
 import { MetaProgressionSystem } from './js/systems/metaProgression.ts';
 import { SynergySystem } from './js/systems/synergySystem.ts';
 import { CosmicEventsSystem } from './js/systems/cosmicEvents.ts';

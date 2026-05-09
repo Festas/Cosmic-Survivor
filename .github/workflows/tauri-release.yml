@@ -1,0 +1,66 @@
+name: tauri-release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, target: 'x86_64-pc-windows-msvc' }
+          - { os: macos-latest,   target: 'aarch64-apple-darwin' }
+          - { os: macos-latest,   target: 'x86_64-apple-darwin' }
+          - { os: ubuntu-latest,  target: 'x86_64-unknown-linux-gnu' }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Linux system deps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri -> target'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Web build
+        run: npm run build
+
+      - name: Tauri build
+        run: npx tauri build --target ${{ matrix.target }}
+        # NOTE: Code signing is not configured. Windows binaries will trigger
+        # SmartScreen warnings and macOS binaries will require Gatekeeper bypass
+        # until Apple/Microsoft certificates are added as repo secrets. This is
+        # expected and acceptable for an open-source game's initial native release.
+        # See src-tauri/README.md for the follow-up signing checklist.
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cosmic-survivor-${{ matrix.target }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb
+          if-no-files-found: ignore

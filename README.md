@@ -357,6 +357,30 @@ Unlock 10 achievements by completing challenges:
 ### Classic Edition
 - The original version is still available in `index.html`
 
+## 🖥️ Run as a desktop app (optional)
+
+Cosmic Survivor can be run as a native desktop window via [Tauri](https://v2.tauri.app/).
+Requires a [Rust toolchain](https://rustup.rs/) installed.
+
+```bash
+npm install
+npm run tauri:dev    # dev window with hot reload
+npm run tauri:build  # produces installer in src-tauri/target/release/bundle/
+```
+
+Native builds are produced for Windows (`.msi`), macOS (`.dmg`, both Intel
+and Apple Silicon), and Linux (`.AppImage`, `.deb`) automatically by the
+`tauri-release` workflow on every `v*` tag.
+
+The desktop build uses the same WebGL renderer as the web build (default since
+v0.x). It connects to the same multiplayer server. Saves and settings live in
+the platform-standard user-data directory (backed by the WebView's
+`localStorage`).
+
+> **Note:** Unsigned binaries will trigger SmartScreen (Windows) or Gatekeeper
+> (macOS) warnings on first launch. See `src-tauri/README.md` for the signing
+> follow-up checklist.
+
 ## 📝 License
 
 This is a learning project. Feel free to use and modify as you wish!
