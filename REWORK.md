@@ -1,9 +1,9 @@
 # Cosmic Survivor — Engine & Architecture Rework
 
 This document is the architecture-decision record (ADR) for the multi-phase
-rework. It explains **what shipped in this PR**, **why we chose a vertical
-slice over a Big Bang rewrite**, and **how to continue the migration in
-follow-up PRs**.
+rework. It captures the currently shipped architecture, why the work was done
+as vertical slices instead of a Big Bang rewrite, and the resulting long-term
+boundaries.
 
 ---
 
@@ -21,33 +21,33 @@ Doing all of that at once would:
 - break every existing import and translation key,
 - balloon the diff far past anything reviewable in a single PR.
 
-So this PR lands a **vertical slice of every phase** — a cohesive set of
-*additive* modules that touch every numbered phase of the rework brief while
-leaving the existing systems running. Nothing in this PR is destructive: the
-legacy paths still work, and every new module is feature-detected.
+The rework landed as **vertical slices of every phase** — cohesive, additive
+modules that touched each numbered phase while keeping legacy paths running.
+The final state keeps those compatibility guarantees: legacy paths still work,
+and new modules are feature-detected.
 
 ---
 
 ## 2. Phases & what shipped
 
 ### Phase 0/1 — Core engine refactor & optimisation
-- **`js/core/objectPool.js`** — generic typed object pool with growth cap and
+- **`js/core/objectPool.ts`** — generic typed object pool with growth cap and
   `null`-on-exhaustion contract so a runaway spawn cannot OOM the tab.
-- **`js/core/eventBus.js`** — minimal pub/sub (`gameBus` singleton) used by
+- **`js/core/eventBus.ts`** — minimal pub/sub (`gameBus` singleton) used by
   the new gameplay systems for cross-cutting signals.
-- **`js/core/rng.js`** — `xoshiro128**` PRNG (string-seeded) with `save/load`
+- **`js/core/rng.ts`** — `xoshiro128**` PRNG (string-seeded) with `save/load`
   state, the prerequisite for deterministic challenges and rollback netcode.
-- **`js/core/spatialHash.js`** — uniform-grid broadphase. Reused scratch
+- **`js/core/spatialHash.ts`** — uniform-grid broadphase. Reused scratch
   buffers; bounded results.
-- **`js/core/fixedClock.js`** — fixed-timestep accumulator (drop-in for the
+- **`js/core/fixedClock.ts`** — fixed-timestep accumulator (drop-in for the
   next sim/render split).
-- **`js/core/workers/broadphase.worker.js`** — Web Worker scaffold that owns
+- **`js/core/workers/broadphase.worker.ts`** — Web Worker scaffold that owns
   a `SpatialHash` and answers proximity queries off-main-thread.
-- **`jsconfig.json`** turns on `checkJs` for `js/core/**`, `js/render/**` and
-  the new gameplay systems so JSDoc types are enforced going forward.
+- **`tsconfig.json`** enforces strict type-checking for `js/core/**`,
+  `js/render/**`, `js/entities/**`, and `js/systems/**`.
 
 ### Phase 2 — Visual overhaul ("juice")
-- **`js/render/juice.js`** — three small, framework-agnostic systems:
+- **`js/render/juice.ts`** — three small, framework-agnostic systems:
   - `TraumaShake` (Squirrel Eiserloh model, squared trauma → quadratic feel),
   - `HitStop` (sim-only pause for crit/heavy-damage frames),
   - `HitFlash` (screen-space colour pulse for damage / level-ups).
@@ -66,13 +66,13 @@ legacy paths still work, and every new module is feature-detected.
 - Existing minimap, XP bar, DPS meter, combo counter, etc. are untouched.
 
 ### Phase 4 — Gameplay mechanics
-- **`js/systems/stanceSystem.js`** — Moving vs Focus stances:
+- **`js/systems/stanceSystem.ts`** — Moving vs Focus stances:
   - Standing still for ~0.5 s engages **Focus** (+20 % damage,
     +5 % crit chance, –15 % damage taken, +10 % attack-cooldown penalty).
   - Moving keeps **Moving** stance with doubled pickup-magnetism.
   - Twelve-frame grace window prevents knockback / tap-to-aim from
     breaking Focus instantly.
-- **`js/systems/weatherSystem.js`** — per-wave weather rolled from a
+- **`js/systems/weatherSystem.ts`** — per-wave weather rolled from a
   weighted table (`clear`, `rain`, `fog`, `storm`, `eclipse`):
   - Multiplies player damage / defense / elemental damage.
   - Adjusts enemy aggro range.
@@ -81,17 +81,17 @@ legacy paths still work, and every new module is feature-detected.
   - Eclipse is reserved for boss waves.
 
 ### Phase 5 — Content & enemies
-- **`js/systems/enemyBehaviors.js`** — opt-in advanced behaviors:
+- **`js/systems/enemyBehaviors.ts`** — opt-in advanced behaviors:
   - `flank` — approach perpendicular to the player rather than head-on.
   - `shieldBuddy` + `applyShieldBuddyAbsorption` — sticks to an ally and
     eats half their incoming damage.
 - **`tools/content-validator/validate.mjs`** — extracts `ENEMY_TYPES` and
-  `BOSS_TYPES` from both `main.js` and `js/entities/*.js`, fails the build on
+  `BOSS_TYPES` from both `main.js` and `js/entities/*.ts` (with `.js` fallback support), fails the build on
   *id-set drift* (a new enemy added in only one file), reports field drift
   as advisory warnings. Wired as `npm run validate:content`.
 
 ### Phase 6 — Multiplayer / co-op
-- **`js/systems/coopAura.js`** — passing a player projectile within ~80 px
+- **`js/systems/coopAura.ts`** — passing a player projectile within ~80 px
   of an ally adds +20 % damage and +1 pierce, idempotently per-ally per
   bullet. The donor ally is ringed in dashed lavender.
 - New `coop_buff` event whitelisted in `server/messageHandler.js`'s
@@ -122,51 +122,16 @@ legacy paths still work, and every new module is feature-detected.
 
 ## 4. Migration roadmap
 
-This PR is **step 1 of N**. Recommended follow-ups, in order, each shippable
-as a small PR:
+All planned rework steps are now shipped:
 
-1. **Replace ad-hoc enemy/bullet allocations with `ObjectPool`** —
-   `damage-text` particles first (highest churn), then enemy bullets, then
-   particle effects. Pools are wired but not yet plumbed into `main.js`'s
-   `createParticles` / `createTextParticle` helpers.
-2. **Move broadphase to `js/core/spatialHash.js`** — start with the bullet
-   vs enemy loop in `Bullet.update` (currently O(N×M)).
-3. **Adopt `FixedClock`** — split simulation from render. Initially run sim
-   at 60 Hz and render at rAF rate, retaining the legacy variable-dt code
-   path behind a `?fixedstep=0` URL flag.
-4. **Promote `js/core/workers/broadphase.worker.js`** — once main thread is
-   pool-aware, hand collision broadphase off-thread.
-5. **WebGL renderer (PixiJS)** — `js/render/WebGLRenderer.js` (PixiJS v8 backend)
-   ships as the **default renderer**. Use `?renderer=canvas2d` to opt out.
-   ```bash
-   # open http://localhost:3000/index-enhanced.html            # WebGL (default)
-   # open http://localhost:3000/index-enhanced.html?renderer=canvas2d  # Canvas2D escape hatch
-   ```
-   ✅ **Shipped** (PR #43): WebGL backend wired, Canvas2D fallback available.
-   ✅ **PR-J**: WebGL is now default; `?renderer=canvas2d` is the escape hatch.
-   Known limitation: auto-disabled on iOS Safari (UA sniff, console.info logged).
-   `window.rework.rendererKind` reflects the resolved renderer (`'webgl'` or `'canvas2d'`).
-6. **TypeScript-first new modules** — keep adding under `js/core/**` and
-   `js/render/**` where `checkJs` already enforces JSDoc types; once enough
-   surface is annotated, switch the `tsconfig` to a real TS compile that
-   emits to `js/core/**/*.js`.
-   ✅ **PR-K**: `js/core/**`, `js/render/**`, `js/entities/**`, `js/systems/**`
-   are now `.ts` (allowJs/strict tsconfig, ambient.d.ts for `window.*`,
-   vite-plugin-checker, `npm run typecheck`, CI typecheck step,
-   `tests/typecheck.test.mjs`). Files carry `// @ts-nocheck` as a transitional
-   stop-gap so runtime is byte-for-byte equivalent; tightening (removing
-   `@ts-nocheck` per file, replacing `any` shapes in `ambient.d.ts`) ships in
-   follow-up PRs. `main.js`, `server/`, `tools/` remain JavaScript.
-6. **Renderer migration** — once `main.js` no longer touches `ctx`
-   directly outside `js/render/**`, swap the 2D backend for PixiJS or
-   regl-based WebGL behind a `Renderer` interface.
-7. **Native shell** — wrap the existing PWA in Tauri once renderer + sim
-   are stable. No code change needed; only a build pipeline addition.
-   ✅ **PR-L**: Tauri v2 native shell shipped. `src-tauri/` scaffold
-   (Cargo.toml, tauri.conf.json, build.rs, src/main.rs, capabilities/default.json,
-   icons/). `npm run tauri:dev` / `npm run tauri:build`. F11 fullscreen wired via
-   `js/desktop/fullscreen.ts` (dynamic import, web bundle unaffected).
-   `tauri-release.yml` workflow builds Windows/macOS/Linux installers on `v*` tags.
+1. **ObjectPool integration** ✅ (PR #40) — allocation-heavy gameplay paths moved to pooled objects.
+2. **SpatialHash broadphase** ✅ (PR #41) — collision broadphase moved to `js/core/spatialHash.ts`.
+3. **FixedClock dual-path** ✅ (PR #41) — deterministic fixed-step path added alongside legacy timing.
+4. **Off-thread broadphase worker** ✅ (PR #41) — worker scaffold in `js/core/workers/broadphase.worker.ts`.
+5. **WebGL renderer (PixiJS) default** ✅ (PR #43, PR #44) — WebGL is default; use `?renderer=canvas2d` as escape hatch.
+6. **TypeScript-first modular tree** ✅ (PR #45) — `js/core/**`, `js/render/**`, `js/entities/**`, `js/systems/**` are `.ts`; `main.js`, `server/`, and `tools/` stay JavaScript.
+7. **Renderer interface boundary** ✅ (PR #43) — shared `Renderer` interface and backend boundary shipped.
+8. **Tauri native shell** ✅ (PR-L / PR #46) — Tauri v2 desktop packaging (`npm run tauri:dev`, `npm run tauri:build`) plus release workflow.
 
 ---
 
@@ -174,24 +139,12 @@ as a small PR:
 
 ```bash
 npm install
-npm test                  # 33/33 pass
+npm test                  # 96/96 pass
 npm run validate:content  # OK + advisory boss warnings
 npm run build             # vite build succeeds
 npm run dev:all           # vite + multiplayer server
-```
-
-```bash
-npm install
-npm test                  # 92/92 pass (entity peeling + camera + input + wave tests)
-npm run validate:content  # OK + advisory boss warnings
-npm run build             # vite build succeeds; dist/ contains pixi chunk
-npm run dev:all           # vite + multiplayer server
-```
-
-```bash
-# PR-L — Tauri native shell
-npm run tauri:build  # produces installer in src-tauri/target/release/bundle/
-npm run tauri:dev    # opens native window with hot reload (requires rustup)
+npm run tauri:dev         # native desktop window with hot reload (requires rustup)
+npm run tauri:build       # installer in src-tauri/target/release/bundle/
 ```
 
 In the browser: stand still in any wave to charge the **Focus** ring around
@@ -201,12 +154,15 @@ Take damage to see the new red hit-flash. Land a critical hit to feel the
 hit-stop. In multiplayer, fire bullets that pass through an ally's lavender
 ring — they'll punch harder.
 
-To test the WebGL renderer:
-```
-index-enhanced.html                                              # WebGL (default)
-index-enhanced.html?renderer=canvas2d                           # Canvas2D escape hatch
-index-enhanced.html?renderer=canvas2d&broadphase=hash&fixedstep=1  # all flags compose
-```
+Runtime URL flags:
+
+| Flag | Meaning |
+| --- | --- |
+| `?renderer=canvas2d` | Force Canvas2D backend instead of default WebGL renderer |
+| `?broadphase=hash` | Force SpatialHash broadphase path |
+| `?fixedstep=1` | Force fixed-timestep simulation path |
+
+Flags compose (for example: `?renderer=canvas2d&broadphase=hash&fixedstep=1`).
 
 ---
 
@@ -216,13 +172,13 @@ Entities extracted from `main.js` and moved to `js/entities/`:
 
 | Entity | File | Status |
 | --- | --- | --- |
-| Player | `js/entities/Player.js` | ✅ Done (PR #43) |
-| Bullet + EnemyBullet | `js/entities/Bullet.js` | ✅ Done (PR #43) |
-| Enemy | `js/entities/Enemy.js` | ✅ Shipped (PR-J) |
-| Pickup + XPOrb + Powerup | `js/entities/Pickup.js` | ✅ Shipped (PR-J) |
-| spawnWave (Wave logic) | `js/systems/waveSystem.js` | ✅ Shipped (PR-J) |
-| Camera | `js/core/camera.js` | ✅ Shipped (PR-J) |
-| Input handlers | `js/core/input.js` | ✅ Shipped (PR-J) |
+| Player | `js/entities/Player.ts` | ✅ Done (PR #43) |
+| Bullet + EnemyBullet | `js/entities/Bullet.ts` | ✅ Done (PR #43) |
+| Enemy | `js/entities/Enemy.ts` | ✅ Shipped (PR-J) |
+| Pickup + XPOrb + Powerup | `js/entities/Pickup.ts` | ✅ Shipped (PR-J) |
+| spawnWave (Wave logic) | `js/systems/waveSystem.ts` | ✅ Shipped (PR-J) |
+| Camera | `js/core/camera.ts` | ✅ Shipped (PR-J) |
+| Input handlers | `js/core/input.ts` | ✅ Shipped (PR-J) |
 | Particle, HUD | — | 🔜 Next slices |
 
 Each extracted class:
