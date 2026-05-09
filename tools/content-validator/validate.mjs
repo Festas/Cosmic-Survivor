@@ -3,8 +3,8 @@
 //
 // The codebase has *two* enemy/boss tables that drift constantly:
 //   - main.js: ENEMY_TYPES, BOSS_TYPES (canonical at runtime)
-//   - js/entities/enemyTypes.js, js/entities/bossTypes.js (used by ESM
-//     systems and tests)
+//   - js/entities/enemyTypes.ts|.js, js/entities/bossTypes.ts|.js (used by
+//     ESM systems and tests)
 //
 // This validator extracts both tables and reports any drift in:
 //   - the set of type ids,
@@ -16,7 +16,7 @@
 // Exits 0 when consistent, 1 on drift. CI hooks into this via
 // `npm run validate:content`.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -66,6 +66,19 @@ function loadTable(file, name) {
     const src = extractTableSource(readText(file), name);
     if (!src) throw new Error(`Could not extract ${name} from ${file}`);
     return evalObject(src);
+}
+
+function resolveEntityFile(basename) {
+    for (const ext of ['.ts', '.js']) {
+        const path = resolve(ROOT, 'js/entities', basename + ext);
+        try {
+            statSync(path);
+            return `js/entities/${basename}${ext}`;
+        } catch {
+            // try next extension
+        }
+    }
+    throw new Error(`Could not find js/entities/${basename}.{ts,js}`);
 }
 
 function approxEqual(a, b) {
@@ -131,9 +144,9 @@ function main() {
     let mainEnemies, jsEnemies, mainBosses, jsBosses;
     try {
         mainEnemies = loadTable('main.js', 'ENEMY_TYPES');
-        jsEnemies = loadTable('js/entities/enemyTypes.js', 'ENEMY_TYPES');
+        jsEnemies = loadTable(resolveEntityFile('enemyTypes'), 'ENEMY_TYPES');
         mainBosses = loadTable('main.js', 'BOSS_TYPES');
-        jsBosses = loadTable('js/entities/bossTypes.js', 'BOSS_TYPES');
+        jsBosses = loadTable(resolveEntityFile('bossTypes'), 'BOSS_TYPES');
     } catch (e) {
         console.error('[validate:content] extraction failed:', e.message);
         process.exit(2);
