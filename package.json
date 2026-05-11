@@ -42,6 +42,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2.11.0",
     "pixi.js": "^8.18.1",
+    "puppeteer-core": "^24.43.0",
     "ws": "^8.20.0"
   }
 }
