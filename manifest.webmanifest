@@ -1,0 +1,14 @@
+{
+  "name": "Cosmic Survivor",
+  "short_name": "Cosmic",
+  "description": "A fast, juicy top-down space survivor-roguelite with gravity Singularities, bullet-time dashing, and elemental Resonance combos.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#05060f",
+  "theme_color": "#05060f",
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

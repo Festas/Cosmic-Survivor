@@ -1,48 +1,23 @@
 {
   "name": "cosmic-survivor",
-  "version": "1.0.0",
-  "description": "A top-down arena survival game. Survive waves of alien creatures on a hostile planet!",
+  "version": "2.0.0",
+  "description": "A fast, juicy top-down space survivor-roguelite. Bend gravity with Singularities, blink through bullet-time, and chain elemental Resonance reactions.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "typecheck": "tsc --noEmit",
-    "build": "tsc --noEmit && vite build && npm run copy-assets",
-    "copy-assets": "copyfiles -f main.js game.js multiplayer-client.js game-integration.js dist",
-    "preview": "vite preview",
-    "serve": "vite preview",
-    "server": "cd server && node index.js",
-    "server:install": "cd server && npm install",
-    "dev:all": "npm run server:install && concurrently \"npm run dev\" \"npm run server\"",
-    "test": "node --import tsx --test tests/",
-    "validate:content": "node tools/content-validator/validate.mjs",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "tauri:icon": "tauri icon"
+    "dev": "node tools/dev-server.mjs",
+    "start": "node tools/dev-server.mjs",
+    "check": "node tools/check.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build": "node tools/build.mjs"
   },
   "keywords": [
     "game",
     "html5",
     "canvas",
-    "survival",
+    "roguelite",
+    "survivor",
     "pwa"
   ],
   "author": "",
-  "license": "MIT",
-  "devDependencies": {
-    "@tauri-apps/cli": "^2.11.1",
-    "@types/node": "^20.19.39",
-    "concurrently": "^9.1.2",
-    "copyfiles": "^2.4.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vite": "^5.0.0",
-    "vite-plugin-checker": "^0.13.0"
-  },
-  "dependencies": {
-    "@tauri-apps/api": "^2.11.0",
-    "pixi.js": "^8.18.1",
-    "puppeteer-core": "^24.43.0",
-    "ws": "^8.20.0"
-  }
+  "license": "MIT"
 }

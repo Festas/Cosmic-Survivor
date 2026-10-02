@@ -1,52 +1,13 @@
-# Multi-stage build for Cosmic Survivor (Frontend + Multiplayer Server)
-
-# Stage 1: Build the frontend and install server dependencies
-FROM node:20-alpine AS builder
-
+# ---- Build stage: assemble the static site (zero runtime deps) ----
+FROM node:20-alpine AS build
 WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install frontend dependencies
-# Note: npm strict-ssl is disabled to work around certificate chain issues
-# that can occur in some Docker build environments with Alpine Linux.
-# The packages are still downloaded from the official npm registry.
-RUN npm config set strict-ssl false && npm install
-
-# Copy source files
 COPY . .
-
-# Build the frontend
 RUN npm run build
 
-# Install server dependencies
-RUN cd server && npm config set strict-ssl false && npm install
-
-# Stage 2: Runtime with nginx + Node.js
-FROM node:20-alpine
-
-# Install nginx and supervisord
-RUN apk add --no-cache nginx supervisor \
-    && mkdir -p /run/nginx
-
-# Copy built frontend files
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
-
-# Copy multiplayer server
-COPY --from=builder /app/server /app/server
-
-# Copy supervisord configuration
-COPY supervisord.conf /etc/supervisord.conf
-
-# Create directory for SQLite database (volume mount point)
-RUN mkdir -p /data
-
-# Expose port 80 (nginx handles both HTTP and WebSocket proxy)
+# ---- Serve stage: tiny nginx image serving the static files ----
+FROM nginx:1.27-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80
-
-# Start both services via supervisord
-CMD ["supervisord", "-c", "/etc/supervisord.conf"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
+  CMD wget -qO- http://127.0.0.1/ >/dev/null 2>&1 || exit 1

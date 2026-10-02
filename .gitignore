@@ -29,16 +29,8 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# Server database files
-server/*.db
-server/*.db-shm
-server/*.db-wal
-server/node_modules/
+# Environment files
+.env
+.env.local
+.env.*.local
 
-# TypeScript build info
-*.tsbuildinfo
-.tsc.log
-
-# Tauri native-shell build artifacts (Rust compilation output and generated code)
-src-tauri/target/
-src-tauri/gen/
