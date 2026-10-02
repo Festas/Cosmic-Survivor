@@ -10,6 +10,15 @@
 const cache = new Map();
 const supported = typeof document !== 'undefined' && typeof document.createElement === 'function';
 
+// Safety cap. Every cache key is built from finite enumerations — enemy
+// shape/radius/colour, the three fill states (base, white hit-flash, cryo
+// freeze), the per-element glow colours, and a handful of blur/bullet-size
+// values — so in practice only a few hundred distinct sprites are ever created.
+// The cap is a guard against a future change accidentally introducing a
+// continuous key: if it is ever exceeded the cache is dropped and rebuilt
+// lazily, which bounds memory at the cost of a one-off rebuild.
+const MAX_SPRITES = 1024;
+
 // Fetch (or lazily build) a glow sprite.
 //   key    — unique cache key for this shape/colour/glow combination
 //   radius — half-extent of the artwork (before the glow padding)
@@ -23,6 +32,7 @@ export function glowSprite(key, radius, blur, paint) {
   if (!supported) return null;
   const existing = cache.get(key);
   if (existing !== undefined) return existing;
+  if (cache.size >= MAX_SPRITES) cache.clear();
   const half = Math.max(1, Math.ceil(radius + blur + 3));
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = half * 2;

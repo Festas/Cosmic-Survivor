@@ -39,12 +39,12 @@ export class Background {
     // gradients — 9 tiles x 3 nebulae — on every single frame)
     ctx.globalCompositeOperation = 'lighter';
     for (const n of this.nebulae) {
-      const spr = glowSprite('neb|' + n.r.toFixed(0) + '|' + n.color, n.r, 0, (g) => {
-        const grd = g.createRadialGradient(0, 0, 0, 0, 0, n.r);
+      const spr = glowSprite('neb|' + n.r.toFixed(0) + '|' + n.color, n.r, 0, (gc) => {
+        const grd = gc.createRadialGradient(0, 0, 0, 0, 0, n.r);
         grd.addColorStop(0, n.color);
         grd.addColorStop(1, 'rgba(0,0,0,0)');
-        g.fillStyle = grd;
-        g.beginPath(); g.arc(0, 0, n.r, 0, TAU); g.fill();
+        gc.fillStyle = grd;
+        gc.beginPath(); gc.arc(0, 0, n.r, 0, TAU); gc.fill();
       });
       const ox = -(cam.x * n.depth) % (w + n.r * 2);
       const oy = -(cam.y * n.depth) % (h + n.r * 2);
