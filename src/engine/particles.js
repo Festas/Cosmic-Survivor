@@ -1,13 +1,42 @@
 // particles.js — pooled particle system with additive glow support.
 
+import { glowSprite } from './sprites.js';
+
+const TAU = Math.PI * 2;
+// Radius the reusable dot sprite is baked at. Particles are drawn by blitting a
+// scaled copy of this cached disc, so most dots downscale (staying crisp) while
+// the occasional large smoke puff upscales a little (acceptable for a glow).
+const DOT_R = 12;
+
 export class Particles {
   constructor(max = 2000) {
     this.max = max;
     this.pool = [];
     this.active = [];
+    // Per-colour cache of baked disc sprites (value may be null when offscreen
+    // canvases are unavailable, e.g. in the Node unit-test environment).
+    this._dots = new Map();
+    // Per-frame memoisation of the drag falloff, which is identical for every
+    // particle sharing a drag coefficient — avoids thousands of Math.pow calls.
+    this._dragCache = new Map();
+    this._dragK = -1;
     for (let i = 0; i < max; i++) {
       this.pool.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 1, size: 2, color: '#fff', drag: 0.9, grav: 0, additive: true, spin: 0, shape: 'dot' });
     }
+  }
+
+  // Fetch (or lazily bake) the disc sprite for a colour. Keyed off the instance
+  // Map so the hot render loop never rebuilds the sprite key string per particle.
+  _dotFor(color) {
+    let spr = this._dots.get(color);
+    if (spr === undefined) {
+      spr = glowSprite('pdot|' + color, DOT_R, 0, (g) => {
+        g.fillStyle = color;
+        g.beginPath(); g.arc(0, 0, DOT_R, 0, TAU); g.fill();
+      });
+      this._dots.set(color, spr);
+    }
+    return spr;
   }
 
   spawn(x, y, color, opts = {}) {
@@ -36,6 +65,11 @@ export class Particles {
   }
 
   update(dt) {
+    // The drag falloff pow(drag, dt*60) depends only on dt and the particle's
+    // drag coefficient (a handful of distinct values), so memoise it per frame.
+    const k = dt * 60;
+    const cache = this._dragCache;
+    if (k !== this._dragK) { cache.clear(); this._dragK = k; }
     for (let i = this.active.length - 1; i >= 0; i--) {
       const p = this.active[i];
       p.life -= dt;
@@ -45,7 +79,8 @@ export class Particles {
         continue;
       }
       p.vy += p.grav * dt;
-      const d = Math.pow(p.drag, dt * 60);
+      let d = cache.get(p.drag);
+      if (d === undefined) { d = Math.pow(p.drag, k); cache.set(p.drag, d); }
       p.vx *= d; p.vy *= d;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
@@ -63,18 +98,28 @@ export class Particles {
       if (p.additive && !additive) { ctx.globalCompositeOperation = 'lighter'; additive = true; }
       else if (!p.additive && additive) { ctx.globalCompositeOperation = 'source-over'; additive = false; }
       ctx.globalAlpha = Math.min(1, t * 1.4);
-      ctx.fillStyle = p.color;
       const s = p.size * (0.3 + t * 0.7);
       if (p.shape === 'spark') {
+        ctx.fillStyle = p.color;
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(Math.atan2(p.vy, p.vx));
         ctx.fillRect(-s * 2, -s * 0.4, s * 4, s * 0.8);
         ctx.restore();
       } else {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, s, 0, Math.PI * 2);
-        ctx.fill();
+        // Blit a cached disc instead of building an arc path and re-parsing the
+        // fill colour every particle — the dominant render cost at high counts.
+        const spr = this._dotFor(p.color);
+        if (spr) {
+          const sc = s / DOT_R;
+          const full = spr.canvas.width * sc;
+          ctx.drawImage(spr.canvas, p.x - spr.off * sc, p.y - spr.off * sc, full, full);
+        } else {
+          ctx.fillStyle = p.color;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, s, 0, TAU);
+          ctx.fill();
+        }
       }
     }
     ctx.restore();
