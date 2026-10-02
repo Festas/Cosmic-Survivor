@@ -52,10 +52,13 @@ export class Particles {
     }
   }
 
-  render(ctx) {
+  render(ctx, bounds = null) {
     ctx.save();
     let additive = false;
+    const minX = bounds ? bounds.minX : 0, maxX = bounds ? bounds.maxX : 0;
+    const minY = bounds ? bounds.minY : 0, maxY = bounds ? bounds.maxY : 0;
     for (const p of this.active) {
+      if (bounds && (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY)) continue;
       const t = p.life / p.maxLife;
       if (p.additive && !additive) { ctx.globalCompositeOperation = 'lighter'; additive = true; }
       else if (!p.additive && additive) { ctx.globalCompositeOperation = 'source-over'; additive = false; }
