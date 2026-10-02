@@ -1,6 +1,7 @@
 // background.js — parallax starfield and drifting nebula, rendered in screen space.
 
 import { rand, randRange, TAU } from '../engine/utils.js';
+import { glowSprite } from '../engine/sprites.js';
 import { COLORS } from './config.js';
 
 export class Background {
@@ -34,20 +35,32 @@ export class Background {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
 
-    // nebula blobs
+    // nebula blobs (pre-baked to sprites so we avoid rebuilding radial
+    // gradients — 9 tiles x 3 nebulae — on every single frame)
     ctx.globalCompositeOperation = 'lighter';
     for (const n of this.nebulae) {
+      const spr = glowSprite('neb|' + n.r.toFixed(0) + '|' + n.color, n.r, 0, (gc) => {
+        const grd = gc.createRadialGradient(0, 0, 0, 0, 0, n.r);
+        grd.addColorStop(0, n.color);
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        gc.fillStyle = grd;
+        gc.beginPath(); gc.arc(0, 0, n.r, 0, TAU); gc.fill();
+      });
       const ox = -(cam.x * n.depth) % (w + n.r * 2);
       const oy = -(cam.y * n.depth) % (h + n.r * 2);
       for (let gx = -1; gx <= 1; gx++) {
         for (let gy = -1; gy <= 1; gy++) {
           const cx = ((n.x + ox) % (w + n.r * 2)) + gx * (w + n.r * 2);
           const cy = ((n.y + oy) % (h + n.r * 2)) + gy * (h + n.r * 2);
-          const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, n.r);
-          grd.addColorStop(0, n.color);
-          grd.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.fillStyle = grd;
-          ctx.fillRect(cx - n.r, cy - n.r, n.r * 2, n.r * 2);
+          if (spr) {
+            ctx.drawImage(spr.canvas, cx - spr.off, cy - spr.off);
+          } else {
+            const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, n.r);
+            grd.addColorStop(0, n.color);
+            grd.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grd;
+            ctx.fillRect(cx - n.r, cy - n.r, n.r * 2, n.r * 2);
+          }
         }
       }
     }

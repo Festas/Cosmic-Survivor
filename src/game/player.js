@@ -204,9 +204,14 @@ export class Player {
   }
 
   acquireTarget(world, fromX = this.x, fromY = this.y) {
-    const r2 = this.stats.range * this.stats.range;
+    const range = this.stats.range;
+    const r2 = range * range;
     let best = null; let bestD = r2;
-    for (const e of world.enemies) {
+    // Broad-phase via the world grid so we only test enemies within weapon range
+    // instead of scanning every enemy (which is O(n) per shooter, per frame).
+    const list = world.grid.query(fromX, fromY, range, this._targetQ || (this._targetQ = []));
+    for (let i = 0; i < list.length; i++) {
+      const e = list[i];
       if (!e.alive) continue;
       const d = dist2(fromX, fromY, e.x, e.y);
       if (d < bestD) { bestD = d; best = e; }

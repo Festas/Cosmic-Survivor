@@ -10,6 +10,7 @@ import {
 } from '../engine/utils.js';
 import { Camera } from '../engine/camera.js';
 import { Particles } from '../engine/particles.js';
+import { glowSprite } from '../engine/sprites.js';
 import { Player } from './player.js';
 import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize } from './enemies.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
@@ -17,24 +18,28 @@ import { draftUpgrades } from './upgrades.js';
 import { Background } from './background.js';
 
 // Lightweight uniform spatial grid for enemy broad-phase queries.
+// Cells are addressed with packed integer keys (instead of string keys) to cut
+// allocation/GC and speed up Map lookups on the hot query path.
 class Grid {
-  constructor(cell) { this.cell = cell; this.map = new Map(); }
+  constructor(cell) { this.cell = cell; this.inv = 1 / cell; this.map = new Map(); }
   clear() { this.map.clear(); }
   insert(e) {
-    const k = (Math.floor(e.x / this.cell)) + ',' + (Math.floor(e.y / this.cell));
+    const cx = Math.floor(e.x * this.inv), cy = Math.floor(e.y * this.inv);
+    const k = (cx + 0x8000) * 0x10000 + (cy + 0x8000);
     let a = this.map.get(k);
     if (!a) { a = []; this.map.set(k, a); }
     a.push(e);
   }
   query(x, y, r, out) {
     out.length = 0;
-    const c = this.cell;
-    const minX = Math.floor((x - r) / c), maxX = Math.floor((x + r) / c);
-    const minY = Math.floor((y - r) / c), maxY = Math.floor((y + r) / c);
+    const inv = this.inv;
+    const minX = Math.floor((x - r) * inv), maxX = Math.floor((x + r) * inv);
+    const minY = Math.floor((y - r) * inv), maxY = Math.floor((y + r) * inv);
     for (let cx = minX; cx <= maxX; cx++) {
+      const base = (cx + 0x8000) * 0x10000 + 0x8000;
       for (let cy = minY; cy <= maxY; cy++) {
-        const a = this.map.get(cx + ',' + cy);
-        if (a) for (const e of a) out.push(e);
+        const a = this.map.get(base + cy);
+        if (a) for (let i = 0; i < a.length; i++) out.push(a[i]);
       }
     }
     return out;
@@ -732,7 +737,7 @@ export class World {
     this.drawEnemies(ctx);
     this.drawPlayer(ctx);
     this.drawBullets(ctx);
-    this.particles.render(ctx);
+    this.particles.render(ctx, this.camera.viewBounds(40));
     this.drawSingularities(ctx, 'over');
     this.drawTexts(ctx);
     cam.end(ctx);
@@ -810,18 +815,36 @@ export class World {
   }
 
   drawEnemies(ctx) {
+    // Cull to the visible viewport (plus a margin for the largest boss + glow)
+    // so off-screen enemies cost nothing, and blit cached glow sprites instead
+    // of paying ctx.shadowBlur per enemy every frame.
+    const b = this.camera.viewBounds(160);
     for (const e of this.enemies) {
       if (!e.alive) continue;
+      if (e.x < b.minX || e.x > b.maxX || e.y < b.minY || e.y > b.maxY) continue;
       const dom = dominantElement(e.status);
+      let fill = e.hitFlash > 0 ? '#ffffff' : e.color;
+      if (e.status.freeze > 0) fill = COLORS.cryo;
+      const glowColor = dom ? dom.color : e.color;
+      const blur = dom ? 14 : (e.boss ? 24 : 6);
+      const shape = e.type.shape;
+      const r = e.radius;
+      const spr = glowSprite('e|' + shape + '|' + r + '|' + fill + '|' + glowColor + '|' + blur, r, blur, (g) => {
+        g.shadowColor = glowColor; g.shadowBlur = blur;
+        g.fillStyle = fill;
+        this.drawShape(g, shape, r);
+      });
       ctx.save();
       ctx.translate(e.x, e.y);
       ctx.rotate(e.spin * (e.massive ? 0.3 : 1));
-      let fill = e.hitFlash > 0 ? '#ffffff' : e.color;
-      if (e.status.freeze > 0) fill = COLORS.cryo;
-      ctx.shadowColor = dom ? dom.color : e.color;
-      ctx.shadowBlur = dom ? 14 : (e.boss ? 24 : 6);
-      ctx.fillStyle = fill;
-      this.drawShape(ctx, e.type.shape, e.radius);
+      if (spr) {
+        ctx.drawImage(spr.canvas, -spr.off, -spr.off);
+      } else {
+        ctx.shadowColor = glowColor; ctx.shadowBlur = blur;
+        ctx.fillStyle = fill;
+        this.drawShape(ctx, shape, r);
+        ctx.shadowBlur = 0;
+      }
       ctx.restore();
 
       if (e.boss) this.drawBossBar(ctx, e);
@@ -871,17 +894,25 @@ export class World {
   }
 
   drawBullets(ctx) {
+    const bnd = this.camera.viewBounds(60);
     ctx.globalCompositeOperation = 'lighter';
     for (const b of this.bullets) {
+      if (b.x < bnd.minX || b.x > bnd.maxX || b.y < bnd.minY || b.y > bnd.maxY) continue;
+      const color = b.crit ? COLORS.gold : COLORS.player;
+      const glow = b.crit ? COLORS.gold : COLORS.playerGlow;
+      const spr = glowSprite('b|' + b.r + '|' + (b.crit ? 1 : 0), b.r * 2.2, 12, (g) => {
+        g.fillStyle = color; g.shadowColor = glow; g.shadowBlur = 12;
+        g.beginPath(); g.ellipse(0, 0, b.r * 2.2, b.r, 0, 0, TAU); g.fill();
+      });
       ctx.save();
       ctx.translate(b.x, b.y);
       ctx.rotate(Math.atan2(b.vy, b.vx));
-      ctx.fillStyle = b.crit ? COLORS.gold : COLORS.player;
-      ctx.shadowColor = b.crit ? COLORS.gold : COLORS.playerGlow;
-      ctx.shadowBlur = 12;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, b.r * 2.2, b.r, 0, 0, TAU);
-      ctx.fill();
+      if (spr) {
+        ctx.drawImage(spr.canvas, -spr.off, -spr.off);
+      } else {
+        ctx.fillStyle = color; ctx.shadowColor = glow; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.ellipse(0, 0, b.r * 2.2, b.r, 0, 0, TAU); ctx.fill();
+      }
       ctx.restore();
     }
     ctx.globalCompositeOperation = 'source-over';
@@ -889,30 +920,56 @@ export class World {
   }
 
   drawEnemyBullets(ctx) {
+    const bnd = this.camera.viewBounds(50);
     ctx.globalCompositeOperation = 'lighter';
     for (const b of this.enemyBullets) {
-      ctx.fillStyle = b.color;
-      ctx.shadowColor = b.color; ctx.shadowBlur = 10;
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+      if (b.x < bnd.minX || b.x > bnd.maxX || b.y < bnd.minY || b.y > bnd.maxY) continue;
+      const spr = glowSprite('eb|' + b.r + '|' + b.color, b.r, 10, (g) => {
+        g.fillStyle = b.color; g.shadowColor = b.color; g.shadowBlur = 10;
+        g.beginPath(); g.arc(0, 0, b.r, 0, TAU); g.fill();
+      });
+      if (spr) {
+        ctx.drawImage(spr.canvas, b.x - spr.off, b.y - spr.off);
+      } else {
+        ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 10;
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+      }
     }
     ctx.globalCompositeOperation = 'source-over';
     ctx.shadowBlur = 0;
   }
 
   drawOrbs(ctx) {
+    const bnd = this.camera.viewBounds(40);
+    const spr = glowSprite('orb', 4, 8, (g) => {
+      g.fillStyle = COLORS.xp; g.shadowColor = COLORS.xp; g.shadowBlur = 8;
+      g.beginPath(); g.arc(0, 0, 4, 0, TAU); g.fill();
+    });
     ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = COLORS.xp;
-    ctx.shadowColor = COLORS.xp; ctx.shadowBlur = 8;
-    for (const o of this.orbs) {
-      const s = 3 + Math.sin(o.t * 8) * 0.6;
-      ctx.beginPath(); ctx.arc(o.x, o.y, s, 0, TAU); ctx.fill();
+    if (spr) {
+      const full = spr.canvas.width;
+      for (const o of this.orbs) {
+        if (o.x < bnd.minX || o.x > bnd.maxX || o.y < bnd.minY || o.y > bnd.maxY) continue;
+        const sc = (3 + Math.sin(o.t * 8) * 0.6) / 4; // pulse, relative to the 4px baked core
+        const d = full * sc;
+        ctx.drawImage(spr.canvas, o.x - spr.off * sc, o.y - spr.off * sc, d, d);
+      }
+    } else {
+      ctx.fillStyle = COLORS.xp; ctx.shadowColor = COLORS.xp; ctx.shadowBlur = 8;
+      for (const o of this.orbs) {
+        if (o.x < bnd.minX || o.x > bnd.maxX || o.y < bnd.minY || o.y > bnd.maxY) continue;
+        const s = 3 + Math.sin(o.t * 8) * 0.6;
+        ctx.beginPath(); ctx.arc(o.x, o.y, s, 0, TAU); ctx.fill();
+      }
     }
     ctx.globalCompositeOperation = 'source-over';
     ctx.shadowBlur = 0;
   }
 
   drawPickups(ctx) {
+    const bnd = this.camera.viewBounds(40);
     for (const it of this.pickups) {
+      if (it.x < bnd.minX || it.x > bnd.maxX || it.y < bnd.minY || it.y > bnd.maxY) continue;
       const y = it.y + Math.sin(it.bob) * 3;
       const color = it.type === 'heal' ? COLORS.heal : it.type === 'magnet' ? COLORS.gold : COLORS.danger;
       ctx.save();
@@ -961,9 +1018,11 @@ export class World {
   }
 
   drawTexts(ctx) {
+    const bnd = this.camera.viewBounds(60);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (const t of this.texts) {
+      if (t.x < bnd.minX || t.x > bnd.maxX || t.y < bnd.minY || t.y > bnd.maxY) continue;
       const a = clamp(t.life / t.maxLife, 0, 1);
       ctx.globalAlpha = a;
       ctx.fillStyle = t.color;
