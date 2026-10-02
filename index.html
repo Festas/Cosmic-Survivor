@@ -1,61 +1,124 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Cosmic Survivor - A Space Arena Survivor Game</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#05060f" />
+  <meta name="description" content="Cosmic Survivor — a fast, juicy top-down space survivor roguelite. Bend gravity with Singularities, blink through bullet-time, and chain elemental reactions." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <title>Cosmic Survivor</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-    <div id="game-container">
-        <canvas id="gameCanvas" width="1200" height="800"></canvas>
-        <div id="ui-overlay">
-            <div id="top-bar">
-                <div id="wave-info">Wave: <span id="wave-number">1</span></div>
-                <div id="timer">Time: <span id="time-left">60</span>s</div>
-                <div id="credits">Credits: <span id="credit-amount">0</span></div>
-            </div>
-            <div id="stats-bar">
-                <div id="health-bar-container">
-                    <div id="health-bar"></div>
-                    <span id="health-text">100 / 100</span>
-                </div>
-            </div>
+  <div id="app">
+    <canvas id="game"></canvas>
+
+    <!-- In-game HUD -->
+    <div id="hud" class="hidden" aria-hidden="true">
+      <div class="hud-top">
+        <div class="hud-left">
+          <div class="chip"><span class="chip-label">THREAT</span><span id="threat">1</span></div>
+          <div class="chip"><span class="chip-label">ENEMIES</span><span id="enemies">0</span></div>
         </div>
-        <div id="shop-modal" class="modal hidden">
-            <div class="modal-content">
-                <h2>Upgrade Station</h2>
-                <p class="wave-complete">Wave <span id="completed-wave">1</span> Complete!</p>
-                <div id="shop-items"></div>
-                <button id="next-wave-btn" class="btn-primary">Start Next Wave</button>
-            </div>
+        <div class="hud-center">
+          <div id="timer">0:00</div>
+          <div id="boss-bar" class="hidden"><span id="boss-name">BOSS</span><div class="boss-track"><i id="boss-fill"></i></div></div>
         </div>
-        <div id="game-over-modal" class="modal hidden">
-            <div class="modal-content">
-                <h2 id="game-over-title">Mission Failed</h2>
-                <p id="game-over-message">You survived <span id="final-wave">0</span> waves</p>
-                <div id="final-stats"></div>
-                <button id="restart-btn" class="btn-primary">Try Again</button>
-            </div>
+        <div class="hud-right">
+          <div id="score">0</div>
+          <div id="multiplier" class="mult">x1.0</div>
+          <div id="hiscore" class="hiscore">BEST 0</div>
         </div>
-        <div id="start-modal" class="modal">
-            <div class="modal-content">
-                <h1>🚀 Cosmic Survivor 🚀</h1>
-                <p class="intro-text">You're stranded on an alien planet. Survive waves of hostile creatures!</p>
-                <div class="controls-info">
-                    <h3>Controls:</h3>
-                    <p>🎮 WASD or Arrow Keys - Move</p>
-                    <p>🔫 Auto-aim and shoot at enemies</p>
-                    <p>💰 Collect credits from defeated enemies</p>
-                    <p>🛒 Buy upgrades between waves</p>
-                </div>
-                <button id="start-btn" class="btn-primary">Begin Mission</button>
-            </div>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="bars">
+          <div class="bar health"><i id="health-fill"></i><span id="health-text">100</span></div>
+          <div class="bar xp"><i id="xp-fill"></i><span id="level-text">LV 1</span></div>
         </div>
+        <div class="abilities">
+          <div id="ability-sing" class="ability"><div class="ring"><svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="19"></circle><circle id="sing-arc" class="arc" cx="22" cy="22" r="19"></circle></svg><span class="ico">🌀</span></div><span class="key">SHIFT</span></div>
+          <div id="ability-dash" class="ability"><div class="ring"><svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="19"></circle><circle id="dash-arc" class="arc" cx="22" cy="22" r="19"></circle></svg><span class="ico">💨</span></div><span class="key">SPACE</span></div>
+        </div>
+      </div>
+
+      <!-- combo flash -->
+      <div id="combo-pop"></div>
     </div>
-    <script src="game.js"></script>
+
+    <!-- Mobile controls -->
+    <div id="touch-controls" class="hidden">
+      <div id="btn-dash" class="touch-btn">💨</div>
+      <div id="btn-sing" class="touch-btn">🌀</div>
+    </div>
+
+    <!-- Start screen -->
+    <div id="start" class="overlay">
+      <div class="panel">
+        <h1 class="title">COSMIC SURVIVOR</h1>
+        <p class="tagline">Bend gravity. Blink through time. Detonate the void.</p>
+        <div class="features">
+          <div><b>🌀 Singularity</b><span>Deploy a black hole that devours swarms, then implodes.</span></div>
+          <div><b>💨 Phase Dash</b><span>Blink through danger — triggers bullet-time &amp; i-frames.</span></div>
+          <div><b>✴️ Resonance</b><span>Chain Fire · Cryo · Shock · Void for explosive reactions.</span></div>
+        </div>
+        <button id="play-btn" class="btn">▶ LAUNCH</button>
+        <div class="controls-hint">
+          <span><kbd>WASD</kbd> Move</span>
+          <span><kbd>Space</kbd> Dash</span>
+          <span><kbd>Shift</kbd> Singularity</span>
+          <span><kbd>P</kbd> Pause</span>
+          <span>Auto-fire at the nearest enemy</span>
+        </div>
+        <div class="settings-row">
+          <label><input type="checkbox" id="opt-music" checked /> Music</label>
+          <label><input type="checkbox" id="opt-sfx" checked /> Sound</label>
+          <label><input type="checkbox" id="opt-shake" checked /> Screen shake</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Level up draft -->
+    <div id="levelup" class="overlay hidden">
+      <div class="panel levelup-panel">
+        <h2 class="levelup-title">LEVEL&nbsp;UP</h2>
+        <p class="levelup-sub">Choose an augment</p>
+        <div id="cards" class="cards"></div>
+        <div class="draft-hint">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> to pick</div>
+      </div>
+    </div>
+
+    <!-- Pause -->
+    <div id="pause" class="overlay hidden">
+      <div class="panel">
+        <h2>PAUSED</h2>
+        <div id="pause-stats" class="run-stats"></div>
+        <button id="resume-btn" class="btn">Resume</button>
+        <button id="quit-btn" class="btn btn-ghost">Abandon Run</button>
+        <div class="settings-row">
+          <label><input type="checkbox" id="opt-music2" /> Music</label>
+          <label><input type="checkbox" id="opt-sfx2" /> Sound</label>
+          <label><input type="checkbox" id="opt-shake2" /> Screen shake</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Game over -->
+    <div id="gameover" class="overlay hidden">
+      <div class="panel">
+        <h2 id="go-title">SYSTEM&nbsp;FAILURE</h2>
+        <div id="go-newbest" class="newbest hidden">★ NEW BEST ★</div>
+        <div id="go-score" class="go-score">0</div>
+        <div id="go-stats" class="run-stats"></div>
+        <button id="retry-btn" class="btn">↻ RETRY</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
 </body>
 </html>
