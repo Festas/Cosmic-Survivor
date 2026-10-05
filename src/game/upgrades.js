@@ -156,11 +156,14 @@ export function luckFactor(rarity, luck) {
 }
 
 // Draft `count` distinct cards for the level-up screen.
+// EVOLVE_WEIGHT_BOOST offsets an evolve card's low legendary base weight (4) so
+// that, when a weapon is actually eligible to evolve, the card appears reliably.
+const EVOLVE_WEIGHT_BOOST = 3;
 export function draftUpgrades(player, count = 3, r) {
   const luck = player.stats.luck || 0;
   const pool = buildPool(player).map((c) => ({
     ...c,
-    weight: RARITY[c.rarity].weight * (c.kind === 'evolve' ? 3 : 1) * luckFactor(c.rarity, luck),
+    weight: RARITY[c.rarity].weight * (c.kind === 'evolve' ? EVOLVE_WEIGHT_BOOST : 1) * luckFactor(c.rarity, luck),
   }));
   const chosen = [];
   const bag = shuffle(pool, r);
