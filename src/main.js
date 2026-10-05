@@ -9,6 +9,8 @@ import { RARITY } from './game/upgrades.js';
 import { weaponDef } from './game/weapons.js';
 import { SHIPS, shipById, DEFAULT_SHIP_ID } from './game/ships.js';
 import { META_UPGRADES, metaCost } from './game/meta.js';
+import { DIRECTIVES, DIRECTIVE_BY_ID, directiveStardustMultiplier } from './game/modifiers.js';
+import { ACHIEVEMENTS, evaluateAchievements } from './game/achievements.js';
 import { formatNumber, formatTime } from './engine/utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -104,10 +106,12 @@ function cycleShip(dir) {
 function refreshStart() {
   $('start-stardust').textContent = formatNumber(store.stardust);
   updateShipPick();
+  updateStartDirectives();
 }
 
 // ---- Hangar overlay ----
 let hangarTab = 'ships';
+const HANGAR_TABS = ['ships', 'meta', 'directives', 'codex'];
 
 function openHangar() {
   renderHangar();
@@ -120,10 +124,12 @@ function closeHangar() {
 
 function setHangarTab(tab) {
   hangarTab = tab;
-  $('tab-ships').classList.toggle('active', tab === 'ships');
-  $('tab-meta').classList.toggle('active', tab === 'meta');
-  $('hangar-ships').classList.toggle('hidden', tab !== 'ships');
-  $('hangar-meta').classList.toggle('hidden', tab !== 'meta');
+  for (const t of HANGAR_TABS) {
+    const btn = $('tab-' + t);
+    const body = $('hangar-' + t);
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (body) body.classList.toggle('hidden', t !== tab);
+  }
 }
 
 function renderHangar() {
@@ -131,6 +137,8 @@ function renderHangar() {
   renderPilotRecord();
   renderShips();
   renderMeta();
+  renderDirectives();
+  renderCodex();
   setHangarTab(hangarTab);
 }
 
@@ -209,6 +217,89 @@ function renderMeta() {
   }
 }
 
+// ---- Directives: opt-in challenge modifiers (more risk → more Stardust) ----
+function renderDirectives() {
+  const wrap = $('hangar-directives');
+  if (!wrap) return;
+  const active = new Set(store.getDirectives());
+  wrap.innerHTML = '';
+
+  const note = document.createElement('div');
+  note.className = 'directive-note';
+  const mult = directiveStardustMultiplier(store.getDirectives());
+  note.innerHTML = active.size
+    ? `<b>${active.size}</b> active · Stardust reward <b>×${mult.toFixed(2)}</b>`
+    : 'Toggle Directives to make runs harder — and multiply the Stardust you earn.';
+  wrap.appendChild(note);
+
+  for (const d of DIRECTIVES) {
+    const on = active.has(d.id);
+    const pct = Math.round((d.stardustMul - 1) * 100);
+    const card = document.createElement('div');
+    card.className = 'directive-card' + (on ? ' active' : '');
+    card.innerHTML = `
+      <div class="dir-head">
+        <span class="dir-ico">${d.icon}</span>
+        <span class="dir-name">${d.name}</span>
+        <span class="dir-reward">✦ +${pct}%</span>
+      </div>
+      <div class="dir-desc">${d.desc}</div>
+      <div class="dir-foot">
+        <span class="dir-risk">${d.risk}</span>
+        <span class="dir-toggle">${on ? 'ACTIVE' : 'ENABLE'}</span>
+      </div>`;
+    card.addEventListener('click', () => {
+      store.toggleDirective(d.id);
+      audio.play('ui');
+      renderDirectives();
+    });
+    wrap.appendChild(card);
+  }
+  updateStartDirectives();
+}
+
+// ---- Codex: the commendation gallery (milestone awards) ----
+function renderCodex() {
+  const wrap = $('hangar-codex');
+  if (!wrap) return;
+  const owned = new Set(store.getAchievements());
+  wrap.innerHTML = '';
+
+  const head = document.createElement('div');
+  head.className = 'codex-progress';
+  head.innerHTML = `<b>${owned.size}</b> / ${ACHIEVEMENTS.length} commendations earned`;
+  wrap.appendChild(head);
+
+  for (const a of ACHIEVEMENTS) {
+    const got = owned.has(a.id);
+    const cell = document.createElement('div');
+    cell.className = 'codex-cell' + (got ? ' earned' : ' locked');
+    cell.innerHTML = `
+      <div class="cx-ico">${got ? a.icon : '🔒'}</div>
+      <div class="cx-main">
+        <div class="cx-name">${a.name}</div>
+        <div class="cx-desc">${a.desc}</div>
+      </div>
+      <div class="cx-reward">✦ ${a.reward}</div>`;
+    wrap.appendChild(cell);
+  }
+}
+
+// Start-screen summary of the directives that will apply to the next run.
+function updateStartDirectives() {
+  const node = $('start-directives');
+  if (!node) return;
+  const ids = store.getDirectives();
+  if (!ids.length) { node.classList.add('hidden'); node.innerHTML = ''; return; }
+  const icons = ids.map((id) => {
+    const d = DIRECTIVE_BY_ID[id];
+    return d ? `<span class="sd-ico" title="${d.name}">${d.icon}</span>` : '';
+  }).join('');
+  const mult = directiveStardustMultiplier(ids);
+  node.innerHTML = `<span class="sd-label">DIRECTIVES</span>${icons}<span class="sd-mult">✦ ×${mult.toFixed(2)}</span>`;
+  node.classList.remove('hidden');
+}
+
 // ------------------------------------------------------------- run control
 function startRun() {
   audio.unlock();
@@ -216,7 +307,11 @@ function startRun() {
   audio.setMuted(s.muted);
   audio.setMusic(s.music);
   rng.reseed((Math.random() * 2 ** 32) >>> 0);
-  world.reset({ shipId: store.getSelectedShip(), metaLevels: store.getMeta() });
+  world.reset({
+    shipId: store.getSelectedShip(),
+    metaLevels: store.getMeta(),
+    directives: store.getDirectives().slice(),
+  });
   bindWorld();
   resize();
   started = true;
@@ -312,13 +407,31 @@ function toggleBanishMode() {
 // ------------------------------------------------------------- game over UI
 function showGameOver(summary) {
   $('hud').classList.add('hidden');
+  // Evaluate commendations first: career totals were already persisted by
+  // world.endRun (recordRun), so the merged context is up to date. Any bounty
+  // Stardust is added before we read the running total below.
+  const newCommends = awardCommendations(summary);
+
   $('go-score').textContent = formatNumber(summary.score);
   $('go-newbest').classList.toggle('hidden', !summary.newBest);
   const earned = summary.stardust || 0;
-  const total = summary.stardustTotal ?? store.stardust;
+  const total = store.stardust;
   const goSd = $('go-stardust');
   goSd.textContent = `✦ +${formatNumber(earned)} Stardust  ·  ${formatNumber(total)} total`;
   goSd.classList.toggle('none', earned <= 0);
+
+  const gc = $('go-commends');
+  if (gc) {
+    if (newCommends.length) {
+      gc.innerHTML = newCommends.map((a) =>
+        `<div class="commend"><span class="c-ico">${a.icon}</span><span class="c-name">${a.name}</span><span class="c-rew">✦ +${a.reward}</span></div>`).join('');
+      gc.classList.remove('hidden');
+    } else {
+      gc.innerHTML = '';
+      gc.classList.add('hidden');
+    }
+  }
+
   const rows = {
     Time: formatTime(summary.time),
     Level: summary.level,
@@ -328,6 +441,48 @@ function showGameOver(summary) {
   if (summary.bossKills > 0) rows.Bosses = summary.bossKills;
   $('go-stats').innerHTML = statRows(rows);
   $('gameover').classList.remove('hidden');
+}
+
+// Merge the just-finished run summary with persisted career totals into the flat
+// context the commendation checks read (see achievements.js).
+function buildAchievementCtx(summary) {
+  const d = store.get();
+  return {
+    // single-run metrics
+    score: summary.score, time: summary.time, level: summary.level,
+    kills: summary.kills, bossKills: summary.bossKills || 0,
+    reactions: summary.reactions || 0, directives: summary.directives || 0,
+    // lifetime / career metrics
+    runs: d.runs || 0, totalKills: d.totalKills || 0,
+    bossKillsTotal: d.bossKillsTotal || 0,
+    shipsUnlocked: ownedShips().length, shipsTotal: SHIPS.length,
+  };
+}
+
+// Unlock any newly earned commendations, pay their one-time Stardust bounty, and
+// surface them via toasts. Returns the freshly unlocked definitions (for the
+// game-over panel).
+function awardCommendations(summary) {
+  const fresh = evaluateAchievements(store.getAchievements(), buildAchievementCtx(summary));
+  if (!fresh.length) return [];
+  let bounty = 0;
+  for (const a of fresh) if (store.unlockAchievement(a.id)) bounty += a.reward || 0;
+  if (bounty > 0) { store.addStardust(bounty); audio.play('levelup'); }
+  for (const a of fresh) {
+    showToast(`<span class="t-ico">${a.icon}</span><div class="t-body"><b>${a.name}</b><span>Commendation · ✦ +${a.reward}</span></div>`);
+  }
+  return fresh;
+}
+
+// Transient top-of-screen notification (auto-dismisses via CSS animation).
+function showToast(html) {
+  const wrap = $('toast');
+  if (!wrap) return;
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = html;
+  wrap.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
 }
 
 function statRows(obj) {
@@ -356,6 +511,7 @@ const el = {
   odBar: $('overdrive-bar'), odFill: $('od-fill'), odText: $('od-text'),
   loadout: $('loadout'),
   reviveChip: $('revive-chip'), reviveN: $('revive-n'),
+  directiveChip: $('directive-chip'), directiveN: $('directive-n'),
 };
 const ARC_LEN = 119.4;
 
@@ -366,6 +522,9 @@ function updateHud() {
   const revives = h.revives || 0;
   el.reviveChip.classList.toggle('hidden', revives <= 0);
   if (revives > 0) el.reviveN.textContent = revives;
+  const dirs = world.directives ? world.directives.length : 0;
+  el.directiveChip.classList.toggle('hidden', dirs <= 0);
+  if (dirs > 0) el.directiveN.textContent = dirs;
   el.timer.textContent = formatTime(h.time);
   el.score.textContent = formatNumber(h.score);
   el.mult.textContent = 'x' + h.multiplier.toFixed(1);
@@ -468,6 +627,8 @@ $('go-hangar-btn').addEventListener('click', openHangar);
 $('hangar-close').addEventListener('click', closeHangar);
 $('tab-ships').addEventListener('click', () => setHangarTab('ships'));
 $('tab-meta').addEventListener('click', () => setHangarTab('meta'));
+$('tab-directives').addEventListener('click', () => setHangarTab('directives'));
+$('tab-codex').addEventListener('click', () => setHangarTab('codex'));
 $('ship-prev').addEventListener('click', () => cycleShip(-1));
 $('ship-next').addEventListener('click', () => cycleShip(1));
 
