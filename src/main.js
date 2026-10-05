@@ -152,7 +152,7 @@ function renderShips() {
   for (const ship of SHIPS) {
     const unlocked = ship.unlockCost === 0 || store.isShipUnlocked(ship.id);
     const selected = selId === ship.id;
-    const def = weaponDef({ id: ship.weapon });
+    const def = weaponDef(ship.weapon);
     const card = document.createElement('div');
     card.className = 'ship-card' + (selected ? ' selected' : '') + (unlocked ? '' : ' locked');
     card.style.setProperty('--accent', ship.color);
