@@ -19,6 +19,7 @@ import { weaponDef, addOrLevelWeapon, evolveWeapon, createWeaponInst } from './w
 import { Background } from './background.js';
 import { shipById, DEFAULT_SHIP_ID } from './ships.js';
 import { computeMetaBonus, createMetaBonus, stardustForRun } from './meta.js';
+import { computeDirectiveEffect, createDirectiveEffect } from './modifiers.js';
 
 // Lightweight uniform spatial grid for enemy broad-phase queries.
 // Cells are addressed with packed integer keys (instead of string keys) to cut
@@ -85,7 +86,14 @@ export class World {
     this.shipId = config.shipId || DEFAULT_SHIP_ID;
     this.metaBonus = config.metaLevels ? computeMetaBonus(config.metaLevels)
       : (config.metaBonus || createMetaBonus());
+    // Active challenge directives fold into one difficulty/economy effect object
+    // that spawn, damage, XP and reward code read. Neutral (all 1s) when none set.
+    this.directives = Array.isArray(config.directives) ? config.directives.slice() : [];
+    this.diff = this.directives.length ? computeDirectiveEffect(this.directives)
+      : createDirectiveEffect();
     this.applyLoadout(this.player, this.shipId, this.metaBonus);
+    // Directive XP modifier layers on top of the loadout's xpMul.
+    this.player.stats.xpMul *= this.diff.xpMul;
 
     this.camera.x = this.player.x;
     this.camera.y = this.player.y;
@@ -108,6 +116,7 @@ export class World {
     this.score = 0;
     this.kills = 0;
     this.bossKills = 0;
+    this.reactions = 0;
     this.revives = this.metaBonus.revives || 0;
     this.streak = 0;
     this.comboTimer = 0;
@@ -164,19 +173,24 @@ export class World {
   requestBulletTime(scale, dur) { this.bulletTimeScale = scale; this.bulletTime = Math.max(this.bulletTime, dur); }
 
   // -------------------------------------------------------- spawning
+  // Directive-adjusted concurrent-enemy cap (capMul widens/narrows the budget).
+  capNow() { return Math.floor(enemyCap(this.elapsed) * (this.diff?.capMul || 1)); }
+
   spawnEnemy(typeKey, x, y) {
     const isBoss = !!BOSS_TYPES[typeKey];
     const def = isBoss ? BOSS_TYPES[typeKey] : ENEMY_TYPES[typeKey];
     if (!def) return null;
-    const hpS = hpScale(this.elapsed);
-    const spS = speedScale(this.elapsed);
+    const d = this.diff || createDirectiveEffect();
+    // Bosses use bossHpMul; rank-and-file use the time-based hp curve × hpMul.
+    const hp = isBoss ? def.hp * d.bossHpMul : def.hp * hpScale(this.elapsed) * d.hpMul;
+    const speed = (isBoss ? def.speed : def.speed * speedScale(this.elapsed)) * d.speedMul;
     const e = {
       type: def, key: typeKey, boss: !!def.boss,
       x, y, vx: 0, vy: 0, kx: 0, ky: 0,
-      hp: def.hp * (isBoss ? 1 : hpS),
-      maxHp: def.hp * (isBoss ? 1 : hpS),
+      hp,
+      maxHp: hp,
       radius: def.radius,
-      speed: def.speed * (isBoss ? 1 : spS),
+      speed,
       damage: def.damage,
       xp: def.xp,
       color: def.color,
@@ -207,7 +221,7 @@ export class World {
   // feel. Strictly bounded by enemyCap so a wave can never blow the enemy budget
   // (keeps the frame budget safe on later, denser waves).
   spawnFormation() {
-    const room = enemyCap(this.elapsed) - this.enemies.length;
+    const room = this.capNow() - this.enemies.length;
     if (room < 4) return; // not enough headroom for a meaningful row
     // Pick an unlocked invader type for the fleet.
     const roster = [];
@@ -255,8 +269,8 @@ export class World {
 
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
-      this.spawnTimer += spawnInterval(this.elapsed);
-      if (this.enemies.length < enemyCap(this.elapsed)) {
+      this.spawnTimer += spawnInterval(this.elapsed) * (this.diff?.spawnMul || 1);
+      if (this.enemies.length < this.capNow()) {
         const key = pickEnemyType(this.elapsed, this.rng);
         const n = packSize(key);
         for (let i = 0; i < n; i++) this.spawnRing(key);
@@ -414,6 +428,7 @@ export class World {
   // reaction descriptor from elements.js resolved spatially here
   applyReaction(r, x, y, source) {
     const mult = this.player.stats.elementMul;
+    this.reactions = (this.reactions || 0) + 1;
     this.addText(x, y - 30, r.name.toUpperCase(), r.color, 18);
     this.audio?.play('reaction');
     this.particles.burst(x, y, r.color, 12, { speed: 300, life: 0.5, size: 3, budget: 360 });
@@ -944,14 +959,18 @@ export class World {
     const summary = {
       score: this.score, time: this.elapsed, level: this.level, kills: this.kills,
       bossKills: this.bossKills || 0,
+      reactions: this.reactions || 0,
+      shipId: this.shipId,
+      directives: this.directives ? this.directives.length : 0,
     };
     const { newBest } = this.store ? this.store.recordRun(summary) : { newBest: false };
     summary.newBest = newBest;
     summary.highScore = this.store ? this.store.get().highScore : this.score;
 
-    // Award Stardust (meta currency) for this run, scaled by the salvage meta.
+    // Award Stardust (meta currency) for this run, scaled by the salvage meta and
+    // by the combined Stardust bonus of any active challenge directives.
     const base = stardustForRun(summary);
-    const earned = Math.floor(base * (this.metaBonus?.stardustMul || 1));
+    const earned = Math.floor(base * (this.metaBonus?.stardustMul || 1) * (this.diff?.stardustMul || 1));
     summary.stardust = earned;
     if (this.store?.addStardust) {
       this.store.addStardust(earned);
@@ -1395,6 +1414,7 @@ export class World {
       enemies: this.enemies.length,
       boss: this.bossActive,
       revives: this.revives || 0,
+      directives: this.directives ? this.directives.length : 0,
     };
   }
 }

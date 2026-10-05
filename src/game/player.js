@@ -127,7 +127,8 @@ export class Player {
       world.addText(this.x, this.y - 24, 'DODGE', COLORS.cryo, 14);
       return 0;
     }
-    const dmg = Math.max(1, amount - this.stats.armor);
+    const incoming = amount * (world.diff?.dmgTakenMul || 1);
+    const dmg = Math.max(1, incoming - this.stats.armor);
     this.hp -= dmg;
     this.invuln = PLAYER.invulnOnHit;
     this.hitFlash = 1;

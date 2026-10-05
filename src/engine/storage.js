@@ -8,30 +8,47 @@ const DEFAULT = {
   bestLevel: 0,
   runs: 0,
   totalKills: 0,
+  bossKillsTotal: 0,    // lifetime bosses destroyed (for commendations)
   // ---- Meta-progression ("Ascension") -----------------------------------
   stardust: 0,          // current spendable currency
   lifetimeStardust: 0,  // total ever earned (for stats / prestige display)
   meta: {},             // { [upgradeId]: level }
   ships: ['vanguard'],  // unlocked ship ids (vanguard is always free)
   ship: 'vanguard',     // last-selected ship id
+  achievements: [],     // unlocked commendation ids
+  directives: [],       // active challenge-directive ids (carried across runs)
   settings: { muted: false, shake: true, music: true },
 };
 
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULT, meta: {}, ships: ['vanguard'], settings: { ...DEFAULT.settings } };
+    if (!raw) return freshDefault();
     const data = JSON.parse(raw);
     return {
       ...DEFAULT,
       ...data,
       meta: { ...(data.meta || {}) },
       ships: Array.isArray(data.ships) && data.ships.length ? data.ships : ['vanguard'],
+      achievements: Array.isArray(data.achievements) ? [...data.achievements] : [],
+      directives: Array.isArray(data.directives) ? [...data.directives] : [],
       settings: { ...DEFAULT.settings, ...(data.settings || {}) },
     };
   } catch {
-    return { ...DEFAULT, meta: {}, ships: ['vanguard'], settings: { ...DEFAULT.settings } };
+    return freshDefault();
   }
+}
+
+// A pristine copy of DEFAULT with fresh (non-shared) object/array fields.
+function freshDefault() {
+  return {
+    ...DEFAULT,
+    meta: {},
+    ships: ['vanguard'],
+    achievements: [],
+    directives: [],
+    settings: { ...DEFAULT.settings },
+  };
 }
 
 function save(data) {
@@ -95,15 +112,50 @@ export const Store = {
   },
 
   // Record the result of a finished run. Returns { newBest }.
-  recordRun({ score, time, level, kills }) {
+  recordRun({ score, time, level, kills, bossKills }) {
     const d = this.data;
     const newBest = score > d.highScore;
     d.runs += 1;
     d.totalKills += kills || 0;
+    d.bossKillsTotal = (d.bossKillsTotal || 0) + (bossKills || 0);
     if (score > d.highScore) d.highScore = score;
     if (time > d.bestTime) d.bestTime = time;
     if (level > d.bestLevel) d.bestLevel = level;
     this.save();
     return { newBest };
   },
+
+  // ---- Commendations (achievements) --------------------------------------
+  getAchievements() {
+    if (!Array.isArray(this.data.achievements)) this.data.achievements = [];
+    return this.data.achievements;
+  },
+  isAchievementUnlocked(id) { return this.getAchievements().includes(id); },
+
+  // Unlock a commendation (idempotent). Returns true only if it was newly added.
+  unlockAchievement(id) {
+    const list = this.getAchievements();
+    if (list.includes(id)) return false;
+    list.push(id);
+    this.save();
+    return true;
+  },
+
+  // ---- Directives (run modifiers) ----------------------------------------
+  getDirectives() {
+    if (!Array.isArray(this.data.directives)) this.data.directives = [];
+    return this.data.directives;
+  },
+  isDirectiveActive(id) { return this.getDirectives().includes(id); },
+
+  // Toggle a directive on/off for future runs. Returns the new active state.
+  toggleDirective(id) {
+    const list = this.getDirectives();
+    const i = list.indexOf(id);
+    if (i >= 0) { list.splice(i, 1); this.save(); return false; }
+    list.push(id);
+    this.save();
+    return true;
+  },
+  clearDirectives() { this.data.directives = []; this.save(); },
 };
