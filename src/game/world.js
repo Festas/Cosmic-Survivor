@@ -59,6 +59,11 @@ export class World {
     this.background = new Background();
     this.grid = new Grid(80);
     this._q = [];
+    // Floating damage numbers are pooled and merged (see addDamageText): during a
+    // boss fight the player can land hundreds of hits/second, and spawning a fresh
+    // rising number per hit was a major render + GC cost.
+    this._textPool = [];
+    this.maxTexts = 160;
 
     this.reset();
   }
@@ -203,7 +208,7 @@ export class World {
 
   muzzle(x, y, angle) {
     for (let i = 0; i < 3; i++) {
-      this.particles.spawn(x, y, COLORS.player, { angle: angle + randRange(-0.3, 0.3), speed: 260, life: 0.18, size: 2 });
+      this.particles.spawn(x, y, COLORS.player, { angle: angle + randRange(-0.3, 0.3), speed: 260, life: 0.18, size: 2, budget: 320 });
     }
   }
 
@@ -223,7 +228,7 @@ export class World {
       e.ky += Math.sin(a) * opts.knockback;
     }
     if (opts.text !== false) {
-      this.addText(e.x, e.y - e.radius - 6, String(rounded), opts.crit ? COLORS.gold : (opts.color || COLORS.white), opts.crit ? 20 : 14);
+      this.addDamageText(e, rounded, opts.crit ? COLORS.gold : (opts.color || COLORS.white), opts.crit ? 20 : 14);
     }
     if (opts.crit) this.audio?.play('crit'); else if (opts.source === 'bullet') this.audio?.play('hit');
     // lifesteal
@@ -302,7 +307,7 @@ export class World {
     const mult = this.player.stats.elementMul;
     this.addText(x, y - 30, r.name.toUpperCase(), r.color, 18);
     this.audio?.play('reaction');
-    this.particles.burst(x, y, r.color, 24, { speed: 300, life: 0.5, size: 3 });
+    this.particles.burst(x, y, r.color, 12, { speed: 300, life: 0.5, size: 3, budget: 360 });
     this.flash = Math.max(this.flash, 0.18);
     if (r.type === 'burst' || r.type === 'field') {
       this.explodeReaction(x, y, (r.radius || 100), (r.damage || 30) * mult, r.color, r.knockback || 120);
@@ -323,7 +328,7 @@ export class World {
 
   explodeReaction(x, y, r, dmg, color, knock) {
     this.damageEnemiesInRadius(x, y, r, dmg, { source: 'reaction', color, knockback: knock });
-    for (let i = 0; i < 2; i++) this.particles.spawn(x, y, color, { speed: 60, life: 0.4, size: r * 0.12 });
+    for (let i = 0; i < 2; i++) this.particles.spawn(x, y, color, { speed: 60, life: 0.4, size: r * 0.12, budget: 300 });
   }
 
   chainLightning(x, y, jumps, dmg, radius, origin) {
@@ -351,7 +356,7 @@ export class World {
       const t = i / seg;
       const px = lerp(x1, x2, t) + randRange(-8, 8);
       const py = lerp(y1, y2, t) + randRange(-8, 8);
-      this.particles.spawn(px, py, color, { speed: 20, life: 0.22, size: 2.5 });
+      this.particles.spawn(px, py, color, { speed: 20, life: 0.22, size: 2.5, budget: 300 });
     }
   }
 
@@ -415,9 +420,9 @@ export class World {
         }
       }
       // accretion particles
-      if (chance(0.9)) {
+      if (chance(0.5)) {
         const p = randOnCircle(sg.x, sg.y, sg.pullRadius * randRange(0.5, 1));
-        this.particles.spawn(p.x, p.y, pick([COLORS.void, COLORS.shock, COLORS.white]), { vx: (sg.x - p.x) * 2, vy: (sg.y - p.y) * 2, life: 0.5, size: 2 });
+        this.particles.spawn(p.x, p.y, pick([COLORS.void, COLORS.shock, COLORS.white]), { vx: (sg.x - p.x) * 2, vy: (sg.y - p.y) * 2, life: 0.5, size: 2, budget: 500 });
       }
       if (sg.t >= sg.duration && !sg.imploded) {
         sg.imploded = true;
@@ -450,7 +455,43 @@ export class World {
 
   // -------------------------------------------------------- text popups
   addText(x, y, text, color, size = 14) {
-    this.texts.push({ x: x + randRange(-6, 6), y, vy: -42, life: 0.9, maxLife: 0.9, text, color, size });
+    const t = this._textPool.pop() || {};
+    t.x = x + randRange(-6, 6); t.y = y; t.vy = -42;
+    t.life = 0.9; t.maxLife = 0.9; t.text = text; t.color = color; t.size = size;
+    t.num = 0; t.owner = null;
+    this._pushText(t);
+    return t;
+  }
+
+  _pushText(t) {
+    const texts = this.texts;
+    if (texts.length >= this.maxTexts) {
+      // Recycle the oldest text (texts are pushed in age order) to bound work.
+      const old = texts.shift();
+      if (old.owner && old.owner._dmgText === old) old.owner._dmgText = null;
+      this._textPool.push(old);
+    }
+    texts.push(t);
+  }
+
+  // Merge repeated damage on the same enemy into a single rising number so that a
+  // storm of hits produces one growing total instead of hundreds of overlapping
+  // fillText draws. Falls back to a fresh text when none is active on the enemy.
+  addDamageText(e, amount, color, size) {
+    const cur = e._dmgText;
+    if (cur && cur.owner === e && cur.life > cur.maxLife * 0.45) {
+      cur.num += amount;
+      cur.text = String(cur.num);
+      cur.life = cur.maxLife;
+      cur.x = e.x + randRange(-4, 4);
+      cur.y = e.y - e.radius - 6;
+      if (size > cur.size) cur.size = size;
+      if (color === COLORS.gold) cur.color = color;
+      return cur;
+    }
+    const t = this.addText(e.x, e.y - e.radius - 6, String(amount), color, size);
+    t.num = amount; t.owner = e; e._dmgText = t;
+    return t;
   }
 
   // -------------------------------------------------------- pickups & xp
@@ -603,7 +644,7 @@ export class World {
         }
       }
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (chance(0.5)) this.particles.spawn(b.x, b.y, b.crit ? COLORS.gold : COLORS.player, { speed: 10, life: 0.18, size: b.r * 0.7 });
+      if (chance(0.25)) this.particles.spawn(b.x, b.y, b.crit ? COLORS.gold : COLORS.player, { speed: 10, life: 0.18, size: b.r * 0.7, budget: 700 });
 
       // collide with enemies
       this.grid.query(b.x, b.y, b.r + 30, this._q);
@@ -628,7 +669,7 @@ export class World {
   hitEnemyWithBullet(b, e) {
     const s = this.player.stats;
     this.damageEnemy(e, b.dmg, { crit: b.crit, source: 'bullet', knockback: b.knockback, angle: Math.atan2(b.vy, b.vx), lifesteal: true });
-    this.particles.burst(b.x, b.y, COLORS.white, 3, { speed: 140, life: 0.2, size: 2 });
+    this.particles.burst(b.x, b.y, COLORS.white, 2, { speed: 140, life: 0.2, size: 2, budget: 500 });
     if (!e.alive) return;
     // elemental imbues -> possible reactions
     for (const key of ['fire', 'cryo', 'shock', 'void']) {
@@ -646,7 +687,7 @@ export class World {
       const b = this.enemyBullets[i];
       b.life -= dt;
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (chance(0.3)) this.particles.spawn(b.x, b.y, b.color, { speed: 8, life: 0.2, size: b.r * 0.6 });
+      if (chance(0.15)) this.particles.spawn(b.x, b.y, b.color, { speed: 8, life: 0.2, size: b.r * 0.6, budget: 700 });
       const rr = p.radius + b.r;
       if (dist2(b.x, b.y, p.x, p.y) < rr * rr) {
         p.takeDamage(b.dmg, this);
@@ -706,7 +747,11 @@ export class World {
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const t = this.texts[i];
       t.life -= dt; t.y += t.vy * dt; t.vy *= Math.pow(0.1, dt);
-      if (t.life <= 0) this.texts.splice(i, 1);
+      if (t.life <= 0) {
+        if (t.owner && t.owner._dmgText === t) t.owner._dmgText = null;
+        this.texts.splice(i, 1);
+        this._textPool.push(t);
+      }
     }
   }
 

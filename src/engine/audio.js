@@ -15,6 +15,43 @@ export class AudioEngine {
     this._nextNote = 0;
     this._step = 0;
     this._lastShoot = 0;
+    // Per-sound throttle + a global polyphony budget. Boss fights can request
+    // hundreds of SFX/second (every bullet hit, crit and elemental reaction);
+    // minting that many WebAudio node graphs is a real source of main-thread
+    // jank, so we rate-limit noisy effects and cap concurrent voices.
+    this._last = Object.create(null);
+    this._voices = [];
+  }
+
+  // Minimum seconds between successive plays of the same sound. Keeps rapid-fire
+  // combat sounds from stacking into a buzzing wall (and from flooding the audio
+  // graph). Important one-shots (level up, boss, death) are intentionally absent.
+  static THROTTLE = {
+    shoot: 0.045, hit: 0.05, crit: 0.05, reaction: 0.06,
+    explode: 0.05, espit: 0.04, edash: 0.06, pickup: 0.02,
+  };
+
+  // Sounds that must always play even when the voice budget is saturated.
+  static PRIORITY = new Set([
+    'levelup', 'implode', 'singularity', 'bosswarn', 'hurt', 'gameover', 'ui', 'evolve',
+  ]);
+
+  // Returns false if this request should be dropped (throttled or over-budget).
+  _gate(name, now) {
+    const minGap = AudioEngine.THROTTLE[name];
+    if (minGap) {
+      const last = this._last[name] || 0;
+      if (now - last < minGap) return false;
+      this._last[name] = now;
+    }
+    // Prune finished voices, then enforce a concurrency cap for non-priority SFX.
+    const v = this._voices;
+    let w = 0;
+    for (let i = 0; i < v.length; i++) if (v[i] > now) v[w++] = v[i];
+    v.length = w;
+    if (!AudioEngine.PRIORITY.has(name) && v.length >= 20) return false;
+    v.push(now + 0.25);
+    return true;
   }
 
   unlock() {
@@ -99,9 +136,9 @@ export class AudioEngine {
   play(name, opts = {}) {
     if (!this.ctx || this.muted) return;
     const t = this.ctx.currentTime;
+    if (!this._gate(name, t)) return;
     switch (name) {
       case 'shoot': {
-        if (t - this._lastShoot < 0.03) return; // avoid buzz on rapid fire
         this._lastShoot = t;
         this._tone(660, 0.09, 'square', 0.12, t, 240);
         break;
