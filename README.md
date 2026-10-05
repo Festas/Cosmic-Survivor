@@ -1,8 +1,10 @@
 # 🌌 Cosmic Survivor
 
-A fast, juicy **top-down space survivor-roguelite**. Pilot a lone starfighter against
-endless swarms of the Devourer's brood, auto-firing while you weave through bullet-hell
-chaos. Survive, level up, and draft game-warping upgrades — then do it all again, better.
+A fast, juicy **top-down space survivor-roguelite** with an **OG alien-invaders** heart and
+**Vampire Survivors × Brotato × Binding of Isaac** build-craft. Pilot a lone starfighter
+against endless invader swarms, auto-firing a growing **arsenal** while you weave through
+bullet-hell chaos. Survive, level up, draft game-warping weapons and items, **evolve** them
+into legendary forms, and ride the **Overdrive** meter to a screen-clearing rampage.
 
 Built from scratch as a **zero-dependency** project: vanilla JavaScript ES modules,
 HTML5 Canvas 2D, and fully procedural WebAudio. No frameworks, no build step, no bundler.
@@ -41,6 +43,39 @@ already-afflicted enemy triggers a **Resonance reaction**:
 
 Stack *Resonance Cascade* to make every reaction hit even harder.
 
+### 🔆 Overdrive
+Every kill stokes the **Overdrive meter**, and chaining kills on a hot combo fills it
+faster. When it tops out, your ship enters a short **rampage**: dramatically faster
+cooldowns and bonus damage across your whole arsenal. *Overdrive Reactor* builds the meter
+quicker and extends the rampage.
+
+---
+
+## 🔫 Arsenal, evolutions & items
+
+Instead of a single gun, you build a **loadout of up to 6 auto-firing weapons** (Vampire
+Survivors style). Each weapon levels up independently, and when a weapon is **maxed** and you
+own the passive it craves, it **evolves** into a legendary form:
+
+| Base weapon        | Evolves into        | Requires                         |
+| ------------------ | ------------------- | -------------------------------- |
+| Ion Blaster        | **Photon Storm**    | Targeting Array (homing)         |
+| Scatter Array      | **Flak Cannon**     | high crit chance                 |
+| Arc Coil           | **Tesla Web**       | Tesla Rounds (shock imbue)       |
+| Missile Pod        | **Swarm Barrage**   | Volatile Payload (explosive)     |
+| Pulse Nova         | **Nova Collapse**   | large blast radius               |
+| Rail Lance         | **Void Lance**      | Void Rounds or heavy pierce      |
+| Graviton Mortar    | **Cluster Swarm**   | Volatile Payload (explosive)     |
+
+**Passive items** are shared stat augments — damage, crit, haste, pierce, elemental imbues,
+drones, lifesteal, armor and more — that buff *every* weapon and ability at once, so builds
+snowball through synergy. Items come in four rarities (**Common → Rare → Epic → Legendary**)
+with stack caps, and some are gated behind what you already own.
+
+Each **level-up** offers a mix of draft cards — a brand-new weapon, a weapon upgrade, a rare
+**EVOLVE**, or a passive item — weighted by rarity (boost your odds with *Lucky Core*). Don't
+like the hand? **Reroll** it, or **Banish** a card to remove it from the run for good.
+
 ---
 
 ## 🎮 Controls
@@ -52,10 +87,12 @@ Stack *Resonance Cascade* to make every reaction hit even harder.
 | Deploy Singularity | `Shift` / `E` / `J`   | Singularity button        |
 | Pause            | `Esc` / `P`             | —                         |
 | Pick upgrade     | `1` `2` `3` or click    | Tap a card                |
+| Reroll draft     | `R` (on level-up)       | Reroll button             |
+| Banish card      | `B` (on level-up)       | Banish button             |
 | Restart          | `R` (on game over)      | Retry button              |
 
-Your weapon **auto-fires at the nearest enemy** — focus on positioning, dodging, and when
-to spend your Singularity.
+Your arsenal **auto-fires at the nearest enemy** — focus on positioning, dodging, building
+synergies, and when to spend your Singularity and Overdrive.
 
 ---
 
@@ -123,9 +160,10 @@ src/
   game/               # The game itself
     config.js         #   tuning constants + difficulty curves (pure)
     elements.js       #   Resonance elements & reactions (pure)
-    upgrades.js       #   upgrade pool & draft logic (pure)
+    weapons.js        #   weapon arsenal, evolutions & firing (pure)
+    upgrades.js       #   level-up draft: weapons, evolves & items (pure)
     enemies.js        #   enemy/boss definitions & behaviors
-    player.js         #   the ship: movement, firing, dash, singularity
+    player.js         #   the ship: movement, arsenal firing, dash, overdrive
     world.js          #   simulation + rendering orchestrator
     background.js     #   parallax starfield & nebula
 tools/                # Zero-dep dev server, build, and check scripts
@@ -133,15 +171,16 @@ tests/                # Unit tests for the pure game logic
 ```
 
 The modules in `engine/utils.js` and the `game/` data modules (`config`, `elements`,
-`upgrades`, `enemies`) are intentionally **DOM-free and pure**, which keeps the core game
-logic unit-testable in plain Node.
+`weapons`, `upgrades`, `enemies`) are intentionally **DOM-free and pure**, which keeps the
+core game logic unit-testable in plain Node.
 
 ---
 
 ## 🧪 Testing
 
 - **Unit tests** (`npm test`) cover the deterministic logic: RNG determinism, difficulty
-  scaling, XP curves, elemental reactions, and the upgrade draft.
+  scaling, XP curves, elemental reactions, the weapon arsenal (defs, leveling, evolutions),
+  and the level-up draft (weapons, evolves, items, reroll/banish gating).
 - The rendering/input layers are verified by running the game in a real browser.
 
 ---

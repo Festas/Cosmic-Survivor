@@ -39,6 +39,8 @@
         <div class="bars">
           <div class="bar health"><i id="health-fill"></i><span id="health-text">100</span></div>
           <div class="bar xp"><i id="xp-fill"></i><span id="level-text">LV 1</span></div>
+          <div class="bar overdrive" id="overdrive-bar"><i id="od-fill"></i><span id="od-text">OVERDRIVE</span></div>
+          <div id="loadout" class="loadout" aria-hidden="true"></div>
         </div>
         <div class="abilities">
           <div id="ability-sing" class="ability"><div class="ring"><svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="19"></circle><circle id="sing-arc" class="arc" cx="22" cy="22" r="19"></circle></svg><span class="ico">🌀</span></div><span class="key">SHIFT</span></div>
@@ -60,11 +62,11 @@
     <div id="start" class="overlay">
       <div class="panel">
         <h1 class="title">COSMIC SURVIVOR</h1>
-        <p class="tagline">Bend gravity. Blink through time. Detonate the void.</p>
+        <p class="tagline">Hold the line against the alien swarm. Stack weapons. Evolve. Overdrive.</p>
         <div class="features">
-          <div><b>🌀 Singularity</b><span>Deploy a black hole that devours swarms, then implodes.</span></div>
-          <div><b>💨 Phase Dash</b><span>Blink through danger — triggers bullet-time &amp; i-frames.</span></div>
-          <div><b>✴️ Resonance</b><span>Chain Fire · Cryo · Shock · Void for explosive reactions.</span></div>
+          <div><b>🔫 Arsenal</b><span>Auto-fire up to 6 weapons at once — then evolve them into legendary forms.</span></div>
+          <div><b>🔆 Overdrive</b><span>Chain kills to fill the meter and unleash a damage &amp; fire-rate rampage.</span></div>
+          <div><b>✴️ Resonance</b><span>Imbue Fire · Cryo · Shock · Void for screen-clearing reactions.</span></div>
         </div>
         <button id="play-btn" class="btn">▶ LAUNCH</button>
         <div class="controls-hint">
@@ -88,7 +90,11 @@
         <h2 class="levelup-title">LEVEL&nbsp;UP</h2>
         <p class="levelup-sub">Choose an augment</p>
         <div id="cards" class="cards"></div>
-        <div class="draft-hint">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> to pick</div>
+        <div class="draft-tools">
+          <button id="reroll-btn" class="btn btn-ghost btn-sm">🎲 Reroll <b id="reroll-n">0</b></button>
+          <button id="banish-btn" class="btn btn-ghost btn-sm">🚫 Banish <b id="banish-n">0</b></button>
+        </div>
+        <div class="draft-hint">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> to pick · <kbd>R</kbd> reroll · <kbd>B</kbd> banish</div>
       </div>
     </div>
 

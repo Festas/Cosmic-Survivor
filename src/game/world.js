@@ -161,6 +161,36 @@ export class World {
     return this.spawnEnemy(typeKey, x, y);
   }
 
+  // Occasional "fleet" wave: an evenly-spaced row of invaders that materialises
+  // just outside the viewport on one side, for that classic descending-formation
+  // feel. Strictly bounded by enemyCap so a wave can never blow the enemy budget
+  // (keeps the frame budget safe on later, denser waves).
+  spawnFormation() {
+    const room = enemyCap(this.elapsed) - this.enemies.length;
+    if (room < 4) return; // not enough headroom for a meaningful row
+    // Pick an unlocked invader type for the fleet.
+    const roster = [];
+    if (this.elapsed >= 15) roster.push('squid');
+    if (this.elapsed >= 30) roster.push('crab');
+    if (this.elapsed >= 70) roster.push('octopus');
+    if (roster.length === 0) roster.push('swarm');
+    const key = pick(roster, this.rng);
+    const count = Math.min(room, 5 + Math.floor(this.rng() * 4)); // 5-8, budget-capped
+    // Approach direction (which side the fleet comes from) + perpendicular spread.
+    const dir = this.rng() * TAU;
+    const cx = this.player.x + Math.cos(dir) * ((this.viewW / 2) + 200);
+    const cy = this.player.y + Math.sin(dir) * ((this.viewH / 2) + 200);
+    const perp = dir + Math.PI / 2;
+    const gap = 58;
+    for (let i = 0; i < count; i++) {
+      const off = (i - (count - 1) / 2) * gap;
+      const x = clamp(cx + Math.cos(perp) * off, 40, ARENA.w - 40);
+      const y = clamp(cy + Math.sin(perp) * off, 40, ARENA.h - 40);
+      this.spawnEnemy(key, x, y);
+    }
+    this.addText(this.player.x, this.player.y - 110, 'INVADERS INCOMING', COLORS.invGreen, 20);
+  }
+
   updateDirector(dt) {
     // Boss handling
     if (this.bossWarn > 0) {
@@ -190,6 +220,14 @@ export class World {
         const n = packSize(key);
         for (let i = 0; i < n; i++) this.spawnRing(key);
       }
+    }
+
+    // Occasional invader-formation wave, layered on top of the trickle (never
+    // replacing it). Lazily scheduled so it needs no state in reset().
+    this.formationTimer = (this.formationTimer ?? 22) - dt;
+    if (this.formationTimer <= 0) {
+      this.formationTimer = 16 + this.rng() * 10; // next wave in ~16-26s
+      if (this.elapsed >= 18) this.spawnFormation();
     }
   }
 
@@ -991,6 +1029,57 @@ export class World {
       case 'boss': {
         for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU; const rr = r * (i % 2 ? 0.7 : 1); const fn = i === 0 ? 'moveTo' : 'lineTo'; ctx[fn](Math.cos(a) * rr, Math.sin(a) * rr); }
         ctx.closePath(); break;
+      }
+      // ---- retro pixel invaders (built from symmetric blocks / saucer ovals) --
+      case 'crab': {
+        const u = r / 5;
+        ctx.rect(-3 * u, -2 * u, 6 * u, 4 * u);   // body
+        ctx.rect(-5 * u, -u, 2 * u, u);           // left arm
+        ctx.rect(3 * u, -u, 2 * u, u);            // right arm
+        ctx.rect(-4 * u, -3 * u, u, u);           // left eye-stalk
+        ctx.rect(3 * u, -3 * u, u, u);            // right eye-stalk
+        ctx.rect(-3 * u, 2 * u, u, 2 * u);        // left leg
+        ctx.rect(2 * u, 2 * u, u, 2 * u);         // right leg
+        ctx.rect(-u, 2 * u, 2 * u, u);            // centre legs
+        break;
+      }
+      case 'squid': {
+        const u = r / 5;
+        ctx.rect(-2 * u, -3 * u, 4 * u, 3 * u);   // head
+        ctx.rect(-3 * u, 0, 6 * u, 2 * u);        // shoulders
+        ctx.rect(-3 * u, 2 * u, u, 2 * u);        // tentacles
+        ctx.rect(-u, 2 * u, u, 2 * u);
+        ctx.rect(0, 2 * u, u, 2 * u);
+        ctx.rect(2 * u, 2 * u, u, 2 * u);
+        break;
+      }
+      case 'octopus': {
+        const u = r / 5;
+        ctx.rect(-2 * u, -4 * u, 4 * u, 2 * u);   // crown
+        ctx.rect(-4 * u, -2 * u, 8 * u, 3 * u);   // body
+        ctx.rect(-4 * u, u, u, 3 * u);            // six legs
+        ctx.rect(-2 * u, u, u, 3 * u);
+        ctx.rect(-u, u, u, 3 * u);
+        ctx.rect(0, u, u, 3 * u);
+        ctx.rect(u, u, u, 3 * u);
+        ctx.rect(3 * u, u, u, 3 * u);
+        break;
+      }
+      case 'ufo': {
+        ctx.ellipse(0, r * 0.15, r, r * 0.42, 0, 0, TAU);       // saucer disc
+        ctx.moveTo(r * 0.5, -r * 0.1);
+        ctx.ellipse(0, -r * 0.1, r * 0.5, r * 0.45, 0, 0, TAU); // dome
+        break;
+      }
+      case 'mothership': {
+        ctx.ellipse(0, r * 0.12, r, r * 0.34, 0, 0, TAU);        // wide hull
+        ctx.moveTo(r * 0.52, -r * 0.18);
+        ctx.ellipse(0, -r * 0.18, r * 0.52, r * 0.5, 0, 0, TAU); // command dome
+        ctx.moveTo(-r * 0.48, r * 0.3);
+        ctx.ellipse(-r * 0.68, r * 0.3, r * 0.2, r * 0.16, 0, 0, TAU); // left pod
+        ctx.moveTo(r * 0.88, r * 0.3);
+        ctx.ellipse(r * 0.68, r * 0.3, r * 0.2, r * 0.16, 0, 0, TAU);  // right pod
+        break;
       }
       default: ctx.arc(0, 0, r, 0, TAU);
     }

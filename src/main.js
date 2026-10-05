@@ -6,6 +6,7 @@ import { Store } from './engine/storage.js';
 import { rng } from './engine/utils.js';
 import { World } from './game/world.js';
 import { RARITY } from './game/upgrades.js';
+import { weaponDef } from './game/weapons.js';
 import { formatNumber, formatTime } from './engine/utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -21,6 +22,8 @@ let world = new World({ viewW: window.innerWidth, viewH: window.innerHeight, aud
 let started = false;
 let paused = false;
 let lastMultTier = 1;
+let lastLoadoutSig = '';
+let banishMode = false;
 
 // ------------------------------------------------------------- canvas size
 function resize() {
@@ -99,28 +102,64 @@ function togglePause(force) {
 }
 
 // ------------------------------------------------------------- level up UI
+const KIND_LABEL = {
+  'weapon-new': 'NEW WEAPON', 'weapon-up': 'UPGRADE', 'evolve': 'EVOLVE', 'item': 'ITEM',
+};
+
 function showLevelUp(choices) {
+  banishMode = false;
   const wrap = $('cards');
+  wrap.classList.remove('banish-mode');
   wrap.innerHTML = '';
   choices.forEach((up, i) => {
-    const r = RARITY[up.rarity];
+    const r = RARITY[up.rarity] || RARITY.common;
     const card = document.createElement('div');
-    card.className = 'card';
+    card.className = 'card' + (up.kind === 'evolve' ? ' evolve' : '');
     card.style.setProperty('--rarity', r.color);
     card.innerHTML = `
+      <div class="kind">${KIND_LABEL[up.kind] || ''}</div>
       <div class="icon">${up.icon}</div>
       <div class="name">${up.name}</div>
       <div class="desc">${up.desc}</div>
-      <div class="rarity">${r.label} · ${i + 1}</div>`;
-    card.addEventListener('click', () => pickUpgrade(up));
+      <div class="rarity">${up.tag || r.label} · ${i + 1}</div>`;
+    card.addEventListener('click', () => {
+      if (banishMode) doBanish(up);
+      else pickUpgrade(up);
+    });
     wrap.appendChild(card);
   });
+  updateDraftTools();
   $('levelup').classList.remove('hidden');
 }
+
+function updateDraftTools() {
+  const rn = world.rerollsLeft || 0;
+  const bn = world.banishLeft || 0;
+  $('reroll-n').textContent = rn;
+  $('banish-n').textContent = bn;
+  $('reroll-btn').disabled = rn <= 0;
+  $('banish-btn').disabled = bn <= 0;
+  $('banish-btn').classList.toggle('active', banishMode);
+}
+
 function pickUpgrade(up) {
   if (world.state !== 'levelup') return;
   world.applyUpgrade(up);
+  banishMode = false;
   $('levelup').classList.add('hidden');
+}
+
+function doBanish(card) {
+  // world.banishChoice re-draws a fresh set and fires onLevelUp -> showLevelUp,
+  // which re-renders the cards and resets banish mode.
+  world.banishChoice(card);
+}
+
+function toggleBanishMode() {
+  if ((world.banishLeft || 0) <= 0) return;
+  banishMode = !banishMode;
+  $('cards').classList.toggle('banish-mode', banishMode);
+  updateDraftTools();
 }
 
 // ------------------------------------------------------------- game over UI
@@ -160,6 +199,8 @@ const el = {
   abilitySing: $('ability-sing'), abilityDash: $('ability-dash'),
   bossBar: $('boss-bar'), bossName: $('boss-name'), bossFill: $('boss-fill'),
   comboPop: $('combo-pop'),
+  odBar: $('overdrive-bar'), odFill: $('od-fill'), odText: $('od-text'),
+  loadout: $('loadout'),
 };
 const ARC_LEN = 119.4;
 
@@ -183,6 +224,28 @@ function updateHud() {
   const dashFrac = 1 - Math.min(1, h.dashCd / h.dashMax);
   el.dashArc.style.strokeDashoffset = ARC_LEN * (1 - dashFrac);
   el.abilityDash.classList.toggle('ready', h.dashCd <= 0);
+
+  // Overdrive meter
+  const p = world.player;
+  const odActive = p.overdriveTime > 0;
+  const odFrac = odActive ? 1 : Math.min(1, p.overdrive / 100);
+  el.odFill.style.width = (odFrac * 100) + '%';
+  el.odBar.classList.toggle('ready', p.overdrive >= 100 && !odActive);
+  el.odBar.classList.toggle('active', odActive);
+  el.odText.textContent = odActive ? 'OVERDRIVE!' : 'OVERDRIVE';
+
+  // Weapon loadout strip (rebuild only when the loadout actually changes)
+  const sig = p.weapons.map((w) => w.id + w.level).join(',');
+  if (sig !== lastLoadoutSig) {
+    lastLoadoutSig = sig;
+    el.loadout.innerHTML = p.weapons.map((w) => {
+      const def = weaponDef(w);
+      const evolved = def && def.evolved ? ' evolved' : '';
+      const name = def ? def.name : w.id;
+      const icon = def ? def.icon : '❓';
+      return `<div class="w${evolved}" title="${name}">${icon}<b>${w.level}</b></div>`;
+    }).join('');
+  }
 
   if (h.boss) {
     el.bossBar.classList.remove('hidden');
@@ -237,6 +300,17 @@ function frame(now) {
 $('play-btn').addEventListener('click', startRun);
 $('retry-btn').addEventListener('click', startRun);
 $('resume-btn').addEventListener('click', () => togglePause(false));
+$('reroll-btn').addEventListener('click', () => { world.rerollChoices(); });
+$('banish-btn').addEventListener('click', toggleBanishMode);
+
+// level-up keyboard shortcuts (reroll / banish). Numeric picks are handled in the
+// main loop via the input poller.
+window.addEventListener('keydown', (e) => {
+  if (!started || world.state !== 'levelup') return;
+  const k = e.key.toLowerCase();
+  if (k === 'r') { world.rerollChoices(); e.preventDefault(); }
+  else if (k === 'b') { toggleBanishMode(); e.preventDefault(); }
+});
 $('quit-btn').addEventListener('click', () => {
   togglePause(false);
   started = false;
