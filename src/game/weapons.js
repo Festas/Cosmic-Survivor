@@ -25,10 +25,11 @@ function dmgOf(s, def, inst, extra = 1) {
   return s.damage * s.weaponDamageMul * (s.transientDamageMul || 1) * def.dmgMul *
     (1 + (inst.level - 1) * def.lvlDmg) * extra;
 }
-// Cooldown shrinks with global haste (cooldownMul) and a per-level bonus.
-function cdOf(s, def, inst) {
+// Cooldown shrinks with global haste (cooldownMul), a per-level bonus, and an
+// optional transient haste factor (e.g. Overdrive), all clamped to a 0.04s floor.
+export function cdOf(s, def, inst, haste = 1) {
   const lvlCut = Math.min(0.55, (inst.level - 1) * (def.lvlCd || 0));
-  return Math.max(0.04, def.baseCd * s.cooldownMul * (1 - lvlCut));
+  return Math.max(0.04, def.baseCd * s.cooldownMul * haste * (1 - lvlCut));
 }
 function rolledCrit(s) { return chance(s.critChance); }
 function withCrit(dmg, crit, s) { return crit ? dmg * s.critMult : dmg; }

@@ -107,6 +107,7 @@ function buildPool(player) {
     const def = weaponDef(inst);
     if (!def) continue;
     if (evolutionReady(player, inst)) {
+      if (banished['evolve_' + inst.id]) continue;
       const evo = weaponDef(def.evolve);
       pool.push({
         kind: 'evolve', id: 'evolve_' + inst.id, weaponId: inst.id,
@@ -114,6 +115,7 @@ function buildPool(player) {
         desc: evo.desc, tag: 'Evolution',
       });
     } else if (inst.level < def.maxLevel) {
+      if (banished['wup_' + inst.id]) continue;
       pool.push({
         kind: 'weapon-up', id: 'wup_' + inst.id, weaponId: inst.id,
         name: def.name, rarity: def.rarity, icon: def.icon,

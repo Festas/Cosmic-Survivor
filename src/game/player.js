@@ -3,7 +3,7 @@
 
 import { PLAYER, WEAPON, DASH, SINGULARITY, ARENA, COLORS } from './config.js';
 import { TAU, clamp, dist, dist2, angleTo, lerpAngle, rand, chance } from '../engine/utils.js';
-import { createWeaponInst, weaponDef } from './weapons.js';
+import { createWeaponInst, weaponDef, cdOf } from './weapons.js';
 
 export function createStats() {
   return {
@@ -274,8 +274,7 @@ export class Player {
       inst.cd = 0;
       def.fire(world, this, inst);
       if (inst.cd <= 0) {
-        const lvlCut = Math.min(0.55, (inst.level - 1) * (def.lvlCd || 0));
-        inst.cd = Math.max(0.04, def.baseCd * s.cooldownMul * s.transientHaste * (1 - lvlCut));
+        inst.cd = cdOf(s, def, inst, s.transientHaste);
       }
     }
   }

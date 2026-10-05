@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   WEAPONS, WEAPON_BY_ID, BASE_WEAPONS, MAX_WEAPONS,
   createWeaponInst, weaponDef, hasWeapon, canTakeWeapon,
-  addOrLevelWeapon, evolutionReady, evolveWeapon,
+  addOrLevelWeapon, evolutionReady, evolveWeapon, cdOf,
 } from '../src/game/weapons.js';
 
 function mockStats(overrides = {}) {
@@ -116,4 +116,18 @@ test('each weapon fires without throwing against a stub world', () => {
     const inst = createWeaponInst(w.id);
     assert.doesNotThrow(() => w.fire(world, player, inst), `weapon ${w.id} threw`);
   }
+});
+
+test('cdOf shrinks with haste and respects the 0.04s floor after haste is applied', () => {
+  const def = { baseCd: 1, lvlCd: 0.1 };
+  const inst = { level: 1 };
+  const s = { cooldownMul: 1 };
+  // Level 1, no haste: just baseCd * cooldownMul.
+  assert.equal(cdOf(s, def, inst), 1);
+  // Transient haste halves cadence.
+  assert.equal(cdOf(s, def, inst, 0.5), 0.5);
+  // Per-level bonus reduces cadence (level 3 -> 20% cut).
+  assert.ok(Math.abs(cdOf(s, def, { level: 3 }) - 0.8) < 1e-9);
+  // Floor: even extreme haste never dips below 0.04 (clamp applied after haste).
+  assert.equal(cdOf(s, def, inst, 0.001), 0.04);
 });

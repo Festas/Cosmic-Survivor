@@ -102,6 +102,22 @@ test('banished cards never appear in the draft', () => {
   assert.ok(!choices.some((c) => c.id === 'wnew_spread'));
 });
 
+test('banishing a weapon-up card removes it from later drafts', () => {
+  const banished = Object.create(null);
+  banished.wup_ion = true;
+  const choices = draftUpgrades(mockPlayer({ banished }), 60, makeRng(9));
+  assert.ok(!choices.some((c) => c.id === 'wup_ion'), 'banished weapon-up must not reappear');
+});
+
+test('banishing an evolve card removes it from later drafts', () => {
+  const ion = createWeaponInst('ion');
+  ion.level = 8;
+  const banished = Object.create(null);
+  banished.evolve_ion = true;
+  const choices = draftUpgrades(mockPlayer({ weapons: [ion], homing: 2, banished }), 60, makeRng(11));
+  assert.ok(!choices.some((c) => c.id === 'evolve_ion'), 'banished evolve must not reappear');
+});
+
 test('an evolve card appears when a weapon is maxed and its synergy is owned', () => {
   const ion = createWeaponInst('ion');
   ion.level = 8;
