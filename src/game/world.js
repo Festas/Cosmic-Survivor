@@ -21,13 +21,19 @@ import { Background } from './background.js';
 // Cells are addressed with packed integer keys (instead of string keys) to cut
 // allocation/GC and speed up Map lookups on the hot query path.
 class Grid {
-  constructor(cell) { this.cell = cell; this.inv = 1 / cell; this.map = new Map(); }
-  clear() { this.map.clear(); }
+  constructor(cell) { this.cell = cell; this.inv = 1 / cell; this.map = new Map(); this._pool = []; }
+  // Salvage the per-cell arrays into a freelist instead of dropping them, so the
+  // every-step rebuild stops minting garbage arrays (a measurable GC cost when
+  // 150+ enemies are on screen during boss waves).
+  clear() {
+    for (const a of this.map.values()) { a.length = 0; this._pool.push(a); }
+    this.map.clear();
+  }
   insert(e) {
     const cx = Math.floor(e.x * this.inv), cy = Math.floor(e.y * this.inv);
     const k = (cx + 0x8000) * 0x10000 + (cy + 0x8000);
     let a = this.map.get(k);
-    if (!a) { a = []; this.map.set(k, a); }
+    if (!a) { a = this._pool.pop() || []; this.map.set(k, a); }
     a.push(e);
   }
   query(x, y, r, out) {
@@ -629,12 +635,20 @@ export class World {
       const b = this.bullets[i];
       b.life -= dt;
       if (b.life <= 0) { this.bullets.splice(i, 1); continue; }
-      // homing
+      // homing — reacquiring a target is a grid query, so only re-scan a few
+      // times per second (or when the current target dies) and steer toward the
+      // cached target every frame. Steering feel is unchanged; query count drops ~6x.
       if (b.homing > 0) {
-        let best = null, bestD = 300 * 300;
-        this.grid.query(b.x, b.y, 300, this._q);
-        for (const e of this._q) { if (!e.alive) continue; const d = dist2(b.x, b.y, e.x, e.y); if (d < bestD) { bestD = d; best = e; } }
-        if (best) {
+        b._htime = (b._htime || 0) - dt;
+        if (!b._target || !b._target.alive || b._htime <= 0) {
+          b._htime = 0.1;
+          let best = null, bestD = 300 * 300;
+          this.grid.query(b.x, b.y, 300, this._q);
+          for (const e of this._q) { if (!e.alive) continue; const d = dist2(b.x, b.y, e.x, e.y); if (d < bestD) { bestD = d; best = e; } }
+          b._target = best;
+        }
+        const best = b._target;
+        if (best && best.alive) {
           const desired = angleTo(b.x, b.y, best.x, best.y);
           b.angle = b.angle ?? Math.atan2(b.vy, b.vx);
           let diff = ((desired - b.angle + Math.PI) % TAU) - Math.PI;
