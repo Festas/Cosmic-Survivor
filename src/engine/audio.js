@@ -14,7 +14,6 @@ export class AudioEngine {
     this._musicTimer = null;
     this._nextNote = 0;
     this._step = 0;
-    this._lastShoot = 0;
     // Per-sound throttle + a global polyphony budget. Boss fights can request
     // hundreds of SFX/second (every bullet hit, crit and elemental reaction);
     // minting that many WebAudio node graphs is a real source of main-thread
@@ -139,7 +138,6 @@ export class AudioEngine {
     if (!this._gate(name, t)) return;
     switch (name) {
       case 'shoot': {
-        this._lastShoot = t;
         this._tone(660, 0.09, 'square', 0.12, t, 240);
         break;
       }

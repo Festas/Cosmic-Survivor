@@ -14,10 +14,10 @@ import {
 } from './weapons.js';
 
 export const RARITY = {
-  common: { label: 'Common', color: '#b9c6ff', weight: 100 },
-  rare: { label: 'Rare', color: '#51e9ff', weight: 40 },
-  epic: { label: 'Epic', color: '#b06bff', weight: 15 },
-  legendary: { label: 'Legendary', color: '#ffd447', weight: 4 },
+  common: { label: 'Common', color: '#b9c6ff', weight: 100, rank: 0 },
+  rare: { label: 'Rare', color: '#51e9ff', weight: 40, rank: 1 },
+  epic: { label: 'Epic', color: '#b06bff', weight: 15, rank: 2 },
+  legendary: { label: 'Legendary', color: '#ffd447', weight: 4, rank: 3 },
 };
 
 // Passive item builder. `apply(stats)` mutates a player stats object.
@@ -145,11 +145,22 @@ function buildPool(player) {
   return pool;
 }
 
+// Luck tilts the draft toward rarer cards. A uniform multiplier would cancel
+// out in a weighted pick, so luck is applied as a per-rarity-rank exponent:
+// common (rank 0) is unchanged while rarer tiers are boosted progressively.
+// luck === 0 returns 1 for every card, leaving the base distribution intact.
+export function luckFactor(rarity, luck) {
+  if (!luck) return 1;
+  const rank = (RARITY[rarity] || RARITY.common).rank || 0;
+  return Math.pow(1 + luck, rank);
+}
+
 // Draft `count` distinct cards for the level-up screen.
 export function draftUpgrades(player, count = 3, r) {
+  const luck = player.stats.luck || 0;
   const pool = buildPool(player).map((c) => ({
     ...c,
-    weight: RARITY[c.rarity].weight * (c.kind === 'evolve' ? 3 : 1) * (1 + (player.stats.luck || 0)),
+    weight: RARITY[c.rarity].weight * (c.kind === 'evolve' ? 3 : 1) * luckFactor(c.rarity, luck),
   }));
   const chosen = [];
   const bag = shuffle(pool, r);

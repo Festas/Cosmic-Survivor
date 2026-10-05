@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ITEMS, ITEM_BY_ID, RARITY, isItemAvailable, isAvailable, draftUpgrades } from '../src/game/upgrades.js';
+import { ITEMS, ITEM_BY_ID, RARITY, isItemAvailable, isAvailable, draftUpgrades, luckFactor } from '../src/game/upgrades.js';
 import { createWeaponInst, BASE_WEAPONS, MAX_WEAPONS } from '../src/game/weapons.js';
 import { makeRng } from '../src/engine/utils.js';
 
@@ -131,4 +131,28 @@ test('full inventory stops offering brand-new weapons', () => {
   const weapons = BASE_WEAPONS.slice(0, MAX_WEAPONS).map((w) => createWeaponInst(w.id));
   const choices = draftUpgrades(mockPlayer({ weapons }), 80, makeRng(3));
   assert.ok(!choices.some((c) => c.kind === 'weapon-new'));
+});
+
+test('luckFactor leaves odds untouched at luck 0 and boosts rarer tiers with luck', () => {
+  // No luck: every tier unchanged, so the weighted draw is unaffected.
+  for (const name of Object.keys(RARITY)) assert.equal(luckFactor(name, 0), 1);
+  // With luck, commons are unchanged but rarer tiers scale up by rank.
+  assert.equal(luckFactor('common', 0.6), 1);
+  assert.ok(luckFactor('rare', 0.6) > 1);
+  assert.ok(luckFactor('legendary', 0.6) > luckFactor('epic', 0.6));
+  assert.ok(luckFactor('epic', 0.6) > luckFactor('rare', 0.6));
+});
+
+test('luck tilts the draft toward rarer cards in aggregate', () => {
+  // Sum rarity ranks of drafted cards across many deterministic seeds; a lucky
+  // player should pull a higher total rank than an unlucky one.
+  const rankSum = (luck) => {
+    let sum = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      const choices = draftUpgrades(mockPlayer({ luck }), 3, makeRng(seed));
+      for (const c of choices) sum += RARITY[c.rarity].rank;
+    }
+    return sum;
+  };
+  assert.ok(rankSum(0.6) > rankSum(0), 'lucky drafts should skew rarer');
 });

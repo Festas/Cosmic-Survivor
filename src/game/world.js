@@ -90,6 +90,7 @@ export class World {
 
     this.elapsed = 0;
     this.spawnTimer = 0.6;
+    this.formationTimer = 22;
     this.nextBossAt = DIRECTOR.bossEvery;
     this.bossActive = null;
     this.bossWarn = 0;
@@ -223,8 +224,8 @@ export class World {
     }
 
     // Occasional invader-formation wave, layered on top of the trickle (never
-    // replacing it). Lazily scheduled so it needs no state in reset().
-    this.formationTimer = (this.formationTimer ?? 22) - dt;
+    // replacing it). Scheduled from formationTimer, initialised in reset().
+    this.formationTimer -= dt;
     if (this.formationTimer <= 0) {
       this.formationTimer = 16 + this.rng() * 10; // next wave in ~16-26s
       if (this.elapsed >= 18) this.spawnFormation();
