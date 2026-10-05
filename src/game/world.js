@@ -900,10 +900,16 @@ export class World {
       if (b.x < bnd.minX || b.x > bnd.maxX || b.y < bnd.minY || b.y > bnd.maxY) continue;
       const color = b.crit ? COLORS.gold : COLORS.player;
       const glow = b.crit ? COLORS.gold : COLORS.playerGlow;
-      const spr = glowSprite('b|' + b.r + '|' + (b.crit ? 1 : 0), b.r * 2.2, 12, (g) => {
-        g.fillStyle = color; g.shadowColor = glow; g.shadowBlur = 12;
-        g.beginPath(); g.ellipse(0, 0, b.r * 2.2, b.r, 0, 0, TAU); g.fill();
-      });
+      // A bullet's radius/crit never change, so resolve its glow sprite once and
+      // cache it on the bullet — avoids rebuilding the key string every frame.
+      let spr = b._spr;
+      if (spr === undefined) {
+        spr = glowSprite('b|' + b.r + '|' + (b.crit ? 1 : 0), b.r * 2.2, 12, (g) => {
+          g.fillStyle = color; g.shadowColor = glow; g.shadowBlur = 12;
+          g.beginPath(); g.ellipse(0, 0, b.r * 2.2, b.r, 0, 0, TAU); g.fill();
+        });
+        b._spr = spr;
+      }
       ctx.save();
       ctx.translate(b.x, b.y);
       ctx.rotate(Math.atan2(b.vy, b.vx));
@@ -924,10 +930,16 @@ export class World {
     ctx.globalCompositeOperation = 'lighter';
     for (const b of this.enemyBullets) {
       if (b.x < bnd.minX || b.x > bnd.maxX || b.y < bnd.minY || b.y > bnd.maxY) continue;
-      const spr = glowSprite('eb|' + b.r + '|' + b.color, b.r, 10, (g) => {
-        g.fillStyle = b.color; g.shadowColor = b.color; g.shadowBlur = 10;
-        g.beginPath(); g.arc(0, 0, b.r, 0, TAU); g.fill();
-      });
+      // Radius/colour are fixed for a bullet's lifetime: cache its sprite so the
+      // key string isn't rebuilt per bullet per frame (boss patterns spawn many).
+      let spr = b._spr;
+      if (spr === undefined) {
+        spr = glowSprite('eb|' + b.r + '|' + b.color, b.r, 10, (g) => {
+          g.fillStyle = b.color; g.shadowColor = b.color; g.shadowBlur = 10;
+          g.beginPath(); g.arc(0, 0, b.r, 0, TAU); g.fill();
+        });
+        b._spr = spr;
+      }
       if (spr) {
         ctx.drawImage(spr.canvas, b.x - spr.off, b.y - spr.off);
       } else {
@@ -1019,14 +1031,31 @@ export class World {
 
   drawTexts(ctx) {
     const bnd = this.camera.viewBounds(60);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    // Collect visible popups into a reused scratch buffer and sort by size so
+    // the expensive `ctx.font` (re)parse happens once per distinct size instead
+    // of once per popup — a big win when a boss fight stacks hundreds of numbers.
+    const vis = this._textScratch || (this._textScratch = []);
+    vis.length = 0;
     for (const t of this.texts) {
       if (t.x < bnd.minX || t.x > bnd.maxX || t.y < bnd.minY || t.y > bnd.maxY) continue;
+      vis.push(t);
+    }
+    if (vis.length === 0) return;
+    vis.sort((a, b) => a.size - b.size);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const fonts = this._fontCache || (this._fontCache = new Map());
+    let curSize = -1;
+    for (const t of vis) {
+      if (t.size !== curSize) {
+        curSize = t.size;
+        let f = fonts.get(curSize);
+        if (f === undefined) { f = `bold ${curSize}px system-ui, sans-serif`; fonts.set(curSize, f); }
+        ctx.font = f;
+      }
       const a = clamp(t.life / t.maxLife, 0, 1);
       ctx.globalAlpha = a;
       ctx.fillStyle = t.color;
-      ctx.font = `bold ${t.size}px system-ui, sans-serif`;
       ctx.fillText(t.text, t.x, t.y);
     }
     ctx.globalAlpha = 1;
