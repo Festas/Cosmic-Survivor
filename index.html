@@ -24,6 +24,7 @@
           <div class="chip"><span class="chip-label">THREAT</span><span id="threat">1</span></div>
           <div class="chip"><span class="chip-label">ENEMIES</span><span id="enemies">0</span></div>
           <div id="revive-chip" class="chip revive hidden"><span class="chip-label">PHOENIX</span><span id="revive-n">0</span></div>
+          <div id="directive-chip" class="chip directive hidden"><span class="chip-label">DIRECTIVES</span><span id="directive-n">0</span></div>
         </div>
         <div class="hud-center">
           <div id="timer">0:00</div>
@@ -85,6 +86,7 @@
           <button id="play-btn" class="btn">▶ LAUNCH</button>
           <button id="hangar-btn" class="btn btn-ghost">🛠 HANGAR</button>
         </div>
+        <div id="start-directives" class="start-directives hidden" title="Active challenge Directives — more risk, more Stardust"></div>
         <div class="controls-hint">
           <span><kbd>WASD</kbd> Move</span>
           <span><kbd>Space</kbd> Dash</span>
@@ -117,9 +119,13 @@
         <div class="hangar-tabs">
           <button id="tab-ships" class="tab active">STARFIGHTERS</button>
           <button id="tab-meta" class="tab">ASCENSION</button>
+          <button id="tab-directives" class="tab">DIRECTIVES</button>
+          <button id="tab-codex" class="tab">CODEX</button>
         </div>
         <div id="hangar-ships" class="hangar-body ship-grid"></div>
         <div id="hangar-meta" class="hangar-body meta-grid hidden"></div>
+        <div id="hangar-directives" class="hangar-body directive-grid hidden"></div>
+        <div id="hangar-codex" class="hangar-body codex-grid hidden"></div>
         <button id="hangar-close" class="btn">✔ DONE</button>
       </div>
     </div>
@@ -161,12 +167,16 @@
         <div id="go-newbest" class="newbest hidden">★ NEW BEST ★</div>
         <div id="go-score" class="go-score">0</div>
         <div id="go-stardust" class="go-stardust">✦ +0 Stardust</div>
+        <div id="go-commends" class="go-commends hidden"></div>
         <div id="go-stats" class="run-stats"></div>
         <button id="retry-btn" class="btn">↻ RETRY</button>
         <button id="go-hangar-btn" class="btn btn-ghost">🛠 HANGAR</button>
       </div>
     </div>
   </div>
+
+  <!-- transient unlock toasts (commendations) -->
+  <div id="toast" class="toast-wrap" aria-live="polite"></div>
 
   <script type="module" src="src/main.js"></script>
 </body>
