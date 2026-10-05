@@ -277,10 +277,11 @@ function frame(now) {
   if (started) {
     if (cmd.pause) togglePause();
     if (!paused) {
-      // keyboard draft selection
+      // keyboard draft selection — mirror card clicks so number keys honour
+      // banish mode too (otherwise 1/2/3 would pick a card you meant to banish).
       if (world.state === 'levelup' && cmd.choose >= 0 && world.pendingChoices) {
         const c = world.pendingChoices[cmd.choose];
-        if (c) pickUpgrade(c);
+        if (c) { if (banishMode) doBanish(c); else pickUpgrade(c); }
       }
       world.update(dt, cmd);
     }
