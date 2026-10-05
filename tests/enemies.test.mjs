@@ -53,3 +53,54 @@ test('boss definitions are well-formed', () => {
     assert.ok(def.radius > 0, `${key} boss needs radius`);
   }
 });
+
+// ---- Content-pack enemies -------------------------------------------------
+
+test('new enemy and boss types are registered and well-formed', () => {
+  for (const key of ['seeder', 'sentinel']) {
+    const def = ENEMY_TYPES[key];
+    assert.ok(def, `${key} should be registered`);
+    assert.equal(def.key, key);
+    assert.ok(def.hp > 0 && def.radius > 0 && def.color, `${key} needs core fields`);
+    assert.ok(typeof def.update === 'function', `${key} needs an update()`);
+  }
+  const boss = BOSS_TYPES.singularis;
+  assert.ok(boss, 'singularis boss should be registered');
+  assert.equal(boss.boss, true);
+  assert.equal(boss.shape, 'boss');
+  assert.ok(boss.hp > 0 && boss.radius > 0);
+});
+
+test('seeder and sentinel become spawnable after their unlock times', () => {
+  const r = makeRng(5);
+  const seen = new Set();
+  for (let i = 0; i < 4000; i++) seen.add(pickEnemyType(200, r));
+  assert.ok(seen.has('seeder'), 'seeder should appear in the late game');
+  assert.ok(seen.has('sentinel'), 'sentinel should appear in the late game');
+});
+
+test('new enemies never spawn before their unlock time', () => {
+  const r = makeRng(7);
+  for (let i = 0; i < 1500; i++) {
+    assert.notEqual(pickEnemyType(30, r), 'seeder'); // seeder unlocks at 60s
+    assert.notEqual(pickEnemyType(50, r), 'sentinel'); // sentinel unlocks at 90s
+  }
+});
+
+test('seeder, sentinel and the Singularis update without throwing and emit bullets', () => {
+  const world = {
+    player: { x: 300, y: 300 },
+    enemyBullets: [],
+    spawnEnemy() { return {}; },
+    shake() {},
+    audio: { play() {} },
+  };
+  const mkEnemy = (def) => ({ x: 0, y: 0, vx: 0, vy: 0, spin: 0, speed: def.speed, damage: def.damage });
+  for (const def of [ENEMY_TYPES.seeder, ENEMY_TYPES.sentinel, BOSS_TYPES.singularis]) {
+    const e = mkEnemy(def);
+    assert.doesNotThrow(() => {
+      for (let i = 0; i < 400; i++) def.update(e, 0.05, world);
+    }, `${def.key} update threw`);
+  }
+  assert.ok(world.enemyBullets.length > 0, 'expansion enemies should fire enemy bullets');
+});

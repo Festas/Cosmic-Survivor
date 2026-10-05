@@ -131,3 +131,47 @@ test('cdOf shrinks with haste and respects the 0.04s floor after haste is applie
   // Floor: even extreme haste never dips below 0.04 (clamp applied after haste).
   assert.equal(cdOf(s, def, inst, 0.001), 0.04);
 });
+
+// ---- Content-pack weapons -------------------------------------------------
+
+test('Halo Launcher fires a full radial burst of bullets', () => {
+  let shots = 0;
+  const world = { spawnBullet: () => { shots++; }, ring() {}, audio: { play() {} } };
+  const player = { x: 0, y: 0, stats: mockStats({ bulletSpeed: 600, knockback: 100, projectilesBonus: 0 }) };
+  const inst = createWeaponInst('halo');
+  WEAPON_BY_ID.halo.fire(world, player, inst);
+  assert.ok(shots >= 7, `expected a radial volley, got ${shots}`);
+});
+
+test('Arc Whip strikes three area zones per swing', () => {
+  let zones = 0;
+  const world = { damageEnemiesInRadius: () => { zones++; }, ring() {}, audio: { play() {} } };
+  const player = { x: 0, y: 0, faceAngle: 0, stats: mockStats({ areaMul: 1, knockback: 100 }), acquireTarget: () => null };
+  const inst = createWeaponInst('lash');
+  WEAPON_BY_ID.lash.fire(world, player, inst);
+  assert.equal(zones, 3);
+});
+
+test('halo evolves into corona only with enough bonus projectiles', () => {
+  const p = mockPlayer(['halo'], { projectilesBonus: 0 });
+  const halo = p.weapons[0];
+  halo.level = weaponDef(halo).maxLevel;
+  assert.ok(!evolutionReady(p, halo), 'not ready without the projectile bonus');
+  p.stats.projectilesBonus = 2;
+  assert.ok(evolutionReady(p, halo), 'ready once Split Barrel x2 is owned');
+  evolveWeapon(p, halo);
+  assert.equal(halo.id, 'corona');
+  assert.ok(weaponDef(halo).evolved);
+});
+
+test('lash evolves into reaver once lifesteal is owned', () => {
+  const p = mockPlayer(['lash'], { lifesteal: 0 });
+  const lash = p.weapons[0];
+  lash.level = weaponDef(lash).maxLevel;
+  assert.ok(!evolutionReady(p, lash), 'not ready without lifesteal');
+  p.stats.lifesteal = 0.03;
+  assert.ok(evolutionReady(p, lash), 'ready once Vampiric Circuit is owned');
+  evolveWeapon(p, lash);
+  assert.equal(lash.id, 'reaver');
+  assert.ok(weaponDef(lash).evolved);
+});

@@ -128,9 +128,21 @@ function setHangarTab(tab) {
 
 function renderHangar() {
   $('hangar-stardust').textContent = formatNumber(store.stardust);
+  renderPilotRecord();
   renderShips();
   renderMeta();
   setHangarTab(hangarTab);
+}
+
+// Lifetime "pilot record" — surfaces the persisted career stats so progression
+// feels tangible across runs (data from storage.js).
+function renderPilotRecord() {
+  const d = store.get();
+  $('rec-runs').textContent = formatNumber(d.runs || 0);
+  $('rec-best').textContent = formatNumber(d.highScore || 0);
+  $('rec-time').textContent = formatTime(d.bestTime || 0);
+  $('rec-kills').textContent = formatNumber(d.totalKills || 0);
+  $('rec-ls').textContent = formatNumber(d.lifetimeStardust || 0);
 }
 
 function renderShips() {

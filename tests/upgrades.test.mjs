@@ -13,7 +13,7 @@ function mockStats(overrides = {}) {
     homing: 0, bulletRadius: 6, knockback: 100, singularityChargeMul: 1,
     singularityRadiusMul: 1, singularityDamageMul: 1, elementMul: 1,
     dashCooldownMul: 1, dashDamageMul: 1, dashRadiusMul: 1,
-    overdriveRate: 1, overdrivePower: 1, droneCount: 0,
+    overdriveRate: 1, overdrivePower: 1, droneCount: 0, droneDamageMul: 1,
     explosiveChance: 0, explosiveDamage: 0, maxHp: 100, armor: 0, regen: 0,
     lifesteal: 0, dodge: 0, moveSpeed: 200, pickupRadius: 100, xpMul: 1,
     ...overrides,
@@ -67,6 +67,46 @@ test('resonance item is gated behind owning an imbue', () => {
   assert.ok(reson.req, 'resonance should have a requirement');
   assert.ok(!isItemAvailable(reson, mockPlayer()));
   assert.ok(isItemAvailable(reson, mockPlayer({ imbue: { fire: 0.6, cryo: 0, shock: 0, void: 0 } })));
+});
+
+// ---- Content-pack items --------------------------------------------------
+
+test('drone_power boosts drone damage and is gated behind owning a drone', () => {
+  const it = ITEM_BY_ID.drone_power;
+  assert.ok(it, 'drone_power item should exist');
+  assert.ok(it.req, 'drone_power should require a drone');
+  assert.ok(!isItemAvailable(it, mockPlayer()), 'not offered without a drone');
+  assert.ok(isItemAvailable(it, mockPlayer({ droneCount: 1 })), 'offered once a drone is owned');
+  const s = mockStats({ droneCount: 1 });
+  it.apply(s);
+  assert.ok(s.droneDamageMul > 1, 'should scale droneDamageMul');
+});
+
+test('crit_capstone raises both crit chance and crit damage', () => {
+  const it = ITEM_BY_ID.crit_capstone;
+  const s = mockStats({ critChance: 0.1, critMult: 2 });
+  it.apply(s);
+  assert.ok(s.critChance > 0.1, 'crit chance should rise');
+  assert.ok(s.critMult > 2, 'crit damage should rise');
+});
+
+test('overdrive_rush speeds Overdrive build-up and movement', () => {
+  const it = ITEM_BY_ID.overdrive_rush;
+  const s = mockStats({ overdriveRate: 1, moveSpeed: 200 });
+  it.apply(s);
+  assert.ok(s.overdriveRate > 1, 'overdrive build-up should rise');
+  assert.ok(s.moveSpeed > 200, 'move speed should rise');
+});
+
+test('content-pack items are draftable once their gates are met', () => {
+  // A wide draw drains the whole candidate pool, so every available item shows.
+  const withDrone = new Set(draftUpgrades(mockPlayer({ droneCount: 1 }), 80, makeRng(123)).map((c) => c.id));
+  assert.ok(withDrone.has('crit_capstone'));
+  assert.ok(withDrone.has('overdrive_rush'));
+  assert.ok(withDrone.has('drone_power'));
+  // Without a drone, the drone booster stays out of the pool entirely.
+  const noDrone = new Set(draftUpgrades(mockPlayer(), 80, makeRng(123)).map((c) => c.id));
+  assert.ok(!noDrone.has('drone_power'), 'drone_power must stay gated without a drone');
 });
 
 test('draftUpgrades returns the requested number of distinct cards with valid kinds', () => {
