@@ -15,8 +15,10 @@ import { Player } from './player.js';
 import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize } from './enemies.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
 import { draftUpgrades } from './upgrades.js';
-import { weaponDef, addOrLevelWeapon, evolveWeapon } from './weapons.js';
+import { weaponDef, addOrLevelWeapon, evolveWeapon, createWeaponInst } from './weapons.js';
 import { Background } from './background.js';
+import { shipById, DEFAULT_SHIP_ID } from './ships.js';
+import { computeMetaBonus, createMetaBonus, stardustForRun } from './meta.js';
 
 // Lightweight uniform spatial grid for enemy broad-phase queries.
 // Cells are addressed with packed integer keys (instead of string keys) to cut
@@ -75,8 +77,16 @@ export class World {
     this.reset();
   }
 
-  reset() {
+  reset(config = {}) {
     this.player = new Player();
+    // Apply the chosen ship identity and persistent meta bonuses to the fresh
+    // loadout before anything reads it. Ship first (swaps starter weapon + gives
+    // its stat identity), then meta on top, then derive hp from the final maxHp.
+    this.shipId = config.shipId || DEFAULT_SHIP_ID;
+    this.metaBonus = config.metaLevels ? computeMetaBonus(config.metaLevels)
+      : (config.metaBonus || createMetaBonus());
+    this.applyLoadout(this.player, this.shipId, this.metaBonus);
+
     this.camera.x = this.player.x;
     this.camera.y = this.player.y;
     this.enemies = [];
@@ -97,6 +107,8 @@ export class World {
 
     this.score = 0;
     this.kills = 0;
+    this.bossKills = 0;
+    this.revives = this.metaBonus.revives || 0;
     this.streak = 0;
     this.comboTimer = 0;
     this.level = 1;
@@ -113,6 +125,34 @@ export class World {
     this.onLevelUp = null;
     this.onGameOver = null;
     this.flash = 0;
+  }
+
+  // Configure a fresh player with a ship identity + persistent meta bonus.
+  applyLoadout(player, shipId, bonus) {
+    const ship = shipById(shipId);
+    const s = player.stats;
+    // Ship starter weapon (replaces the default Ion Blaster when different).
+    if (ship.weapon && ship.weapon !== 'ion') {
+      player.weapons = [createWeaponInst(ship.weapon)];
+    }
+    // Ship identity modifiers, then permanent meta bonuses layered on top.
+    ship.apply(s);
+    s.maxHp += bonus.maxHpAdd;
+    s.weaponDamageMul *= bonus.damageMul;
+    s.moveSpeed *= bonus.moveSpeedMul;
+    s.armor += bonus.armorAdd;
+    s.regen += bonus.regenAdd;
+    s.luck = (s.luck || 0) + bonus.luckAdd;
+    s.critChance += bonus.critAdd;
+    s.cooldownMul *= bonus.hasteMul;
+    s.xpMul *= bonus.xpMul;
+    s.pickupRadius *= bonus.pickupMul;
+    s.singularityChargeMul *= bonus.singChargeMul;
+    // Clamp and derive starting HP from the final maxHp.
+    s.maxHp = Math.max(1, Math.round(s.maxHp));
+    player.hp = s.maxHp;
+    player.shipColor = ship.color;
+    player.syncDrones();
   }
 
   get multiplier() { return comboMultiplier(this.streak); }
@@ -355,7 +395,7 @@ export class World {
       this.explode(e.x, e.y, 110, edmg, COLORS.fire);
     }
 
-    if (e.boss) { this.bossActive = null; this.flash = 0.6; this.addText(e.x, e.y - 80, 'BOSS DOWN!', COLORS.gold, 30); }
+    if (e.boss) { this.bossActive = null; this.bossKills++; this.flash = 0.6; this.addText(e.x, e.y - 80, 'BOSS DOWN!', COLORS.gold, 30); }
   }
 
   explode(x, y, r, dmg, color) {
@@ -668,7 +708,35 @@ export class World {
     this.background.update(dt, this.player.vx, this.player.vy);
     this.camera.follow(this.player.x, this.player.y, dt);
 
-    if (!this.player.alive && this.state === 'playing') this.endRun();
+    if (!this.player.alive && this.state === 'playing') {
+      if (this.revives > 0) this.revivePlayer();
+      else this.endRun();
+    }
+  }
+
+  // Phoenix Protocol: spend a stored revive to bring the player back mid-run with
+  // half HP, brief invulnerability and a clearing nova so you aren't instantly
+  // re-killed. Driven by the meta bonus (this.revives) set at run start.
+  revivePlayer() {
+    this.revives--;
+    const p = this.player;
+    p.alive = true;
+    p.hp = Math.max(1, Math.round(p.stats.maxHp * 0.5));
+    p.invuln = Math.max(p.invuln, 2.2);
+    p.overdriveTime = Math.max(p.overdriveTime, 3);
+    this.flash = 0.8;
+    this.shake(24);
+    this.hitStopFor(0.1);
+    this.audio?.play('levelup');
+    this.addText(p.x, p.y - 50, 'PHOENIX REVIVE', COLORS.fire, 30);
+    this.particles.burst(p.x, p.y, COLORS.fire, 60, { speed: 360, life: 0.8 });
+    // clear nearby threats so the revive actually lands
+    for (const e of this.enemies.slice()) {
+      if (e.alive && !e.boss && dist2(p.x, p.y, e.x, e.y) < 360 * 360) {
+        this.damageEnemy(e, 400, { source: 'explosion', knockback: 420 });
+      }
+    }
+    for (const b of this.enemyBullets) b.life = 0;
   }
 
   step(dt, cmd) {
@@ -875,10 +943,21 @@ export class World {
     this.flash = 0.5;
     const summary = {
       score: this.score, time: this.elapsed, level: this.level, kills: this.kills,
+      bossKills: this.bossKills || 0,
     };
     const { newBest } = this.store ? this.store.recordRun(summary) : { newBest: false };
     summary.newBest = newBest;
     summary.highScore = this.store ? this.store.get().highScore : this.score;
+
+    // Award Stardust (meta currency) for this run, scaled by the salvage meta.
+    const base = stardustForRun(summary);
+    const earned = Math.floor(base * (this.metaBonus?.stardustMul || 1));
+    summary.stardust = earned;
+    if (this.store?.addStardust) {
+      this.store.addStardust(earned);
+      summary.stardustTotal = this.store.get().stardust;
+    }
+
     if (this.onGameOver) this.onGameOver(summary);
   }
 
@@ -943,11 +1022,12 @@ export class World {
       ctx.restore();
     }
     ctx.globalAlpha = p.invuln > 0 && !p.dashing ? (Math.sin(performance.now() / 40) * 0.3 + 0.6) : 1;
-    // glow body
-    ctx.shadowColor = COLORS.playerGlow;
+    // glow body (tinted by the chosen ship's accent colour)
+    const hull = p.shipColor || COLORS.player;
+    ctx.shadowColor = p.shipColor || COLORS.playerGlow;
     ctx.shadowBlur = p.dashing ? 30 : 16;
     ctx.rotate(p.aimAngle);
-    ctx.fillStyle = p.hitFlash > 0 ? '#fff' : COLORS.player;
+    ctx.fillStyle = p.hitFlash > 0 ? '#fff' : hull;
     ctx.beginPath();
     ctx.moveTo(p.radius + 4, 0);
     ctx.lineTo(-p.radius, -p.radius * 0.8);
@@ -1314,6 +1394,7 @@ export class World {
       dashMax: DASH.cooldown * this.player.stats.dashCooldownMul,
       enemies: this.enemies.length,
       boss: this.bossActive,
+      revives: this.revives || 0,
     };
   }
 }

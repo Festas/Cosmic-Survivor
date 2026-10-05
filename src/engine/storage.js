@@ -8,17 +8,29 @@ const DEFAULT = {
   bestLevel: 0,
   runs: 0,
   totalKills: 0,
+  // ---- Meta-progression ("Ascension") -----------------------------------
+  stardust: 0,          // current spendable currency
+  lifetimeStardust: 0,  // total ever earned (for stats / prestige display)
+  meta: {},             // { [upgradeId]: level }
+  ships: ['vanguard'],  // unlocked ship ids (vanguard is always free)
+  ship: 'vanguard',     // last-selected ship id
   settings: { muted: false, shake: true, music: true },
 };
 
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULT, settings: { ...DEFAULT.settings } };
+    if (!raw) return { ...DEFAULT, meta: {}, ships: ['vanguard'], settings: { ...DEFAULT.settings } };
     const data = JSON.parse(raw);
-    return { ...DEFAULT, ...data, settings: { ...DEFAULT.settings, ...(data.settings || {}) } };
+    return {
+      ...DEFAULT,
+      ...data,
+      meta: { ...(data.meta || {}) },
+      ships: Array.isArray(data.ships) && data.ships.length ? data.ships : ['vanguard'],
+      settings: { ...DEFAULT.settings, ...(data.settings || {}) },
+    };
   } catch {
-    return { ...DEFAULT, settings: { ...DEFAULT.settings } };
+    return { ...DEFAULT, meta: {}, ships: ['vanguard'], settings: { ...DEFAULT.settings } };
   }
 }
 
@@ -40,6 +52,46 @@ export const Store = {
   setSetting(key, value) {
     this.data.settings[key] = value;
     this.save();
+  },
+
+  // ---- Meta-progression --------------------------------------------------
+  get stardust() { return this.data.stardust || 0; },
+  getMeta() { return this.data.meta || (this.data.meta = {}); },
+  getMetaLevel(id) { return this.getMeta()[id] || 0; },
+
+  addStardust(amount) {
+    const n = Math.max(0, Math.floor(amount || 0));
+    this.data.stardust = (this.data.stardust || 0) + n;
+    this.data.lifetimeStardust = (this.data.lifetimeStardust || 0) + n;
+    this.save();
+    return this.data.stardust;
+  },
+
+  // Spend Stardust to raise a meta upgrade by one level. Returns true on success.
+  buyMeta(id, cost, maxLevel) {
+    const meta = this.getMeta();
+    const cur = meta[id] || 0;
+    if (cur >= maxLevel) return false;
+    if ((this.data.stardust || 0) < cost) return false;
+    this.data.stardust -= cost;
+    meta[id] = cur + 1;
+    this.save();
+    return true;
+  },
+
+  // ---- Ships -------------------------------------------------------------
+  isShipUnlocked(id) { return (this.data.ships || []).includes(id); },
+  getSelectedShip() { return this.data.ship || 'vanguard'; },
+  selectShip(id) { this.data.ship = id; this.save(); },
+
+  // Spend Stardust to permanently unlock a ship. Returns true on success.
+  unlockShip(id, cost) {
+    if (this.isShipUnlocked(id)) return true;
+    if ((this.data.stardust || 0) < cost) return false;
+    this.data.stardust -= cost;
+    this.data.ships = [...(this.data.ships || []), id];
+    this.save();
+    return true;
   },
 
   // Record the result of a finished run. Returns { newBest }.
