@@ -5,7 +5,8 @@ A fast, juicy **top-down space survivor-roguelite** with an **OG alien-invaders*
 against endless invader swarms, auto-firing a growing **arsenal** while you weave through
 bullet-hell chaos. Survive, level up, draft game-warping weapons and items, **evolve** them
 into legendary forms, and ride the **Overdrive** meter to a screen-clearing rampage — then
-bank **Stardust** to permanently **ascend** and unlock new **starfighters** between runs.
+bank **Stardust** to permanently **ascend**, unlock new **starfighters**, dial up optional
+**Directives** and collect **Commendations** between runs.
 
 Built from scratch as a **zero-dependency** project: vanilla JavaScript ES modules,
 HTML5 Canvas 2D, and fully procedural WebAudio. No frameworks, no build step, no bundler.
@@ -81,6 +82,19 @@ profile and accent colour:
 | 🌀 **Oracle** | Voidcaller | Graviton Mortar | Void imbue + supercharged Singularity |
 
 Ships beyond the Vanguard are unlocked permanently with Stardust.
+
+### 🎲 Directives
+Opt-in **challenge modifiers** toggled in the Hangar before a run. Each makes the run harder
+in some dimension — tougher or faster enemies, denser swarms, a fragile hull, bulkier bosses,
+slower leveling — and in return **multiplies the Stardust** you earn. Directives **stack**, so
+their reward multipliers compound: a bigger gamble pays out more. Your selection is remembered
+across runs and shown on the start screen and HUD.
+
+### 🏅 Commendations
+Permanent **milestone awards** earned by hitting thresholds in a single run (survive 10 minutes,
+1,000 points of score, level 20, a 3-boss run, 60 reactions…) or across your whole career
+(1,000 kills, 10 bosses, unlock every ship, finish with 4 Directives…). Each pays a one-time
+**Stardust bounty** and pops a toast when unlocked. Track them all in the Hangar's **Codex** tab.
 
 ---
 
@@ -197,6 +211,8 @@ src/
     upgrades.js       #   level-up draft: weapons, evolves & items (pure)
     meta.js           #   permanent Ascension upgrades & Stardust (pure)
     ships.js          #   playable starfighter catalogue (pure)
+    modifiers.js      #   Directives: opt-in challenge modifiers (pure)
+    achievements.js   #   Commendations: milestone awards (pure)
     enemies.js        #   enemy/boss definitions & behaviors
     player.js         #   the ship: movement, arsenal firing, dash, overdrive
     world.js          #   simulation + rendering orchestrator
@@ -206,8 +222,9 @@ tests/                # Unit tests for the pure game logic
 ```
 
 The modules in `engine/utils.js` and the `game/` data modules (`config`, `elements`,
-`weapons`, `upgrades`, `meta`, `ships`, `enemies`) are intentionally **DOM-free and pure**,
-which keeps the core game logic unit-testable in plain Node.
+`weapons`, `upgrades`, `meta`, `ships`, `modifiers`, `achievements`, `enemies`) are
+intentionally **DOM-free and pure**, which keeps the core game logic unit-testable in plain
+Node.
 
 ---
 
@@ -216,7 +233,8 @@ which keeps the core game logic unit-testable in plain Node.
 - **Unit tests** (`npm test`) cover the deterministic logic: RNG determinism, difficulty
   scaling, XP curves, elemental reactions, the weapon arsenal (defs, leveling, evolutions),
   the level-up draft (weapons, evolves, items, reroll/banish gating), the meta-progression
-  (Ascension costs, bonus aggregation, Stardust rewards) and the starfighter catalogue.
+  (Ascension costs, bonus aggregation, Stardust rewards), the starfighter catalogue, the
+  Directives (difficulty/economy folding) and the Commendations (threshold checks).
 - The rendering/input layers are verified by running the game in a real browser.
 
 ---
