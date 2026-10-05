@@ -64,7 +64,12 @@ export const ITEMS = [
 
   // ---- Companions & on-hit ---------------------------------------------
   I('drone', 'Orbital Drone', 'epic', '🛰️', 'Gain an orbiting drone that auto-fires', (s) => { s.droneCount += 1; }, { maxStacks: 4 }),
+  I('drone_power', 'Drone Uplink', 'epic', '🤖', '+45% drone damage', (s) => { s.droneDamageMul *= 1.45; }, { maxStacks: 4, tags: ['drone'], req: (s) => s.droneCount > 0 }),
   I('explosive', 'Volatile Payload', 'epic', '🧨', 'Kills have a chance to explode', (s) => { s.explosiveChance = Math.min(0.6, s.explosiveChance + 0.25); s.explosiveDamage += 24; }, { maxStacks: 3 }),
+
+  // ---- Build capstones --------------------------------------------------
+  I('crit_capstone', "Executioner's Edge", 'epic', '⚔️', '+10% crit chance & +75% crit damage', (s) => { s.critChance += 0.1; s.critMult += 0.75; }, { maxStacks: 3, tags: ['crit'] }),
+  I('overdrive_rush', 'Kinetic Reactor', 'rare', '🔋', '+28% Overdrive build-up & +6% move speed', (s) => { s.overdriveRate *= 1.28; s.moveSpeed *= 1.06; }, { maxStacks: 3, tags: ['overdrive'] }),
 
   // ---- Defense & utility ------------------------------------------------
   I('maxhp', 'Reinforced Hull', 'common', '❤️', '+25 max HP (and heal)', (s) => { s.maxHp += 25; s.pendingHeal = (s.pendingHeal || 0) + 25; }),

@@ -55,6 +55,9 @@ html, body {
 }
 .chip-label { font-size: 9px; letter-spacing: 2px; color: var(--muted); }
 .chip span:last-child { font-size: 18px; font-weight: 700; }
+.chip.revive { border-color: rgba(255,106,61,0.55); box-shadow: 0 0 14px -4px var(--fire, #ff6a3d); }
+.chip.revive .chip-label { color: #ff8a5d; }
+.chip.revive span:last-child { color: #ff6a3d; }
 
 .hud-center { text-align: center; }
 #timer {

@@ -303,15 +303,18 @@ function showGameOver(summary) {
   $('go-score').textContent = formatNumber(summary.score);
   $('go-newbest').classList.toggle('hidden', !summary.newBest);
   const earned = summary.stardust || 0;
+  const total = summary.stardustTotal ?? store.stardust;
   const goSd = $('go-stardust');
-  goSd.textContent = `✦ +${formatNumber(earned)} Stardust`;
+  goSd.textContent = `✦ +${formatNumber(earned)} Stardust  ·  ${formatNumber(total)} total`;
   goSd.classList.toggle('none', earned <= 0);
-  $('go-stats').innerHTML = statRows({
+  const rows = {
     Time: formatTime(summary.time),
     Level: summary.level,
     Kills: summary.kills,
     Best: formatNumber(summary.highScore),
-  });
+  };
+  if (summary.bossKills > 0) rows.Bosses = summary.bossKills;
+  $('go-stats').innerHTML = statRows(rows);
   $('gameover').classList.remove('hidden');
 }
 
@@ -340,6 +343,7 @@ const el = {
   comboPop: $('combo-pop'),
   odBar: $('overdrive-bar'), odFill: $('od-fill'), odText: $('od-text'),
   loadout: $('loadout'),
+  reviveChip: $('revive-chip'), reviveN: $('revive-n'),
 };
 const ARC_LEN = 119.4;
 
@@ -347,6 +351,9 @@ function updateHud() {
   const h = world.getHud();
   el.threat.textContent = h.threat;
   el.enemies.textContent = h.enemies;
+  const revives = h.revives || 0;
+  el.reviveChip.classList.toggle('hidden', revives <= 0);
+  if (revives > 0) el.reviveN.textContent = revives;
   el.timer.textContent = formatTime(h.time);
   el.score.textContent = formatNumber(h.score);
   el.mult.textContent = 'x' + h.multiplier.toFixed(1);
