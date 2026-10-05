@@ -4,7 +4,8 @@ A fast, juicy **top-down space survivor-roguelite** with an **OG alien-invaders*
 **Vampire Survivors × Brotato × Binding of Isaac** build-craft. Pilot a lone starfighter
 against endless invader swarms, auto-firing a growing **arsenal** while you weave through
 bullet-hell chaos. Survive, level up, draft game-warping weapons and items, **evolve** them
-into legendary forms, and ride the **Overdrive** meter to a screen-clearing rampage.
+into legendary forms, and ride the **Overdrive** meter to a screen-clearing rampage — then
+bank **Stardust** to permanently **ascend** and unlock new **starfighters** between runs.
 
 Built from scratch as a **zero-dependency** project: vanilla JavaScript ES modules,
 HTML5 Canvas 2D, and fully procedural WebAudio. No frameworks, no build step, no bundler.
@@ -48,6 +49,38 @@ Every kill stokes the **Overdrive meter**, and chaining kills on a hot combo fil
 faster. When it tops out, your ship enters a short **rampage**: dramatically faster
 cooldowns and bonus damage across your whole arsenal. *Overdrive Reactor* builds the meter
 quicker and extends the rampage.
+
+---
+
+## 🛠 The Hangar — permanent progression
+
+Every run now feeds a persistent meta-layer, so you grow stronger even when you lose.
+
+### ✦ Stardust
+Finish a run and you bank **Stardust**, scaled by your score, survival time, kills, level
+and bosses downed (the *Salvage Rig* upgrade multiplies the haul). Spend it in the
+**Hangar**, reachable from the start and game-over screens.
+
+### 🌟 Ascension
+A tree of **12 permanent upgrades** bought with Stardust — more max HP, damage, move speed,
+armor, regen, crit, attack speed, XP & pickup range, luck, Singularity charge, Stardust
+gain, and the capstone **Phoenix Protocol**, which revives you once per run at half HP with
+a clearing nova. Levels persist forever and layer on top of your ship and in-run drafts.
+
+### 🚀 Starfighters
+Pick from **6 ships**, each a distinct build identity with its own starter weapon, stat
+profile and accent colour:
+
+| Ship | Style | Starter | Identity |
+| ---- | ----- | ------- | -------- |
+| 🛸 **Vanguard** | Balanced all-rounder | Ion Blaster | No weaknesses (free) |
+| 🗡️ **Striker** | Glass cannon | Scatter Array | +damage & crit, less HP |
+| 🛡️ **Juggernaut** | Fortress | Pulse Nova | +HP/armor/knockback, slower |
+| ⚡ **Tempest** | Blitz | Arc Coil | +speed & haste, fragile |
+| 🔥 **Pyre** | Pyromancer | Missile Pod | Fire imbue + explosions |
+| 🌀 **Oracle** | Voidcaller | Graviton Mortar | Void imbue + supercharged Singularity |
+
+Ships beyond the Vanguard are unlocked permanently with Stardust.
 
 ---
 
@@ -156,12 +189,14 @@ src/
     audio.js          #   procedural WebAudio SFX + music
     particles.js      #   pooled particle system
     camera.js         #   follow + screen-shake
-    storage.js        #   high scores & settings (localStorage)
+    storage.js        #   high scores, settings, Stardust & unlocks (localStorage)
   game/               # The game itself
     config.js         #   tuning constants + difficulty curves (pure)
     elements.js       #   Resonance elements & reactions (pure)
     weapons.js        #   weapon arsenal, evolutions & firing (pure)
     upgrades.js       #   level-up draft: weapons, evolves & items (pure)
+    meta.js           #   permanent Ascension upgrades & Stardust (pure)
+    ships.js          #   playable starfighter catalogue (pure)
     enemies.js        #   enemy/boss definitions & behaviors
     player.js         #   the ship: movement, arsenal firing, dash, overdrive
     world.js          #   simulation + rendering orchestrator
@@ -171,8 +206,8 @@ tests/                # Unit tests for the pure game logic
 ```
 
 The modules in `engine/utils.js` and the `game/` data modules (`config`, `elements`,
-`weapons`, `upgrades`, `enemies`) are intentionally **DOM-free and pure**, which keeps the
-core game logic unit-testable in plain Node.
+`weapons`, `upgrades`, `meta`, `ships`, `enemies`) are intentionally **DOM-free and pure**,
+which keeps the core game logic unit-testable in plain Node.
 
 ---
 
@@ -180,7 +215,8 @@ core game logic unit-testable in plain Node.
 
 - **Unit tests** (`npm test`) cover the deterministic logic: RNG determinism, difficulty
   scaling, XP curves, elemental reactions, the weapon arsenal (defs, leveling, evolutions),
-  and the level-up draft (weapons, evolves, items, reroll/banish gating).
+  the level-up draft (weapons, evolves, items, reroll/banish gating), the meta-progression
+  (Ascension costs, bonus aggregation, Stardust rewards) and the starfighter catalogue.
 - The rendering/input layers are verified by running the game in a real browser.
 
 ---

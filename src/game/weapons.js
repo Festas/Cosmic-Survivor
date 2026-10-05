@@ -345,6 +345,99 @@ export const WEAPONS = [
       world.audio?.play('explode');
     },
   }),
+
+  // 8) Halo Launcher — a radial curtain of bolts around the ship. -----------
+  W({
+    id: 'halo', name: 'Halo Launcher', rarity: 'rare', icon: '💫',
+    desc: 'Rings the ship with a radial burst of bolts, clearing every angle.',
+    baseCd: 0.95, dmgMul: 0.8, lvlDmg: 0.18,
+    evolve: 'corona', req: (s) => s.projectilesBonus >= 2, reqText: 'Split Barrel ×2',
+    fire(world, player, inst) {
+      const s = player.stats;
+      // One extra bolt per level, plus the shared projectile bonus, fanned
+      // evenly over a full circle. inst.phase spins the pattern each volley.
+      const n = 6 + inst.level + s.projectilesBonus;
+      inst.phase = (inst.phase || 0) + 0.4;
+      for (let i = 0; i < n; i++) {
+        const ang = inst.phase + (i / n) * TAU;
+        const crit = rolledCrit(s);
+        world.spawnBullet(player.x, player.y, ang, {
+          damage: withCrit(dmgOf(s, this, inst), crit, s), crit,
+          knockback: s.knockback * 1.2, tint: COLORS.cryo, glow: COLORS.cryo,
+        });
+      }
+      world.ring(player.x, player.y, 36, COLORS.cryo);
+      world.audio?.play('shoot');
+    },
+  }),
+  W({
+    id: 'corona', name: 'Corona Burst', rarity: 'legendary', icon: '🎇', evolved: true,
+    desc: 'A searing double corona of piercing plasma erupts in every direction.',
+    baseCd: 0.8, dmgMul: 0.95, lvlDmg: 0.18,
+    fire(world, player, inst) {
+      const s = player.stats;
+      const n = 9 + inst.level + s.projectilesBonus;
+      inst.phase = (inst.phase || 0) + 0.5;
+      for (let ring = 0; ring < 2; ring++) {
+        const off = ring * (Math.PI / n); // interleave the second ring
+        for (let i = 0; i < n; i++) {
+          const ang = inst.phase + off + (i / n) * TAU;
+          const crit = rolledCrit(s);
+          world.spawnBullet(player.x, player.y, ang, {
+            damage: withCrit(dmgOf(s, this, inst), crit, s), crit,
+            pierce: 1 + s.pierce, speed: s.bulletSpeed * (ring ? 0.8 : 1.05),
+            knockback: s.knockback * 1.3, tint: COLORS.fire, glow: COLORS.fire,
+          });
+        }
+      }
+      world.ring(player.x, player.y, 46, COLORS.fire);
+      world.audio?.play('shoot');
+    },
+  }),
+
+  // 9) Arc Whip — a short-range sweeping melee lash in the facing arc. -------
+  W({
+    id: 'lash', name: 'Arc Whip', rarity: 'epic', icon: '🔗',
+    desc: 'Lashes a crackling arc across the front, shredding and flinging foes.',
+    baseCd: 0.7, dmgMul: 1.15, lvlDmg: 0.2,
+    evolve: 'reaver', req: (s) => s.lifesteal > 0, reqText: 'Vampiric Circuit',
+    fire(world, player, inst) {
+      const s = player.stats;
+      const t = player.acquireTarget(world);
+      const ang = t ? angleTo(player.x, player.y, t.x, t.y) : player.faceAngle;
+      const reach = 70 + inst.level * 5;
+      const r = (40 + inst.level * 2.5) * s.areaMul;
+      const base = dmgOf(s, this, inst);
+      // Three overlapping strike zones sweeping a short arc in front of the ship.
+      for (let k = -1; k <= 1; k++) {
+        const a = ang + k * 0.45;
+        const hx = player.x + Math.cos(a) * reach;
+        const hy = player.y + Math.sin(a) * reach;
+        const crit = rolledCrit(s);
+        world.damageEnemiesInRadius(hx, hy, r, withCrit(base, crit, s), {
+          source: 'bullet', color: COLORS.shock, knockback: s.knockback * 1.8, crit, lifesteal: true,
+        });
+        world.ring(hx, hy, r, COLORS.shock);
+      }
+      world.audio?.play('reaction');
+    },
+  }),
+  W({
+    id: 'reaver', name: 'Rift Reaver', rarity: 'legendary', icon: '🪓', evolved: true,
+    desc: 'A whirling rift scythe that carves all around you and drinks their essence.',
+    baseCd: 0.62, dmgMul: 1.35, lvlDmg: 0.2,
+    fire(world, player, inst) {
+      const s = player.stats;
+      const r = (120 + inst.level * 8) * s.areaMul;
+      const crit = rolledCrit(s);
+      world.damageEnemiesInRadius(player.x, player.y, r, withCrit(dmgOf(s, this, inst), crit, s), {
+        source: 'bullet', color: COLORS.void, knockback: s.knockback * 2, crit, lifesteal: true,
+      });
+      world.ring(player.x, player.y, r, COLORS.void);
+      world.shake(3);
+      world.audio?.play('reaction');
+    },
+  }),
 ];
 
 export const WEAPON_BY_ID = Object.create(null);

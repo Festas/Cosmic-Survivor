@@ -187,6 +187,53 @@ export const ENEMY_TYPES = {
       }
     },
   },
+
+  // ---- Expansion archetypes ------------------------------------------------
+  // Area-denial skirmisher: hovers at mid range and sows drifting spore-mines
+  // that linger as a slow hazard field (reuses the enemy-bullet primitive with a
+  // near-stationary velocity, so no new world hooks are needed).
+  seeder: {
+    key: 'seeder', name: 'Seeder', hp: 40, speed: 70, radius: 15, damage: 9, xp: 3,
+    color: '#7bdcb5', shape: 'blob',
+    update(e, dt, world) {
+      const d = dist(e.x, e.y, world.player.x, world.player.y);
+      if (d < 260) steerTo(e, world.player.x, world.player.y, dt, -0.7);
+      else if (d > 380) steerTo(e, world.player.x, world.player.y, dt, 0.85);
+      else {
+        const a = angleTo(e.x, e.y, world.player.x, world.player.y) + Math.PI / 2;
+        steerTo(e, e.x + Math.cos(a) * 50, e.y + Math.sin(a) * 50, dt, 0.6);
+      }
+      e.sowT = (e.sowT ?? randRange(1.4, 2.6)) - dt;
+      if (e.sowT <= 0 && d < 520) {
+        e.sowT = 2.6;
+        const n = 3;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU + rand() * 0.5;
+          world.enemyBullets.push({
+            x: e.x, y: e.y, vx: Math.cos(a) * 55, vy: Math.sin(a) * 55,
+            r: 9, dmg: e.damage, life: 2.8, color: '#7bdcb5',
+          });
+        }
+        world.audio?.play('espit');
+      }
+    },
+  },
+  // Siege artillery: slow, tanky and gravity-resistant (massive) like the Brute,
+  // but anchors the swarm by lobbing a rotating ring of flak on a cadence — the
+  // first non-boss bullet-hell pressure, arriving in the late game.
+  sentinel: {
+    key: 'sentinel', name: 'Sentinel', hp: 120, speed: 40, radius: 24, damage: 16, xp: 5,
+    color: COLORS.invAmber, shape: 'hex', massive: true,
+    update(e, dt, world) {
+      steerTo(e, world.player.x, world.player.y, dt, 0.45);
+      e.burstT = (e.burstT ?? randRange(1.8, 3)) - dt;
+      if (e.burstT <= 0 && dist(e.x, e.y, world.player.x, world.player.y) < 620) {
+        e.burstT = 3.0;
+        ringBurst(world, e, 9, 170, Math.round(e.damage * 0.7), COLORS.invAmber, e.spin);
+        world.audio?.play('bossfire');
+      }
+    },
+  },
 };
 
 export const BOSS_TYPES = {
@@ -305,6 +352,58 @@ export const BOSS_TYPES = {
       }
     },
   },
+  // Void-gravity flagship tying the pack together: hovers at range and cycles a
+  // rotating plasma spiral, a full collapse ring-burst, then summons an escort.
+  // Massive, so it ignores the player's Singularity/Void pulls (a proper duel).
+  singularis: {
+    key: 'singularis', name: 'The Singularis', hp: 3200, speed: 50, radius: 50, damage: 24, xp: 80,
+    color: COLORS.void, shape: 'boss', boss: true, massive: true,
+    update(e, dt, world) {
+      // Hover-keep a mid distance from the player (mirrors the Mothership).
+      const d = dist(e.x, e.y, world.player.x, world.player.y);
+      if (d > 420) steerTo(e, world.player.x, world.player.y, dt, 0.7);
+      else if (d < 260) steerTo(e, world.player.x, world.player.y, dt, -0.6);
+      else {
+        const a = angleTo(e.x, e.y, world.player.x, world.player.y) + Math.PI / 2;
+        steerTo(e, e.x + Math.cos(a) * 90, e.y + Math.sin(a) * 90, dt, 0.7);
+      }
+
+      e.spin = (e.spin || 0) + dt * 1.2;
+      e.phase = e.phase || 'spiral';
+      e.timer = (e.timer ?? 5) - dt;
+
+      if (e.phase === 'spiral') {
+        e.emitT = (e.emitT ?? 0.09) - dt;
+        if (e.emitT <= 0) {
+          e.emitT = 0.09;
+          e.sweepA = (e.sweepA || 0) + 0.34; // rotate the emitter -> spiral
+          for (let k = 0; k < 3; k++) {
+            const a = e.sweepA + k * (TAU / 3);
+            world.enemyBullets.push({
+              x: e.x, y: e.y, vx: Math.cos(a) * 200, vy: Math.sin(a) * 200,
+              r: 8, dmg: 12, life: 5, color: COLORS.void,
+            });
+          }
+        }
+        if (e.timer <= 0) { e.phase = 'collapse'; e.timer = 0.7; world.shake(7); }
+      } else if (e.phase === 'collapse') {
+        e.vx *= 0.9; e.vy *= 0.9; // brace, then erupt
+        if (e.timer <= 0) {
+          ringBurst(world, e, 26, 210, 14, COLORS.void, e.spin);
+          world.audio?.play('bossfire'); world.shake(12);
+          const n = 4;
+          const base = angleTo(e.x, e.y, world.player.x, world.player.y);
+          for (let i = 0; i < n; i++) {
+            const a = base + (i - (n - 1) / 2) * 0.4;
+            world.spawnEnemy(i % 2 ? 'swarm' : 'seeder', e.x + Math.cos(a) * 70, e.y + Math.sin(a) * 70);
+          }
+          e.phase = 'summon'; e.timer = 1.4;
+        }
+      } else { // summon dwell, then loop back to the spiral
+        if (e.timer <= 0) { e.phase = 'spiral'; e.timer = 5; }
+      }
+    },
+  },
 };
 
 // Time-gated spawn table. Each entry: [typeKey, unlockSeconds, weightFn(t)].
@@ -319,6 +418,8 @@ const SPAWN_TABLE = [
   ['splitter', 55, () => 3.5],
   ['octopus', 70, (t) => 3 + t * 0.01],
   ['brute', 80, (t) => 2 + t * 0.01],
+  ['seeder', 60, (t) => 3 + t * 0.01],
+  ['sentinel', 90, (t) => 2 + t * 0.008],
 ];
 
 export function pickEnemyType(t, r = rand) {
