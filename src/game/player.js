@@ -3,6 +3,7 @@
 
 import { PLAYER, WEAPON, DASH, SINGULARITY, ARENA, COLORS } from './config.js';
 import { TAU, clamp, dist, dist2, angleTo, lerpAngle, rand, chance } from '../engine/utils.js';
+import { createWeaponInst, weaponDef } from './weapons.js';
 
 export function createStats() {
   return {
@@ -27,6 +28,16 @@ export function createStats() {
     range: WEAPON.range,
     homing: WEAPON.homing,
 
+    // ---- Roguelite loadout knobs (read by weapons.js) -------------------
+    // Global multipliers that every equipped weapon benefits from, so passive
+    // items create build-defining synergies across the whole arsenal.
+    weaponDamageMul: 1, // % damage applied on top of `damage`
+    cooldownMul: 1,     // attack-speed: lower fires faster
+    projectilesBonus: 0, // flat extra pellets for projectile weapons
+    areaMul: 1,         // scales every AoE/explosion radius
+    durationMul: 1,     // scales timed effects (beams, fields)
+    projectileSpeedMul: 1,
+
     pickupRadius: PLAYER.pickupRadius,
     magnetSpeed: PLAYER.magnetSpeed,
     xpMul: 1,
@@ -35,6 +46,16 @@ export function createStats() {
     dashCooldownMul: 1,
     dashDamageMul: 1,
     dashRadiusMul: 1,
+
+    overdriveRate: 1,
+    overdrivePower: 1,
+    // Transient per-frame multipliers (managed by Player.update for Overdrive).
+    // Weapons read these so the rampage buff never corrupts the base loadout.
+    transientDamageMul: 1,
+    transientHaste: 1,
+
+    rerolls: 0,
+    banishes: 0,
 
     droneCount: 0,
     droneDamageMul: 1,
@@ -65,6 +86,7 @@ export class Player {
     this.aimAngle = 0;
     this.faceAngle = 0;
     this.fireCd = 0;
+    this.weapons = [createWeaponInst('ion')];
     this.dashCd = 0;
     this.dashTime = 0;
     this.dashDirX = 1;
@@ -72,8 +94,11 @@ export class Player {
     this.invuln = 0;
     this.hitFlash = 0;
     this.singCharge = 0;
+    this.overdrive = 0;       // 0..100 meter, builds from kills/combo
+    this.overdriveTime = 0;   // seconds of active Overdrive remaining
     this.drones = [];
     this.upgradeCounts = {};
+    this.banished = Object.create(null);
     this.thrust = 0;
     this.alive = true;
   }
@@ -125,6 +150,25 @@ export class Player {
     this.fireCd = Math.max(0, this.fireCd - dt);
     if (this.hp < s.maxHp) this.hp = Math.min(s.maxHp, this.hp + s.regen * dt);
 
+    // ---- Overdrive meter ----------------------------------------------
+    // Kills charge the meter (see World.killEnemy). When it tops out the ship
+    // enters a short rampage: faster cooldowns and bonus damage via transient
+    // multipliers that weapons read, so the base loadout is never mutated.
+    this.overdriveTime = Math.max(0, this.overdriveTime - dt);
+    const odActive = this.overdriveTime > 0;
+    s.transientDamageMul = odActive ? 1.6 * s.overdrivePower : 1;
+    s.transientHaste = odActive ? 0.5 : 1;
+    if (this.overdrive >= 100 && !odActive) {
+      this.overdrive = 0;
+      this.overdriveTime = 5 * s.overdrivePower;
+      this.invuln = Math.max(this.invuln, 0.4);
+      world.flash = Math.max(world.flash, 0.5);
+      world.shake?.(6);
+      world.audio?.play('levelup');
+      world.addText?.(this.x, this.y - 44, 'OVERDRIVE!', COLORS.gold || '#ffd54a', 26);
+      world.particles.burst(this.x, this.y, COLORS.gold || '#ffd54a', 36, { speed: 300, life: 0.7 });
+    }
+
     // ---- Movement ------------------------------------------------------
     let mx = cmd.moveX, my = cmd.moveY;
     const ml = Math.hypot(mx, my);
@@ -165,12 +209,11 @@ export class Player {
     this.y = clamp(this.y, ARENA.pad, ARENA.h - ARENA.pad);
 
     // ---- Aiming & firing ----------------------------------------------
+    // Keep the ship pointed at the nearest threat for visual feedback, then let
+    // every equipped weapon fire on its own independent cooldown.
     const target = this.acquireTarget(world);
     if (target) this.aimAngle = lerpAngle(this.aimAngle, angleTo(this.x, this.y, target.x, target.y), 0.4);
-    if (this.fireCd <= 0 && target) {
-      this.fire(world, this.aimAngle);
-      this.fireCd = s.fireInterval;
-    }
+    this.fireWeapons(dt, world);
 
     // ---- Singularity trigger ------------------------------------------
     if (cmd.singularity && this.singReady) {
@@ -219,20 +262,21 @@ export class Player {
     return best;
   }
 
-  fire(world, baseAngle) {
+  fireWeapons(dt, world) {
     const s = this.stats;
-    const n = s.projectiles;
-    const spread = s.spread;
-    const start = -(n - 1) / 2;
-    for (let i = 0; i < n; i++) {
-      const a = baseAngle + (start + i) * spread;
-      const crit = chance(s.critChance);
-      world.spawnBullet(this.x, this.y, a, {
-        damage: s.damage * (crit ? s.critMult : 1),
-        crit,
-      });
+    for (const inst of this.weapons) {
+      inst.cd -= dt;
+      if (inst.cd > 0) continue;
+      const def = weaponDef(inst);
+      if (!def) { inst.cd = 0.5; continue; }
+      // The weapon sets its own cd when it can't act (e.g. no target); otherwise
+      // apply the standard per-weapon cadence after a successful volley.
+      inst.cd = 0;
+      def.fire(world, this, inst);
+      if (inst.cd <= 0) {
+        const lvlCut = Math.min(0.55, (inst.level - 1) * (def.lvlCd || 0));
+        inst.cd = Math.max(0.04, def.baseCd * s.cooldownMul * s.transientHaste * (1 - lvlCut));
+      }
     }
-    world.muzzle(this.x + Math.cos(baseAngle) * 18, this.y + Math.sin(baseAngle) * 18, baseAngle);
-    world.audio?.play('shoot');
   }
 }

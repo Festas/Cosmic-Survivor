@@ -15,6 +15,7 @@ import { Player } from './player.js';
 import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize } from './enemies.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
 import { draftUpgrades } from './upgrades.js';
+import { weaponDef, addOrLevelWeapon, evolveWeapon } from './weapons.js';
 import { Background } from './background.js';
 
 // Lightweight uniform spatial grid for enemy broad-phase queries.
@@ -195,21 +196,38 @@ export class World {
   // -------------------------------------------------------- bullets
   spawnBullet(x, y, angle, opts = {}) {
     const s = this.player.stats;
+    const speed = (opts.speed ?? s.bulletSpeed) * (s.projectileSpeedMul || 1);
     this.bullets.push({
       x, y,
-      vx: Math.cos(angle) * s.bulletSpeed,
-      vy: Math.sin(angle) * s.bulletSpeed,
-      r: opts.drone ? s.bulletRadius * 0.8 : s.bulletRadius,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: opts.radius ?? (opts.drone ? s.bulletRadius * 0.8 : s.bulletRadius),
       dmg: opts.damage ?? s.damage,
       crit: !!opts.crit,
-      pierce: s.pierce,
-      life: s.bulletLife,
-      homing: s.homing,
-      knockback: s.knockback,
+      pierce: opts.pierce ?? s.pierce,
+      life: opts.life ?? s.bulletLife,
+      homing: opts.homing ?? s.homing,
+      knockback: opts.knockback ?? s.knockback,
       hits: null,
       angle,
       drone: !!opts.drone,
+      tint: opts.tint || null,
+      glow: opts.glow || null,
+      explodeR: opts.explodeR || 0,
+      explodeDmg: opts.explodeDmg || 0,
     });
+  }
+
+  // A quick expanding shockwave ring (pure cosmetic) used by AoE weapons. Drawn
+  // with cheap pooled particles so it respects the particle budget during swarms.
+  ring(x, y, radius, color) {
+    const n = Math.min(26, Math.max(10, Math.round(radius / 10)));
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      this.particles.spawn(x + Math.cos(a) * radius * 0.35, y + Math.sin(a) * radius * 0.35, color, {
+        angle: a, speed: radius * 2.4, life: 0.26, size: 2.5, budget: 420,
+      });
+    }
   }
 
   muzzle(x, y, angle) {
@@ -264,6 +282,12 @@ export class World {
     const points = Math.round((e.boss ? 500 : 10 + e.maxHp * 0.3) * this.multiplier);
     this.score += points;
     this.player.addCharge(e.boss ? 40 : SINGULARITY.chargePerKill);
+
+    // Overdrive meter: kills stoke the rampage gauge. Combo streak adds a little
+    // extra so chaining kills fills it faster (Brotato/Isaac-style payoff).
+    const odGain = (e.boss ? 34 : (e.massive ? 7 : 2.4)) * (this.player.stats.overdriveRate || 1)
+      * (1 + Math.min(1.2, this.streak * 0.012));
+    this.player.overdrive = Math.min(100, this.player.overdrive + odGain);
 
     // death FX
     const col = e.color;
@@ -515,16 +539,52 @@ export class World {
     this.audio?.play('levelup');
     this.flash = Math.max(this.flash, 0.3);
     this.particles.burst(this.player.x, this.player.y, COLORS.xp, 30, { speed: 260, life: 0.6 });
+    this.rerollsLeft = (this.player.stats.rerolls || 0) + 1;
+    this.banishLeft = (this.player.stats.banishes || 0) + 1;
     const choices = draftUpgrades(this.player, 3, this.rng);
     this.pendingChoices = choices;
     this.state = 'levelup';
     if (this.onLevelUp) this.onLevelUp(choices);
   }
 
+  // Re-roll the current level-up offer (limited uses per level).
+  rerollChoices() {
+    if (this.state !== 'levelup' || this.rerollsLeft <= 0) return false;
+    this.rerollsLeft--;
+    this.pendingChoices = draftUpgrades(this.player, 3, this.rng);
+    this.audio?.play('ui');
+    if (this.onLevelUp) this.onLevelUp(this.pendingChoices);
+    return true;
+  }
+
+  // Banish one offered card (remove it from this run) and redraw a fresh set.
+  banishChoice(card) {
+    if (this.state !== 'levelup' || this.banishLeft <= 0 || !card) return false;
+    this.banishLeft--;
+    this.player.banished[card.id] = true;
+    this.pendingChoices = draftUpgrades(this.player, 3, this.rng);
+    this.audio?.play('ui');
+    if (this.onLevelUp) this.onLevelUp(this.pendingChoices);
+    return true;
+  }
+
   applyUpgrade(up) {
-    up.apply(this.player.stats);
-    this.player.upgradeCounts[up.id] = (this.player.upgradeCounts[up.id] || 0) + 1;
-    this.player.hp = Math.min(this.player.stats.maxHp, this.player.hp);
+    const p = this.player;
+    if (up.kind === 'item') {
+      up.apply(p.stats);
+      p.upgradeCounts[up.id] = (p.upgradeCounts[up.id] || 0) + 1;
+    } else if (up.kind === 'weapon-new' || up.kind === 'weapon-up') {
+      addOrLevelWeapon(p, up.weaponId);
+    } else if (up.kind === 'evolve') {
+      const inst = p.weapons.find((w) => w.id === up.weaponId);
+      if (inst) { evolveWeapon(p, inst); this.flash = Math.max(this.flash, 0.4); this.audio?.play('implode'); }
+    } else if (typeof up.apply === 'function') {
+      // Legacy stat-only upgrade.
+      up.apply(p.stats);
+      if (up.id) p.upgradeCounts[up.id] = (p.upgradeCounts[up.id] || 0) + 1;
+    }
+    p.syncDrones();
+    p.hp = Math.min(p.stats.maxHp, p.hp);
     this.pendingChoices = null;
     this.state = 'playing';
     this.audio?.play('ui');
@@ -658,7 +718,7 @@ export class World {
         }
       }
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (chance(0.25)) this.particles.spawn(b.x, b.y, b.crit ? COLORS.gold : COLORS.player, { speed: 10, life: 0.18, size: b.r * 0.7, budget: 700 });
+      if (chance(0.25)) this.particles.spawn(b.x, b.y, b.tint || (b.crit ? COLORS.gold : COLORS.player), { speed: 10, life: 0.18, size: b.r * 0.7, budget: 700 });
 
       // collide with enemies
       this.grid.query(b.x, b.y, b.r + 30, this._q);
@@ -676,6 +736,7 @@ export class World {
           } else { consumed = true; break; }
         }
       }
+      if (consumed && b.explodeR > 0) this.explode(b.x, b.y, b.explodeR, b.explodeDmg, b.tint || COLORS.fire);
       if (consumed || b.x < 0 || b.y < 0 || b.x > ARENA.w || b.y > ARENA.h) this.bullets.splice(i, 1);
     }
   }
@@ -957,13 +1018,13 @@ export class World {
     ctx.globalCompositeOperation = 'lighter';
     for (const b of this.bullets) {
       if (b.x < bnd.minX || b.x > bnd.maxX || b.y < bnd.minY || b.y > bnd.maxY) continue;
-      const color = b.crit ? COLORS.gold : COLORS.player;
-      const glow = b.crit ? COLORS.gold : COLORS.playerGlow;
-      // A bullet's radius/crit never change, so resolve its glow sprite once and
-      // cache it on the bullet — avoids rebuilding the key string every frame.
+      const color = b.tint || (b.crit ? COLORS.gold : COLORS.player);
+      const glow = b.glow || (b.crit ? COLORS.gold : COLORS.playerGlow);
+      // A bullet's radius/crit/tint never change, so resolve its glow sprite once
+      // and cache it on the bullet — avoids rebuilding the key string every frame.
       let spr = b._spr;
       if (spr === undefined) {
-        spr = glowSprite('b|' + b.r + '|' + (b.crit ? 1 : 0), b.r * 2.2, 12, (g) => {
+        spr = glowSprite('b|' + b.r + '|' + (b.crit ? 1 : 0) + '|' + color, b.r * 2.2, 12, (g) => {
           g.fillStyle = color; g.shadowColor = glow; g.shadowBlur = 12;
           g.beginPath(); g.ellipse(0, 0, b.r * 2.2, b.r, 0, 0, TAU); g.fill();
         });
