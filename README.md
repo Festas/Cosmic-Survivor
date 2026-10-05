@@ -113,6 +113,8 @@ own the passive it craves, it **evolves** into a legendary form:
 | Pulse Nova         | **Nova Collapse**   | large blast radius               |
 | Rail Lance         | **Void Lance**      | Void Rounds or heavy pierce      |
 | Graviton Mortar    | **Cluster Swarm**   | Volatile Payload (explosive)     |
+| Halo Launcher      | **Corona Burst**    | Split Barrel ×2 (+projectiles)   |
+| Arc Whip           | **Rift Reaver**     | Vampiric Circuit (lifesteal)     |
 
 **Passive items** are shared stat augments — damage, crit, haste, pierce, elemental imbues,
 drones, lifesteal, armor and more — that buff *every* weapon and ability at once, so builds
