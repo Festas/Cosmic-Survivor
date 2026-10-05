@@ -61,6 +61,7 @@
     <!-- Start screen -->
     <div id="start" class="overlay">
       <div class="panel">
+        <div class="stardust-pill" title="Stardust — earn it in runs, spend it in the Hangar">✦ <b id="start-stardust">0</b> Stardust</div>
         <h1 class="title">COSMIC SURVIVOR</h1>
         <p class="tagline">Hold the line against the alien swarm. Stack weapons. Evolve. Overdrive.</p>
         <div class="features">
@@ -68,7 +69,21 @@
           <div><b>🔆 Overdrive</b><span>Chain kills to fill the meter and unleash a damage &amp; fire-rate rampage.</span></div>
           <div><b>✴️ Resonance</b><span>Imbue Fire · Cryo · Shock · Void for screen-clearing reactions.</span></div>
         </div>
-        <button id="play-btn" class="btn">▶ LAUNCH</button>
+        <div class="ship-pick">
+          <button id="ship-prev" class="ship-nav" aria-label="Previous ship">◀</button>
+          <div class="ship-pick-mid">
+            <div class="ship-pick-icon" id="ship-pick-icon">🛸</div>
+            <div class="ship-pick-info">
+              <div class="ship-pick-name" id="ship-pick-name">Vanguard</div>
+              <div class="ship-pick-tag" id="ship-pick-tag">Balanced · reliable all-rounder</div>
+            </div>
+          </div>
+          <button id="ship-next" class="ship-nav" aria-label="Next ship">▶</button>
+        </div>
+        <div class="start-actions">
+          <button id="play-btn" class="btn">▶ LAUNCH</button>
+          <button id="hangar-btn" class="btn btn-ghost">🛠 HANGAR</button>
+        </div>
         <div class="controls-hint">
           <span><kbd>WASD</kbd> Move</span>
           <span><kbd>Space</kbd> Dash</span>
@@ -83,6 +98,24 @@
         </div>
       </div>
     </div>
+
+    <!-- Hangar (ships + ascension meta-progression) -->
+    <div id="hangar" class="overlay hidden">
+      <div class="panel hangar-panel">
+        <div class="hangar-head">
+          <h2 class="hangar-title">🛠 HANGAR</h2>
+          <div class="stardust-pill big">✦ <b id="hangar-stardust">0</b> Stardust</div>
+        </div>
+        <div class="hangar-tabs">
+          <button id="tab-ships" class="tab active">STARFIGHTERS</button>
+          <button id="tab-meta" class="tab">ASCENSION</button>
+        </div>
+        <div id="hangar-ships" class="hangar-body ship-grid"></div>
+        <div id="hangar-meta" class="hangar-body meta-grid hidden"></div>
+        <button id="hangar-close" class="btn">✔ DONE</button>
+      </div>
+    </div>
+
 
     <!-- Level up draft -->
     <div id="levelup" class="overlay hidden">
@@ -119,8 +152,10 @@
         <h2 id="go-title">SYSTEM&nbsp;FAILURE</h2>
         <div id="go-newbest" class="newbest hidden">★ NEW BEST ★</div>
         <div id="go-score" class="go-score">0</div>
+        <div id="go-stardust" class="go-stardust">✦ +0 Stardust</div>
         <div id="go-stats" class="run-stats"></div>
         <button id="retry-btn" class="btn">↻ RETRY</button>
+        <button id="go-hangar-btn" class="btn btn-ghost">🛠 HANGAR</button>
       </div>
     </div>
   </div>

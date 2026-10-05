@@ -7,6 +7,8 @@ import { rng } from './engine/utils.js';
 import { World } from './game/world.js';
 import { RARITY } from './game/upgrades.js';
 import { weaponDef } from './game/weapons.js';
+import { SHIPS, shipById, DEFAULT_SHIP_ID } from './game/ships.js';
+import { META_UPGRADES, metaCost } from './game/meta.js';
 import { formatNumber, formatTime } from './engine/utils.js';
 
 const $ = (id) => document.getElementById(id);
@@ -62,6 +64,139 @@ wireSetting(['opt-music', 'opt-music2'], 'music', (v) => { store.setSetting('mus
 wireSetting(['opt-sfx', 'opt-sfx2'], 'muted', (v) => { store.setSetting('muted', !v); audio.setMuted(!v); });
 wireSetting(['opt-shake', 'opt-shake2'], 'shake', (v) => { store.setSetting('shake', v); });
 
+// ------------------------------------------------------------- hangar / ships
+// Ships the player actually owns (free ships are always available).
+function ownedShips() {
+  return SHIPS.filter((s) => s.unlockCost === 0 || store.isShipUnlocked(s.id));
+}
+
+let pickIndex = 0;
+
+// Start-screen quick picker: cycle through owned ships and remember the choice.
+function updateShipPick() {
+  const owned = ownedShips();
+  const selId = store.getSelectedShip();
+  let idx = owned.findIndex((s) => s.id === selId);
+  if (idx < 0) idx = 0;
+  pickIndex = ((pickIndex % owned.length) + owned.length) % owned.length;
+  // keep pickIndex in sync with the stored selection on first paint
+  if (owned[pickIndex].id !== selId && owned[idx]) pickIndex = idx;
+  const ship = owned[pickIndex] || shipById(DEFAULT_SHIP_ID);
+  store.selectShip(ship.id);
+  $('ship-pick-icon').textContent = ship.icon;
+  $('ship-pick-icon').style.color = ship.color;
+  $('ship-pick-name').textContent = ship.name;
+  $('ship-pick-tag').textContent = ship.tag;
+  const multi = owned.length > 1;
+  $('ship-prev').classList.toggle('hidden', !multi);
+  $('ship-next').classList.toggle('hidden', !multi);
+}
+
+function cycleShip(dir) {
+  const owned = ownedShips();
+  pickIndex = ((pickIndex + dir) % owned.length + owned.length) % owned.length;
+  store.selectShip(owned[pickIndex].id);
+  updateShipPick();
+  audio.play('ui');
+}
+
+// Refresh the start screen's Stardust balance + ship summary.
+function refreshStart() {
+  $('start-stardust').textContent = formatNumber(store.stardust);
+  updateShipPick();
+}
+
+// ---- Hangar overlay ----
+let hangarTab = 'ships';
+
+function openHangar() {
+  renderHangar();
+  $('hangar').classList.remove('hidden');
+}
+function closeHangar() {
+  $('hangar').classList.add('hidden');
+  refreshStart();
+}
+
+function setHangarTab(tab) {
+  hangarTab = tab;
+  $('tab-ships').classList.toggle('active', tab === 'ships');
+  $('tab-meta').classList.toggle('active', tab === 'meta');
+  $('hangar-ships').classList.toggle('hidden', tab !== 'ships');
+  $('hangar-meta').classList.toggle('hidden', tab !== 'meta');
+}
+
+function renderHangar() {
+  $('hangar-stardust').textContent = formatNumber(store.stardust);
+  renderShips();
+  renderMeta();
+  setHangarTab(hangarTab);
+}
+
+function renderShips() {
+  const wrap = $('hangar-ships');
+  const selId = store.getSelectedShip();
+  wrap.innerHTML = '';
+  for (const ship of SHIPS) {
+    const unlocked = ship.unlockCost === 0 || store.isShipUnlocked(ship.id);
+    const selected = selId === ship.id;
+    const def = weaponDef({ id: ship.weapon });
+    const card = document.createElement('div');
+    card.className = 'ship-card' + (selected ? ' selected' : '') + (unlocked ? '' : ' locked');
+    card.style.setProperty('--accent', ship.color);
+    let action;
+    if (selected) action = '<div class="ship-badge">✓ SELECTED</div>';
+    else if (unlocked) action = '<button class="btn btn-sm ship-select">SELECT</button>';
+    else {
+      const afford = store.stardust >= ship.unlockCost;
+      action = `<button class="btn btn-sm ship-unlock"${afford ? '' : ' disabled'}>✦ ${formatNumber(ship.unlockCost)} UNLOCK</button>`;
+    }
+    card.innerHTML = `
+      <div class="ship-card-head"><span class="ship-ico">${ship.icon}</span><span class="ship-name">${ship.name}</span></div>
+      <div class="ship-tag">${ship.tag}</div>
+      <div class="ship-desc">${ship.desc}</div>
+      <div class="ship-weapon">Starter: <b>${def ? def.name : ship.weapon}</b></div>
+      <div class="ship-action">${action}</div>`;
+    const selectBtn = card.querySelector('.ship-select');
+    const unlockBtn = card.querySelector('.ship-unlock');
+    if (selectBtn) selectBtn.addEventListener('click', () => { store.selectShip(ship.id); audio.play('ui'); renderHangar(); });
+    if (unlockBtn) unlockBtn.addEventListener('click', () => {
+      if (store.unlockShip(ship.id, ship.unlockCost)) { store.selectShip(ship.id); audio.play('levelup'); renderHangar(); }
+    });
+    wrap.appendChild(card);
+  }
+}
+
+function renderMeta() {
+  const wrap = $('hangar-meta');
+  wrap.innerHTML = '';
+  for (const def of META_UPGRADES) {
+    const level = store.getMetaLevel(def.id);
+    const maxed = level >= def.max;
+    const cost = metaCost(def, level);
+    const afford = store.stardust >= cost;
+    const row = document.createElement('div');
+    row.className = 'meta-row' + (maxed ? ' maxed' : '');
+    const pips = Array.from({ length: def.max }, (_, i) => `<span class="pip${i < level ? ' on' : ''}"></span>`).join('');
+    const btn = maxed
+      ? '<div class="meta-max">MAX</div>'
+      : `<button class="btn btn-sm meta-buy"${afford ? '' : ' disabled'}>✦ ${formatNumber(cost)}</button>`;
+    row.innerHTML = `
+      <div class="meta-ico">${def.icon}</div>
+      <div class="meta-main">
+        <div class="meta-name">${def.name} <span class="meta-lvl">${level}/${def.max}</span></div>
+        <div class="meta-desc">${def.desc}</div>
+        <div class="meta-pips">${pips}</div>
+      </div>
+      <div class="meta-action">${btn}</div>`;
+    const buyBtn = row.querySelector('.meta-buy');
+    if (buyBtn) buyBtn.addEventListener('click', () => {
+      if (store.buyMeta(def.id, cost, def.max)) { audio.play('pickup'); renderHangar(); }
+    });
+    wrap.appendChild(row);
+  }
+}
+
 // ------------------------------------------------------------- run control
 function startRun() {
   audio.unlock();
@@ -69,7 +204,7 @@ function startRun() {
   audio.setMuted(s.muted);
   audio.setMusic(s.music);
   rng.reseed((Math.random() * 2 ** 32) >>> 0);
-  world.reset();
+  world.reset({ shipId: store.getSelectedShip(), metaLevels: store.getMeta() });
   bindWorld();
   resize();
   started = true;
@@ -167,6 +302,10 @@ function showGameOver(summary) {
   $('hud').classList.add('hidden');
   $('go-score').textContent = formatNumber(summary.score);
   $('go-newbest').classList.toggle('hidden', !summary.newBest);
+  const earned = summary.stardust || 0;
+  const goSd = $('go-stardust');
+  goSd.textContent = `✦ +${formatNumber(earned)} Stardust`;
+  goSd.classList.toggle('none', earned <= 0);
   $('go-stats').innerHTML = statRows({
     Time: formatTime(summary.time),
     Level: summary.level,
@@ -304,6 +443,15 @@ $('resume-btn').addEventListener('click', () => togglePause(false));
 $('reroll-btn').addEventListener('click', () => { world.rerollChoices(); });
 $('banish-btn').addEventListener('click', toggleBanishMode);
 
+// Hangar + ship picker
+$('hangar-btn').addEventListener('click', openHangar);
+$('go-hangar-btn').addEventListener('click', openHangar);
+$('hangar-close').addEventListener('click', closeHangar);
+$('tab-ships').addEventListener('click', () => setHangarTab('ships'));
+$('tab-meta').addEventListener('click', () => setHangarTab('meta'));
+$('ship-prev').addEventListener('click', () => cycleShip(-1));
+$('ship-next').addEventListener('click', () => cycleShip(1));
+
 // level-up keyboard shortcuts (reroll / banish). Numeric picks are handled in the
 // main loop via the input poller.
 window.addEventListener('keydown', (e) => {
@@ -326,6 +474,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 applySettingsToUI();
+refreshStart();
 resize();
 requestAnimationFrame(frame);
 
