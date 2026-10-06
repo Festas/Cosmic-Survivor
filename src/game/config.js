@@ -40,8 +40,23 @@ export const PLAYER = {
   regen: 0.6, // hp per second (base; upgrades add)
   pickupRadius: 140,
   magnetSpeed: 620,
-  invulnOnHit: 0.9, // seconds of i-frames after taking damage
-  contactCooldown: 0.45, // per-enemy contact damage cadence
+  // i-frames after taking a hit. Projectiles/AoE grant a normal window; *contact*
+  // grants only a short one so standing inside a swarm keeps chipping you (the
+  // old 0.9s global window let a tanky build sit on one spot forever — see
+  // contactInvuln + World.updateEnemies).
+  invulnOnHit: 0.5, // seconds of i-frames after a projectile/AoE hit
+  contactInvuln: 0.18, // shorter i-frames after a body-contact hit (anti-turtle)
+  contactCooldown: 0.5, // per-enemy contact damage cadence
+  // Armor is a flat reduction but can never negate more than this fraction of a
+  // hit, so stacking armor softens damage instead of trivialising it. Keeps late
+  // game threatening even for defensive builds.
+  minDamageFraction: 0.34,
+  // Lifesteal is budgeted (see Player.lifestealHeal): it can return at most
+  // lifestealCapRate * maxHp per second, with a small burst reserve of
+  // lifestealCapBurst * maxHp. Prevents the "leech a huge swarm = unkillable"
+  // inversion while leaving single-target leech builds feeling strong.
+  lifestealCapRate: 0.14, // max HP/s returned by lifesteal (fraction of maxHp)
+  lifestealCapBurst: 0.3, // stored burst reserve (fraction of maxHp)
 };
 
 export const WEAPON = {
@@ -103,17 +118,22 @@ export const COMBO = {
 export const DIRECTOR = {
   // enemies alive cap grows over time
   baseCap: 26,
-  capPerMin: 20,
-  capMax: 180,
+  capPerMin: 22,
+  capMax: 200,
   // spawn interval shrinks over time
   spawnStart: 1.1,
-  spawnMin: 0.16,
-  spawnHalfLife: 95, // seconds for interval to approach min
+  spawnMin: 0.14,
+  spawnHalfLife: 85, // seconds for interval to approach min
   // global enemy stat scaling
   hpStart: 1,
-  hpPerMin: 0.55,
-  speedPerMin: 0.05,
-  speedMax: 1.7,
+  hpPerMin: 0.56,
+  speedPerMin: 0.06,
+  speedMax: 1.85,
+  // enemy damage scaling over time — rank-and-file hits get harder so late-game
+  // crowds stay threatening (bosses keep their hand-tuned per-pattern damage).
+  dmgStart: 1,
+  dmgPerMin: 0.2,
+  dmgMax: 2.6,
   // boss cadence
   bossEvery: 60, // seconds
 };
@@ -134,6 +154,12 @@ export function hpScale(t) {
 
 export function speedScale(t) {
   return Math.min(DIRECTOR.speedMax, 1 + (DIRECTOR.speedPerMin * t) / 60);
+}
+
+// Rank-and-file contact/bullet damage multiplier. Grows with elapsed time and is
+// clamped, so the early game stays gentle while late waves punish standing still.
+export function dmgScale(t) {
+  return Math.min(DIRECTOR.dmgMax, DIRECTOR.dmgStart + (DIRECTOR.dmgPerMin * t) / 60);
 }
 
 // XP required to go from `level` to `level+1`.

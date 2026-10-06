@@ -2,8 +2,8 @@
 // reactions, leveling, scoring and rendering. Coordinates the whole run.
 
 import {
-  ARENA, COLORS, SINGULARITY, DASH, COMBO, DIRECTOR,
-  spawnInterval, enemyCap, hpScale, speedScale, xpForLevel, comboMultiplier,
+  ARENA, COLORS, PLAYER, SINGULARITY, DASH, COMBO, DIRECTOR,
+  spawnInterval, enemyCap, hpScale, speedScale, dmgScale, xpForLevel, comboMultiplier,
 } from './config.js';
 import {
   TAU, clamp, lerp, dist, dist2, angleTo, rand, randRange, randOnCircle, chance, pick,
@@ -184,6 +184,8 @@ export class World {
     // Bosses use bossHpMul; rank-and-file use the time-based hp curve × hpMul.
     const hp = isBoss ? def.hp * d.bossHpMul : def.hp * hpScale(this.elapsed) * d.hpMul;
     const speed = (isBoss ? def.speed : def.speed * speedScale(this.elapsed)) * d.speedMul;
+    // Rank-and-file damage ramps with time (bosses keep their tuned damage).
+    const damage = isBoss ? def.damage : def.damage * dmgScale(this.elapsed);
     const e = {
       type: def, key: typeKey, boss: !!def.boss,
       x, y, vx: 0, vy: 0, kx: 0, ky: 0,
@@ -191,7 +193,7 @@ export class World {
       maxHp: hp,
       radius: def.radius,
       speed,
-      damage: def.damage,
+      damage,
       xp: def.xp,
       color: def.color,
       status: createStatus(),
@@ -216,10 +218,11 @@ export class World {
     return this.spawnEnemy(typeKey, x, y);
   }
 
-  // Occasional "fleet" wave: an evenly-spaced row of invaders that materialises
-  // just outside the viewport on one side, for that classic descending-formation
-  // feel. Strictly bounded by enemyCap so a wave can never blow the enemy budget
-  // (keeps the frame budget safe on later, denser waves).
+  // "Fleet" wave: evenly-spaced rows of invaders that materialise just outside the
+  // viewport. Early waves are a single row; as the run escalates they become 2-3
+  // simultaneous arms (a pincer) that converge from different sides, so a camping
+  // player is surrounded and must move, while a kiting player can punch through a
+  // single arm. Strictly bounded by enemyCap so a wave can never blow the budget.
   spawnFormation() {
     const room = this.capNow() - this.enemies.length;
     if (room < 4) return; // not enough headroom for a meaningful row
@@ -229,21 +232,30 @@ export class World {
     if (this.elapsed >= 30) roster.push('crab');
     if (this.elapsed >= 70) roster.push('octopus');
     if (roster.length === 0) roster.push('swarm');
-    const key = pick(roster, this.rng);
-    const count = Math.min(room, 5 + Math.floor(this.rng() * 4)); // 5-8, budget-capped
-    // Approach direction (which side the fleet comes from) + perpendicular spread.
-    const dir = this.rng() * TAU;
-    const cx = this.player.x + Math.cos(dir) * ((this.viewW / 2) + 200);
-    const cy = this.player.y + Math.sin(dir) * ((this.viewH / 2) + 200);
-    const perp = dir + Math.PI / 2;
+    // Wave size and arm count both grow with elapsed time.
+    const arms = this.elapsed >= 150 ? 3 : this.elapsed >= 70 ? 2 : 1;
+    const perArm = 5 + Math.floor(this.elapsed / 30); // grows over the run
+    let budget = Math.min(room, arms * perArm, 26); // hard cap protects frame budget
+    const baseDir = this.rng() * TAU;
     const gap = 58;
-    for (let i = 0; i < count; i++) {
-      const off = (i - (count - 1) / 2) * gap;
-      const x = clamp(cx + Math.cos(perp) * off, 40, ARENA.w - 40);
-      const y = clamp(cy + Math.sin(perp) * off, 40, ARENA.h - 40);
-      this.spawnEnemy(key, x, y);
+    for (let arm = 0; arm < arms && budget > 0; arm++) {
+      const key = pick(roster, this.rng);
+      const count = Math.min(budget, perArm);
+      budget -= count;
+      // Spread arms around the player (pincer); jitter so it is not perfectly even.
+      const dir = baseDir + (arm / arms) * TAU + (this.rng() - 0.5) * 0.4;
+      const cx = this.player.x + Math.cos(dir) * ((this.viewW / 2) + 200);
+      const cy = this.player.y + Math.sin(dir) * ((this.viewH / 2) + 200);
+      const perp = dir + Math.PI / 2;
+      for (let i = 0; i < count; i++) {
+        const off = (i - (count - 1) / 2) * gap;
+        const x = clamp(cx + Math.cos(perp) * off, 40, ARENA.w - 40);
+        const y = clamp(cy + Math.sin(perp) * off, 40, ARENA.h - 40);
+        this.spawnEnemy(key, x, y);
+      }
     }
-    this.addText(this.player.x, this.player.y - 110, 'INVADERS INCOMING', COLORS.invGreen, 20);
+    const label = arms >= 2 ? 'PINCER INCOMING' : 'INVADERS INCOMING';
+    this.addText(this.player.x, this.player.y - 110, label, COLORS.invGreen, 20);
   }
 
   updateDirector(dt) {
@@ -277,11 +289,16 @@ export class World {
       }
     }
 
-    // Occasional invader-formation wave, layered on top of the trickle (never
-    // replacing it). Scheduled from formationTimer, initialised in reset().
+    // Invader-formation wave, layered on top of the trickle (never replacing it).
+    // These are the main anti-camp pressure: as the run goes on they arrive more
+    // often and as multi-sided pincers, so a stationary player gets surrounded and
+    // must reposition, while a mover can carve a lane through one arm. Telegraphed
+    // via spawnFormation's "INVADERS INCOMING" text so the pressure stays fair.
     this.formationTimer -= dt;
     if (this.formationTimer <= 0) {
-      this.formationTimer = 16 + this.rng() * 10; // next wave in ~16-26s
+      // Cadence tightens over the run: ~18-26s early, down to ~8-12s late game.
+      const base = Math.max(8, 20 - this.elapsed / 25);
+      this.formationTimer = base + this.rng() * 6;
       if (this.elapsed >= 18) this.spawnFormation();
     }
   }
@@ -348,9 +365,9 @@ export class World {
       this.addDamageText(e, rounded, opts.crit ? COLORS.gold : (opts.color || COLORS.white), opts.crit ? 20 : 14);
     }
     if (opts.crit) this.audio?.play('crit'); else if (opts.source === 'bullet') this.audio?.play('hit');
-    // lifesteal
+    // lifesteal (budgeted so leeching from a dense swarm can't fully out-heal it)
     if (opts.lifesteal && this.player.stats.lifesteal > 0) {
-      this.player.heal(rounded * this.player.stats.lifesteal);
+      this.player.lifestealHeal(rounded * this.player.stats.lifesteal);
     }
     if (e.hp <= 0) this.killEnemy(e, opts);
   }
@@ -802,9 +819,11 @@ export class World {
       e.contactT = Math.max(0, e.contactT - dt);
       const rr = e.radius + p.radius;
       if (e.contactT <= 0 && dist2(e.x, e.y, p.x, p.y) < rr * rr) {
-        const dealt = p.takeDamage(e.damage, this);
+        // Short contact i-frames (not the full projectile window) so that being
+        // surrounded keeps dealing damage — you must keep moving, not turtle.
+        const dealt = p.takeDamage(e.damage, this, PLAYER.contactInvuln);
         if (dealt > 0) {
-          e.contactT = 0.5;
+          e.contactT = PLAYER.contactCooldown;
           const a = angleTo(p.x, p.y, e.x, e.y);
           p.x -= Math.cos(a) * 6; p.y -= Math.sin(a) * 6;
         }

@@ -101,6 +101,10 @@ export class Player {
     this.banished = Object.create(null);
     this.thrust = 0;
     this.alive = true;
+    // Rolling lifesteal budget: caps how much HP leeching can return per second
+    // so that standing inside a huge swarm (many hits/frame) no longer out-heals
+    // all incoming damage. Replenished in update(), spent in lifestealHeal().
+    this.lsBudget = 0;
   }
 
   get dashing() { return this.dashTime > 0; }
@@ -120,17 +124,31 @@ export class Player {
     this.hp = Math.min(this.stats.maxHp, this.hp + amount);
   }
 
+  // Lifesteal heal that respects a per-second budget (PLAYER.lifestealCapRate),
+  // so leeching from a dense crowd can't fully negate the damage that crowd deals.
+  // A small burst reserve (lifestealCapBurst) keeps single-target leech snappy.
+  lifestealHeal(amount) {
+    if (amount <= 0) return;
+    const give = Math.min(amount, this.lsBudget);
+    if (give > 0) { this.heal(give); this.lsBudget -= give; }
+  }
+
   // Returns the actual damage taken (after armor/dodge), or 0 if avoided.
-  takeDamage(amount, world) {
+  // `iframes` lets the caller grant a shorter invulnerability window for
+  // body-contact hits than for projectiles, so a surrounding swarm keeps dealing
+  // damage instead of being fully absorbed by one long i-frame.
+  takeDamage(amount, world, iframes = PLAYER.invulnOnHit) {
     if (this.invuln > 0 || this.dashing) return 0;
     if (chance(this.stats.dodge)) {
       world.addText(this.x, this.y - 24, 'DODGE', COLORS.cryo, 14);
       return 0;
     }
     const incoming = amount * (world.diff?.dmgTakenMul || 1);
-    const dmg = Math.max(1, incoming - this.stats.armor);
+    // Flat armor reduction, but never below a floor fraction of the hit so armor
+    // softens rather than negates (prevents the "stand still forever" turtle).
+    const dmg = Math.max(incoming * PLAYER.minDamageFraction, incoming - this.stats.armor);
     this.hp -= dmg;
-    this.invuln = PLAYER.invulnOnHit;
+    this.invuln = iframes;
     this.hitFlash = 1;
     world.shake(Math.min(18, 5 + dmg * 0.4));
     world.hitStopFor(0.06);
@@ -149,6 +167,11 @@ export class Player {
     this.hitFlash = Math.max(0, this.hitFlash - dt * 4);
     this.dashCd = Math.max(0, this.dashCd - dt);
     this.fireCd = Math.max(0, this.fireCd - dt);
+    // Replenish the lifesteal budget toward a small burst reserve.
+    this.lsBudget = Math.min(
+      s.maxHp * PLAYER.lifestealCapBurst,
+      this.lsBudget + s.maxHp * PLAYER.lifestealCapRate * dt,
+    );
     if (this.hp < s.maxHp) this.hp = Math.min(s.maxHp, this.hp + s.regen * dt);
 
     // ---- Overdrive meter ----------------------------------------------
