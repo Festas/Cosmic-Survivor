@@ -11,6 +11,7 @@ import {
 import { Camera } from '../engine/camera.js';
 import { Particles } from '../engine/particles.js';
 import { glowSprite } from '../engine/sprites.js';
+import { paletteFor, drawEnemyBody, drawBossCore, isUpright, enemyPath, withAlpha } from './enemyArt.js';
 import { Player } from './player.js';
 import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize, rollElite } from './enemies.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
@@ -1111,10 +1112,13 @@ export class World {
   drawEnemies(ctx) {
     // Cull to the visible viewport (plus a margin for the largest boss + glow)
     // so off-screen enemies cost nothing, and blit cached glow sprites instead
-    // of paying ctx.shadowBlur per enemy every frame.
+    // of paying ctx.shadowBlur per enemy every frame. The detailed, static hull
+    // is baked once per shape/colour/radius (drawEnemyBody); only the boss energy
+    // core is animated live below.
     const b = this.camera.viewBounds(160);
     const elites = this._eliteFrame;
     elites.length = 0;
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000;
     for (const e of this.enemies) {
       if (!e.alive) continue;
       if (e.x < b.minX || e.x > b.maxX || e.y < b.minY || e.y > b.maxY) continue;
@@ -1125,33 +1129,27 @@ export class World {
       const blur = dom ? 14 : (e.boss ? 24 : 6);
       const shape = e.type.shape;
       const r = e.radius;
-      const spr = glowSprite('e|' + shape + '|' + r + '|' + fill + '|' + glowColor + '|' + blur, r, blur, (g) => {
-        g.shadowColor = glowColor; g.shadowBlur = blur;
-        g.fillStyle = fill;
-        this.drawShape(g, shape, r);
-        // Crisp dark outline (no glow) so the body always reads as a solid
-        // object against the bloom and the enemy fire drawn on top of it.
-        g.shadowBlur = 0;
-        g.lineJoin = 'round';
-        g.lineWidth = Math.max(1.6, r * 0.14);
-        g.strokeStyle = 'rgba(4,7,18,0.9)';
-        g.stroke();
-      });
+      // Plating/rim/eye palette derives from the enemy's own base colour (not the
+      // possibly white/cryo `fill`), so it stays stable through hit-flash/freeze.
+      const pal = paletteFor(e.color);
+      const spr = glowSprite(
+        'e|' + shape + '|' + r + '|' + fill + '|' + glowColor + '|' + blur + '|' + e.color,
+        r, blur,
+        (g) => drawEnemyBody(g, shape, r, { fill, glow: glowColor, blur, accent: pal.accent, highlight: pal.highlight, eye: pal.eye }),
+      );
       ctx.save();
       ctx.translate(e.x, e.y);
-      ctx.rotate(e.spin * (e.massive ? 0.3 : 1));
+      // Pixel invaders, saucers and bosses read as upright craft; faceted shapes
+      // keep their per-spawn tilt (and bosses' slow spin) for variety.
+      if (!isUpright(shape)) ctx.rotate(e.spin * (e.massive ? 0.3 : 1));
       if (spr) {
         ctx.drawImage(spr.canvas, -spr.off, -spr.off);
       } else {
-        ctx.shadowColor = glowColor; ctx.shadowBlur = blur;
-        ctx.fillStyle = fill;
-        this.drawShape(ctx, shape, r);
-        ctx.shadowBlur = 0;
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = Math.max(1.6, r * 0.14);
-        ctx.strokeStyle = 'rgba(4,7,18,0.9)';
-        ctx.stroke();
+        drawEnemyBody(ctx, shape, r, { fill, glow: glowColor, blur, accent: pal.accent, highlight: pal.highlight, eye: pal.eye });
       }
+      // Live animated energy core makes the boss fight feel epic. Only a couple of
+      // bosses are ever on screen, so this per-frame glow is negligible.
+      if (e.boss) drawBossCore(ctx, r, { time: now + (e._coreT || (e._coreT = rand() * 6)), color: e.color, ring: pal.highlight });
       ctx.restore();
 
       // Defer the elite marker ring to drawEliteRings() so it lands on top of the
@@ -1191,79 +1189,10 @@ export class World {
     }
   }
 
+  // Thin wrapper kept for compatibility: the authoritative silhouette geometry
+  // now lives in enemyArt.enemyPath (shared by the fill and the dark outline).
   drawShape(ctx, shape, r) {
-    ctx.beginPath();
-    switch (shape) {
-      case 'tri':
-        ctx.moveTo(r, 0); ctx.lineTo(-r * 0.8, -r * 0.8); ctx.lineTo(-r * 0.8, r * 0.8); ctx.closePath(); break;
-      case 'diamond':
-        ctx.moveTo(0, -r); ctx.lineTo(r, 0); ctx.lineTo(0, r); ctx.lineTo(-r, 0); ctx.closePath(); break;
-      case 'arrow':
-        ctx.moveTo(r, 0); ctx.lineTo(-r, -r * 0.7); ctx.lineTo(-r * 0.4, 0); ctx.lineTo(-r, r * 0.7); ctx.closePath(); break;
-      case 'pentagon':
-      case 'hex':
-      case 'blob': {
-        const n = shape === 'hex' ? 6 : shape === 'pentagon' ? 5 : 8;
-        for (let i = 0; i < n; i++) { const a = (i / n) * TAU; const rr = r * (shape === 'blob' ? (0.82 + Math.sin(a * 3) * 0.18) : 1); const fn = i === 0 ? 'moveTo' : 'lineTo'; ctx[fn](Math.cos(a) * rr, Math.sin(a) * rr); }
-        ctx.closePath(); break;
-      }
-      case 'boss': {
-        for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU; const rr = r * (i % 2 ? 0.7 : 1); const fn = i === 0 ? 'moveTo' : 'lineTo'; ctx[fn](Math.cos(a) * rr, Math.sin(a) * rr); }
-        ctx.closePath(); break;
-      }
-      // ---- retro pixel invaders (built from symmetric blocks / saucer ovals) --
-      case 'crab': {
-        const u = r / 5;
-        ctx.rect(-3 * u, -2 * u, 6 * u, 4 * u);   // body
-        ctx.rect(-5 * u, -u, 2 * u, u);           // left arm
-        ctx.rect(3 * u, -u, 2 * u, u);            // right arm
-        ctx.rect(-4 * u, -3 * u, u, u);           // left eye-stalk
-        ctx.rect(3 * u, -3 * u, u, u);            // right eye-stalk
-        ctx.rect(-3 * u, 2 * u, u, 2 * u);        // left leg
-        ctx.rect(2 * u, 2 * u, u, 2 * u);         // right leg
-        ctx.rect(-u, 2 * u, 2 * u, u);            // centre legs
-        break;
-      }
-      case 'squid': {
-        const u = r / 5;
-        ctx.rect(-2 * u, -3 * u, 4 * u, 3 * u);   // head
-        ctx.rect(-3 * u, 0, 6 * u, 2 * u);        // shoulders
-        ctx.rect(-3 * u, 2 * u, u, 2 * u);        // tentacles
-        ctx.rect(-u, 2 * u, u, 2 * u);
-        ctx.rect(0, 2 * u, u, 2 * u);
-        ctx.rect(2 * u, 2 * u, u, 2 * u);
-        break;
-      }
-      case 'octopus': {
-        const u = r / 5;
-        ctx.rect(-2 * u, -4 * u, 4 * u, 2 * u);   // crown
-        ctx.rect(-4 * u, -2 * u, 8 * u, 3 * u);   // body
-        ctx.rect(-4 * u, u, u, 3 * u);            // six legs
-        ctx.rect(-2 * u, u, u, 3 * u);
-        ctx.rect(-u, u, u, 3 * u);
-        ctx.rect(0, u, u, 3 * u);
-        ctx.rect(u, u, u, 3 * u);
-        ctx.rect(3 * u, u, u, 3 * u);
-        break;
-      }
-      case 'ufo': {
-        ctx.ellipse(0, r * 0.15, r, r * 0.42, 0, 0, TAU);       // saucer disc
-        ctx.moveTo(r * 0.5, -r * 0.1);
-        ctx.ellipse(0, -r * 0.1, r * 0.5, r * 0.45, 0, 0, TAU); // dome
-        break;
-      }
-      case 'mothership': {
-        ctx.ellipse(0, r * 0.12, r, r * 0.34, 0, 0, TAU);        // wide hull
-        ctx.moveTo(r * 0.52, -r * 0.18);
-        ctx.ellipse(0, -r * 0.18, r * 0.52, r * 0.5, 0, 0, TAU); // command dome
-        ctx.moveTo(-r * 0.48, r * 0.3);
-        ctx.ellipse(-r * 0.68, r * 0.3, r * 0.2, r * 0.16, 0, 0, TAU); // left pod
-        ctx.moveTo(r * 0.88, r * 0.3);
-        ctx.ellipse(r * 0.68, r * 0.3, r * 0.2, r * 0.16, 0, 0, TAU);  // right pod
-        break;
-      }
-      default: ctx.arc(0, 0, r, 0, TAU);
-    }
+    enemyPath(ctx, shape, r);
     ctx.fill();
   }
 
@@ -1276,11 +1205,31 @@ export class World {
   }
 
   drawBossBar(ctx, e) {
-    const w = e.radius * 2.4;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(e.x - w / 2, e.y - e.radius - 16, w, 6);
+    const frac = clamp(e.hp / e.maxHp, 0, 1);
+    const w = e.radius * 2.6;
+    const h = 7;
+    const x = e.x - w / 2;
+    const y = e.y - e.radius - 20;
+    // Housing with a danger-tinted border so the boss bar reads as a heavy,
+    // segmented health gauge rather than a thin enemy strip.
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+    // Glowing fill.
+    ctx.save();
+    ctx.shadowColor = COLORS.danger; ctx.shadowBlur = 10;
     ctx.fillStyle = COLORS.danger;
-    ctx.fillRect(e.x - w / 2, e.y - e.radius - 16, w * clamp(e.hp / e.maxHp, 0, 1), 6);
+    ctx.fillRect(x, y, w * frac, h);
+    ctx.restore();
+    // Hot leading edge.
+    ctx.fillStyle = '#ffd0dc';
+    ctx.fillRect(x + Math.max(0, w * frac - 2), y, 2, h);
+    // Segment ticks (quarters) for an at-a-glance "phase" read.
+    ctx.fillStyle = 'rgba(6,10,22,0.85)';
+    for (let i = 1; i < 4; i++) ctx.fillRect(x + (w * i) / 4 - 1, y, 1.5, h);
+    // Bright border.
+    ctx.strokeStyle = withAlpha(COLORS.danger, 0.9);
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
   }
 
   drawBullets(ctx) {
