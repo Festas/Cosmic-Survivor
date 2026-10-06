@@ -423,15 +423,61 @@ kbd { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2)
 
 /* Mobile controls */
 #touch-controls { position: absolute; inset: 0; pointer-events: none; z-index: 8; }
-.touch-btn {
-  position: absolute; bottom: 90px; width: 74px; height: 74px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center; font-size: 30px;
-  background: rgba(81,233,255,0.12); border: 2px solid rgba(81,233,255,0.4);
-  pointer-events: auto; backdrop-filter: blur(4px);
+
+/* Dynamic joystick: a faint "home" hint on the left, and a live ring+knob that
+   snaps to wherever the thumb lands (driven per-frame from input.joy). */
+.joy-hint {
+  position: absolute; left: calc(env(safe-area-inset-left, 0px) + 92px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+  width: 128px; height: 128px; margin: 0 0 -64px -64px; border-radius: 50%;
+  border: 2px dashed rgba(81,233,255,0.28);
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(81,233,255,0.5); font: 700 12px/1 system-ui, sans-serif; letter-spacing: 2px;
+  pointer-events: none; transition: opacity 0.2s;
 }
-#btn-dash { right: 120px; }
-#btn-sing { right: 30px; bottom: 150px; border-color: rgba(176,107,255,0.5); background: rgba(176,107,255,0.14); }
-.touch-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.25); }
+.joy-hint.off { opacity: 0; }
+.joy-ring {
+  position: absolute; left: 0; top: 0; width: 132px; height: 132px; margin: -66px 0 0 -66px;
+  border-radius: 50%; border: 2px solid rgba(81,233,255,0.55);
+  background: radial-gradient(circle, rgba(81,233,255,0.14), rgba(81,233,255,0.04));
+  box-shadow: 0 0 24px -4px rgba(81,233,255,0.5);
+  pointer-events: none; display: none;
+}
+.joy-ring.active { display: block; }
+.joy-knob {
+  position: absolute; left: 50%; top: 50%; width: 60px; height: 60px; margin: -30px 0 0 -30px;
+  border-radius: 50%; background: rgba(81,233,255,0.4); border: 2px solid rgba(81,233,255,0.9);
+  box-shadow: 0 0 20px rgba(81,233,255,0.6); will-change: transform;
+}
+
+.touch-btn {
+  position: absolute; width: 84px; height: 84px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 34px;
+  background: rgba(81,233,255,0.14); border: 2px solid rgba(81,233,255,0.45);
+  pointer-events: auto; backdrop-filter: blur(4px); user-select: none;
+  -webkit-user-select: none; touch-action: none;
+}
+/* Action buttons live in a vertical stack at the right edge, clear of the
+   centre HUD bars (health/XP/overdrive) which occupy the bottom-left. */
+#btn-dash {
+  right: calc(env(safe-area-inset-right, 0px) + 26px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 100px);
+}
+#btn-sing {
+  right: calc(env(safe-area-inset-right, 0px) + 26px);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 200px);
+  border-color: rgba(176,107,255,0.55); background: rgba(176,107,255,0.16);
+}
+.touch-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.28); }
+
+/* On touch devices the big action buttons replace the small desktop cooldown
+   indicators, so hide the redundant .abilities row to avoid clutter/overlap. */
+@media (pointer: coarse) {
+  .abilities { display: none; }
+  /* Reserve a right-hand gutter so the status bars never run under the
+     right-edge action button column. */
+  .bars { max-width: min(520px, calc(100% - 150px)); }
+}
 
 @media (max-width: 760px) {
   .cards { grid-template-columns: 1fr; }

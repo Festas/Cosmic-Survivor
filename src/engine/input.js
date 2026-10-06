@@ -81,10 +81,14 @@ export class Input {
 
   bindButton(elDash, elSing) {
     const press = (prop) => (e) => { this[prop] = true; e.preventDefault(); };
-    if (elDash) elDash.addEventListener('touchstart', press('touchDash'), { passive: false });
-    if (elDash) elDash.addEventListener('mousedown', press('touchDash'));
-    if (elSing) elSing.addEventListener('touchstart', press('touchSing'), { passive: false });
-    if (elSing) elSing.addEventListener('mousedown', press('touchSing'));
+    if (elDash) {
+      elDash.addEventListener('touchstart', press('touchDash'), { passive: false });
+      elDash.addEventListener('mousedown', press('touchDash'));
+    }
+    if (elSing) {
+      elSing.addEventListener('touchstart', press('touchSing'), { passive: false });
+      elSing.addEventListener('mousedown', press('touchSing'));
+    }
   }
 
   isDown(...keys) { return keys.some((k) => this.keys.has(k)); }
