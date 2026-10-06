@@ -990,8 +990,8 @@ export class World {
     this.drawSingularities(ctx, 'under');
     this.drawOrbs(ctx);
     this.drawPickups(ctx);
-    this.drawEnemyBullets(ctx);
     this.drawEnemies(ctx);
+    this.drawEnemyBullets(ctx);
     this.drawPlayer(ctx);
     this.drawBullets(ctx);
     this.particles.render(ctx, this.camera.viewBounds(40));
@@ -1091,6 +1091,13 @@ export class World {
         g.shadowColor = glowColor; g.shadowBlur = blur;
         g.fillStyle = fill;
         this.drawShape(g, shape, r);
+        // Crisp dark outline (no glow) so the body always reads as a solid
+        // object against the bloom and the enemy fire drawn on top of it.
+        g.shadowBlur = 0;
+        g.lineJoin = 'round';
+        g.lineWidth = Math.max(1.6, r * 0.14);
+        g.strokeStyle = 'rgba(4,7,18,0.9)';
+        g.stroke();
       });
       ctx.save();
       ctx.translate(e.x, e.y);
@@ -1102,6 +1109,10 @@ export class World {
         ctx.fillStyle = fill;
         this.drawShape(ctx, shape, r);
         ctx.shadowBlur = 0;
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = Math.max(1.6, r * 0.14);
+        ctx.strokeStyle = 'rgba(4,7,18,0.9)';
+        ctx.stroke();
       }
       ctx.restore();
 
@@ -1236,27 +1247,40 @@ export class World {
 
   drawEnemyBullets(ctx) {
     const bnd = this.camera.viewBounds(50);
-    ctx.globalCompositeOperation = 'lighter';
+    // Enemy fire reads as a solid, high-contrast *danger pellet*: a dark rim, a
+    // saturated body in the firer's colour, and a white-hot core, with only a
+    // tight glow. Drawn source-over (not additive) and on top of the enemies, so
+    // incoming shots never blend into the enemy bloom the way the old additive
+    // same-colour dots did — the core/rim make them unmistakably projectiles.
     for (const b of this.enemyBullets) {
       if (b.x < bnd.minX || b.x > bnd.maxX || b.y < bnd.minY || b.y > bnd.maxY) continue;
-      // Radius/colour are fixed for a bullet's lifetime: cache its sprite so the
-      // key string isn't rebuilt per bullet per frame (boss patterns spawn many).
       let spr = b._spr;
       if (spr === undefined) {
-        spr = glowSprite('eb|' + b.r + '|' + b.color, b.r, 10, (g) => {
-          g.fillStyle = b.color; g.shadowColor = b.color; g.shadowBlur = 10;
-          g.beginPath(); g.arc(0, 0, b.r, 0, TAU); g.fill();
+        const r = b.r;
+        const blur = Math.max(5, r * 0.7);
+        spr = glowSprite('eb2|' + r + '|' + b.color, r + 2.5, blur, (g) => {
+          g.shadowColor = b.color; g.shadowBlur = blur;
+          g.fillStyle = 'rgba(8,2,12,0.92)';
+          g.beginPath(); g.arc(0, 0, r + 1.5, 0, TAU); g.fill();
+          g.shadowBlur = 0;
+          g.fillStyle = b.color;
+          g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
+          g.fillStyle = '#ffffff';
+          g.beginPath(); g.arc(0, 0, Math.max(1.6, r * 0.42), 0, TAU); g.fill();
         });
         b._spr = spr;
       }
       if (spr) {
         ctx.drawImage(spr.canvas, b.x - spr.off, b.y - spr.off);
       } else {
-        ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 10;
+        ctx.fillStyle = 'rgba(8,2,12,0.92)';
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 1.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = b.color;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(1.6, b.r * 0.42), 0, TAU); ctx.fill();
       }
     }
-    ctx.globalCompositeOperation = 'source-over';
     ctx.shadowBlur = 0;
   }
 
