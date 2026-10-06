@@ -49,7 +49,7 @@ Stack *Resonance Cascade* to make every reaction hit even harder.
 The longer you survive, the more the swarm sends **elites** — gold-ringed, beefed-up
 versions of the mid-tier archetypes with far more health, a harder hit and a larger frame.
 They start trickling in after the first minutes and ramp toward a steady minority of every
-wave, so late runs stay dangerous instead of melting. Put one down and it pays out — elites
+wave, so late runs stay dangerous instead of becoming a cakewalk. Put one down and it pays out — elites
 drop a **richer burst of XP**.
 
 ### 🔆 Overdrive

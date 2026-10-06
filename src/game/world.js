@@ -1169,6 +1169,9 @@ export class World {
   // never a per-frame shadowBlur. Fed by the reused this._eliteFrame buffer.
   drawEliteRings(ctx) {
     for (const e of this._eliteFrame) {
+      // Defensive only: the buffer holds elites that were alive during the cull
+      // and rendering never kills anything, so this never fires today — but it
+      // keeps a ring from ever floating over a corpse if the draw order changes.
       if (!e.alive) continue;
       const rr = e.radius + 5;
       const ring = glowSprite('elite|' + Math.round(rr), rr, 10, (g) => {
