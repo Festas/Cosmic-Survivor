@@ -266,7 +266,7 @@ function detailSaucer(ctx, shape, r, accent, highlight, eye) {
   // Running lights along the saucer rim.
   const lights = shape === 'mothership' ? 7 : 5;
   const ry = shape === 'mothership' ? r * 0.12 : r * 0.15;
-  const rx = shape === 'mothership' ? r * 0.82 : r * 0.82;
+  const rx = shape === 'mothership' ? r * 0.9 : r * 0.8;
   for (let i = 0; i < lights; i++) {
     const t = (i + 0.5) / lights;
     const x = -rx + t * rx * 2;

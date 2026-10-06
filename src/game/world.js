@@ -1149,7 +1149,11 @@ export class World {
       }
       // Live animated energy core makes the boss fight feel epic. Only a couple of
       // bosses are ever on screen, so this per-frame glow is negligible.
-      if (e.boss) drawBossCore(ctx, r, { time: now + (e._coreT || (e._coreT = rand() * 6)), color: e.color, ring: pal.highlight });
+      if (e.boss) {
+        // Random per-boss phase so multiple bosses don't pulse in lockstep.
+        if (e._coreT === undefined) e._coreT = rand() * 6;
+        drawBossCore(ctx, r, { time: now + e._coreT, color: e.color, ring: pal.highlight });
+      }
       ctx.restore();
 
       // Defer the elite marker ring to drawEliteRings() so it lands on top of the
