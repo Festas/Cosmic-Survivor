@@ -121,24 +121,43 @@ export const COMBO = {
 export const DIRECTOR = {
   // enemies alive cap grows over time
   baseCap: 30,
-  capPerMin: 28,
-  capMax: 260,
+  capPerMin: 33,
+  capMax: 300,
   // spawn interval shrinks over time
   spawnStart: 0.9,
-  spawnMin: 0.11,
-  spawnHalfLife: 68, // seconds for interval to approach min
+  spawnMin: 0.1,
+  spawnHalfLife: 60, // seconds for interval to approach min
   // global enemy stat scaling
   hpStart: 1,
-  hpPerMin: 0.75,
-  speedPerMin: 0.085,
-  speedMax: 2.05,
+  hpPerMin: 0.95,
+  speedPerMin: 0.1,
+  speedMax: 2.2,
   // enemy damage scaling over time — rank-and-file hits get harder so late-game
   // crowds stay threatening (bosses keep their hand-tuned per-pattern damage).
   dmgStart: 1,
-  dmgPerMin: 0.3,
-  dmgMax: 3.1,
-  // boss cadence
+  dmgPerMin: 0.38,
+  dmgMax: 3.4,
+  // boss cadence (legacy; the wave director — see WAVE — now gates bosses).
   bossEvery: 54, // seconds
+};
+
+// Wave director. The run is paced in discrete waves instead of a raw timer: a
+// Wave Counter drives the roster "themes" (every 10 waves), guaranteed Elite
+// waves (every 5th) and Boss waves (every 10th). Bosses gate progression — the
+// wave clock pauses while a boss is alive — so bosses can never stack up.
+export const WAVE = {
+  duration: 20,    // base seconds a normal wave lasts
+  durationMin: 12, // waves tighten to this as the run escalates
+  rampWaves: 60,   // waves over which duration eases from duration -> durationMin
+  eliteEvery: 5,   // an Elite is guaranteed on waves 5, 15, 25, …
+  bossEvery: 10,   // a Boss arrives on waves 10, 20, 30, …
+  bossCount: 10,   // distinct bosses before the roster cycles (one per 10 waves)
+  themeSize: 10,   // waves per enemy theme (matches bossEvery: one boss per theme)
+  // Past this wave the difficulty grows exponentially (the "endless" tier).
+  hyperStart: 100,
+  hyperBase: 1.055,     // per-wave hp/reward multiplier beyond hyperStart
+  hyperSpeedBase: 1.01, // gentler per-wave speed multiplier beyond hyperStart
+  hyperSpeedMax: 2.4,
 };
 
 // Elite affix. A growing fraction of mid-tier+ spawns are promoted to tougher,
@@ -200,4 +219,45 @@ export function xpForLevel(level) {
 export function comboMultiplier(streak) {
   const steps = Math.floor(streak / COMBO.step);
   return Math.min(COMBO.max, 1 + steps * COMBO.amount);
+}
+
+// -------------------------------------------------------------- wave scaling
+
+// Seconds a given wave lasts. Eases from WAVE.duration down to WAVE.durationMin
+// across the first WAVE.rampWaves waves so the mid game tightens the cadence.
+export function waveDuration(wave) {
+  const { duration, durationMin, rampWaves } = WAVE;
+  const k = Math.min(1, Math.max(0, (wave - 1) / rampWaves));
+  return duration + (durationMin - duration) * k;
+}
+
+// Exponential difficulty multiplier for the endless tier. Exactly 1 up to and
+// including WAVE.hyperStart (so waves 1–100 keep their hand-tuned curve), then
+// grows geometrically — this is what makes "past wave 100" ramp hard.
+export function waveHyperScale(wave) {
+  if (wave <= WAVE.hyperStart) return 1;
+  return Math.pow(WAVE.hyperBase, wave - WAVE.hyperStart);
+}
+
+// Gentler exponential applied to enemy speed past the hyper threshold, clamped so
+// late-game enemies get faster without becoming literally undodgeable.
+export function waveSpeedHyper(wave) {
+  if (wave <= WAVE.hyperStart) return 1;
+  return Math.min(WAVE.hyperSpeedMax, Math.pow(WAVE.hyperSpeedBase, wave - WAVE.hyperStart));
+}
+
+// Boss HP/threat multiplier for the wave it appears on. Pre-100 this is 1 (each
+// boss carries its own hand-tuned per-slot HP); past 100 the roster cycles and
+// the exponential tier makes repeat bosses dramatically tankier.
+export function bossWaveScale(wave) {
+  return waveHyperScale(wave);
+}
+
+// True for boss waves (every WAVE.bossEvery) and elite waves (every WAVE.eliteEvery
+// that is not also a boss wave — i.e. 5, 15, 25, …).
+export function isBossWave(wave) {
+  return wave > 0 && wave % WAVE.bossEvery === 0;
+}
+export function isEliteWave(wave) {
+  return wave > 0 && wave % WAVE.eliteEvery === 0 && wave % WAVE.bossEvery !== 0;
 }
