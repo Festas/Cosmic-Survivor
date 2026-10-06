@@ -2,7 +2,7 @@
 // reactions, leveling, scoring and rendering. Coordinates the whole run.
 
 import {
-  ARENA, COLORS, PLAYER, SINGULARITY, DASH, COMBO, DIRECTOR,
+  ARENA, COLORS, PLAYER, SINGULARITY, DASH, COMBO, DIRECTOR, ELITE,
   spawnInterval, enemyCap, hpScale, speedScale, dmgScale, xpForLevel, comboMultiplier,
 } from './config.js';
 import {
@@ -12,7 +12,7 @@ import { Camera } from '../engine/camera.js';
 import { Particles } from '../engine/particles.js';
 import { glowSprite } from '../engine/sprites.js';
 import { Player } from './player.js';
-import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize } from './enemies.js';
+import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize, rollElite } from './enemies.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
 import { draftUpgrades } from './upgrades.js';
 import { weaponDef, addOrLevelWeapon, evolveWeapon, createWeaponInst } from './weapons.js';
@@ -200,6 +200,18 @@ export class World {
       hitFlash: 0, spin: rand() * TAU, alive: true, contactT: 0,
       massive: !!def.massive,
     };
+    // Elite promotion: a time-gated chance to turn a mid-tier+ spawn into a
+    // heavier, XP-rich variant (gold ring drawn in renderEnemies). Scaling is
+    // applied on top of the director curves so elites stay relative to the wave.
+    if (!isBoss && rollElite(def, this.elapsed, this.rng)) {
+      e.elite = true;
+      e.hp *= ELITE.hpMul;
+      e.maxHp *= ELITE.hpMul;
+      e.damage *= ELITE.damageMul;
+      e.radius *= ELITE.radiusMul;
+      e.speed *= ELITE.speedMul;
+      e.xp = Math.max(1, Math.round(e.xp * ELITE.xpMul));
+    }
     this.enemies.push(e);
     if (e.boss) { this.bossActive = e; }
     return e;
@@ -1134,6 +1146,28 @@ export class World {
         ctx.stroke();
       }
       ctx.restore();
+
+      // Elite marker: a crisp, non-rotating gold glow ring just outside the body.
+      // Baked into a cached glow sprite (keyed by integer radius) so it costs a
+      // single blit per frame and never pays per-frame shadowBlur.
+      if (e.elite) {
+        const rr = e.radius + 5;
+        const key = 'elite|' + Math.round(rr);
+        const ring = glowSprite(key, rr, 10, (g) => {
+          g.shadowColor = ELITE.ring; g.shadowBlur = 10;
+          g.strokeStyle = ELITE.ring; g.lineWidth = 2.5;
+          g.beginPath(); g.arc(0, 0, rr, 0, TAU); g.stroke();
+        });
+        if (ring) {
+          ctx.drawImage(ring.canvas, e.x - ring.off, e.y - ring.off);
+        } else {
+          ctx.save();
+          ctx.shadowColor = ELITE.ring; ctx.shadowBlur = 10;
+          ctx.strokeStyle = ELITE.ring; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.arc(e.x, e.y, rr, 0, TAU); ctx.stroke();
+          ctx.restore();
+        }
+      }
 
       if (e.boss) this.drawBossBar(ctx, e);
       else if (e.maxHp > 60 && e.hp < e.maxHp) this.drawHpBar(ctx, e);

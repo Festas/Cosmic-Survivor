@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize } from '../src/game/enemies.js';
+import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize, rollElite } from '../src/game/enemies.js';
 import { makeRng } from '../src/engine/utils.js';
+import { ELITE } from '../src/game/config.js';
 
 test('pickEnemyType always returns a valid enemy key', () => {
   const r = makeRng(11);
@@ -103,4 +104,44 @@ test('seeder, sentinel and the Singularis update without throwing and emit bulle
     }, `${def.key} update threw`);
   }
   assert.ok(world.enemyBullets.length > 0, 'expansion enemies should fire enemy bullets');
+});
+
+// ---- Elite affix ----------------------------------------------------------
+
+test('rollElite never promotes bosses or the xp:1 trash tier', () => {
+  const r = () => 0; // always "rolls" the lowest value => would promote if eligible
+  const late = 100000; // well past the unlock, chance at its cap
+  for (const def of Object.values(BOSS_TYPES)) {
+    assert.equal(rollElite(def, late, r), false, `${def.key} boss must never be elite`);
+  }
+  for (const def of Object.values(ENEMY_TYPES)) {
+    if ((def.xp || 0) < 2) {
+      assert.equal(rollElite(def, late, r), false, `${def.key} (xp<2) must never be elite`);
+    }
+  }
+  // A guard against bad input.
+  assert.equal(rollElite(null, late, r), false);
+  assert.equal(rollElite(undefined, late, r), false);
+});
+
+test('rollElite respects the unlock gate for eligible enemies', () => {
+  const eligible = Object.values(ENEMY_TYPES).find((d) => (d.xp || 0) >= 2);
+  assert.ok(eligible, 'expected at least one xp>=2 enemy');
+  const r = () => 0; // minimal roll: promotes whenever chance > 0
+  assert.equal(rollElite(eligible, ELITE.unlock - 1, r), false, 'no elites before unlock');
+  assert.equal(rollElite(eligible, ELITE.unlock, r), true, 'elites open at unlock');
+});
+
+test('rollElite promotes an eligible enemy only when the roll beats the chance', () => {
+  const eligible = Object.values(ENEMY_TYPES).find((d) => (d.xp || 0) >= 2);
+  const late = 100000; // chance pinned at ELITE.chanceMax
+  assert.equal(rollElite(eligible, late, () => 0), true, 'low roll => promote');
+  assert.equal(rollElite(eligible, late, () => 0.999), false, 'high roll => no promote');
+  // Statistically, the promotion rate should land near the configured cap.
+  const rng = makeRng(42);
+  let elites = 0;
+  const N = 20000;
+  for (let i = 0; i < N; i++) if (rollElite(eligible, late, rng)) elites++;
+  const rate = elites / N;
+  assert.ok(Math.abs(rate - ELITE.chanceMax) < 0.02, `rate ${rate} should be ~${ELITE.chanceMax}`);
 });

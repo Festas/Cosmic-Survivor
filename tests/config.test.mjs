@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  spawnInterval, enemyCap, hpScale, speedScale, xpForLevel, comboMultiplier,
-  COMBO, ARENA,
+  spawnInterval, enemyCap, hpScale, speedScale, xpForLevel, comboMultiplier, eliteChance,
+  COMBO, ARENA, ELITE,
 } from '../src/game/config.js';
 
 test('spawnInterval decreases over time (ramps difficulty)', () => {
@@ -47,4 +47,22 @@ test('comboMultiplier starts at 1 and steps up', () => {
 
 test('arena has sane dimensions', () => {
   assert.ok(ARENA.w > 0 && ARENA.h > 0);
+});
+
+test('eliteChance is zero before unlock, then ramps and is clamped', () => {
+  // No elites until the unlock gate.
+  assert.equal(eliteChance(0), 0);
+  assert.equal(eliteChance(ELITE.unlock - 1), 0);
+  // Opens at the unlock boundary.
+  assert.ok(eliteChance(ELITE.unlock) > 0);
+  // Non-decreasing as the run goes on.
+  assert.ok(eliteChance(600) >= eliteChance(120));
+  // Always a probability, never exceeding the configured cap.
+  for (const t of [0, 75, 120, 300, 600, 3600]) {
+    const c = eliteChance(t);
+    assert.ok(c >= 0 && c <= 1);
+    assert.ok(c <= ELITE.chanceMax + 1e-9);
+  }
+  // Reaches the cap eventually.
+  assert.ok(Math.abs(eliteChance(1e6) - ELITE.chanceMax) < 1e-9);
 });

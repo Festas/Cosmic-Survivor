@@ -1,7 +1,7 @@
 // enemies.js — enemy archetypes, behaviors, bosses and the spawn director table.
 
 import { TAU, angleTo, dist, clamp, rand, randRange, chance } from '../engine/utils.js';
-import { COLORS } from './config.js';
+import { COLORS, eliteChance } from './config.js';
 import { createStatus } from './elements.js';
 
 // Steer an enemy toward a point at its current speed with light smoothing.
@@ -441,4 +441,14 @@ export function packSize(typeKey) {
   if (typeKey === 'squid') return 2 + (chance(0.5) ? 2 : 0);
   if (typeKey === 'crab') return 2 + (chance(0.3) ? 1 : 0);
   return 1;
+}
+
+// Decide whether a freshly spawned enemy should be promoted to an elite. Pure so
+// it can be unit-tested. Bosses and the xp:1 trash tier (drone/swarm/squid —
+// which also arrive in packs) are never eligible, so elites always read as a
+// single, heavier threat rather than a wall of buffed swarmlings.
+export function rollElite(def, t, r = rand) {
+  if (!def || def.boss || (def.xp || 0) < 2) return false;
+  const roll = typeof r === 'function' ? r() : rand();
+  return roll < eliteChance(t);
 }

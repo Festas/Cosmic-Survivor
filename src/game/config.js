@@ -138,6 +138,23 @@ export const DIRECTOR = {
   bossEvery: 60, // seconds
 };
 
+// Elite affix. A growing fraction of mid-tier+ spawns are promoted to tougher,
+// XP-rich "elite" variants (marked with a gold ring in world.js). Elites keep
+// the late game threatening without adding new archetypes — they are just beefed
+// up versions of the existing roster, so they never hurt readability.
+export const ELITE = {
+  unlock: 75, // seconds before any elite can appear
+  chanceStart: 0.02,
+  chancePerMin: 0.05,
+  chanceMax: 0.22,
+  hpMul: 2.6, // elites are spongy — a real speed bump, not a one-shot
+  damageMul: 1.4,
+  radiusMul: 1.25, // visibly larger so the threat reads at a glance
+  speedMul: 0.9, // slightly heavier/slower than their base archetype
+  xpMul: 3, // worth chasing: they drop a richer burst of XP orbs
+  ring: COLORS.gold, // elite marker ring colour
+};
+
 export function spawnInterval(t) {
   const { spawnStart, spawnMin, spawnHalfLife } = DIRECTOR;
   return spawnMin + (spawnStart - spawnMin) * Math.pow(0.5, t / spawnHalfLife);
@@ -160,6 +177,15 @@ export function speedScale(t) {
 // clamped, so the early game stays gentle while late waves punish standing still.
 export function dmgScale(t) {
   return Math.min(DIRECTOR.dmgMax, DIRECTOR.dmgStart + (DIRECTOR.dmgPerMin * t) / 60);
+}
+
+// Probability [0,1] that an eligible spawn is promoted to an elite. Zero until
+// ELITE.unlock, then ramps with elapsed minutes and is clamped at chanceMax so
+// elites stay a spice, never the majority.
+export function eliteChance(t) {
+  if (t < ELITE.unlock) return 0;
+  const m = (t - ELITE.unlock) / 60;
+  return Math.min(ELITE.chanceMax, ELITE.chanceStart + ELITE.chancePerMin * m);
 }
 
 // XP required to go from `level` to `level+1`.
