@@ -323,6 +323,10 @@ export class World {
     if (this.waveTime >= waveDuration(this.wave)) {
       this.waveTime = 0;
       this.startWave(this.wave + 1);
+      // If that rolled into a boss wave, a warning just began — hold all spawns
+      // this tick too (startWave set bossWarn), so nothing trickles out under the
+      // incoming-boss telegraph.
+      if (this.bossWarn > 0) return;
     }
 
     // Trickle spawns, drawn from the current theme's roster.

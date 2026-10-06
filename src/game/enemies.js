@@ -437,7 +437,7 @@ export const ENEMY_TYPES = {
     onDeath(e, world) {
       ringBurst(world, e, 12, 215, Math.max(6, Math.round(e.damage * 0.7)), COLORS.fire, rand() * TAU, 3.2);
       world.audio?.play('implode');
-      world.shake(5);
+      world.shake?.(5);
     },
   },
   // Phase-stalker: closes in, then blinks a short distance toward the player on a
