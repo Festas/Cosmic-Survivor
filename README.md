@@ -179,7 +179,7 @@ docker run --rm -p 8080:80 cosmic-survivor
 ```
 
 `nginx.conf` sets correct MIME types for ES modules, gzip, and sensible cache headers
-(the service worker is always revalidated so updates ship instantly).
+(`index.html` and `sw.js` are always revalidated, so a new build ships immediately).
 
 ---
 
@@ -187,6 +187,12 @@ docker run --rm -p 8080:80 cosmic-survivor
 
 The game registers a service worker (`sw.js`) and ships a web manifest, so it's installable
 and **playable offline** after the first load.
+
+Updates can't get stuck on a stale cache: `tools/build.mjs` stamps the service worker with a
+content hash of the build, so every deploy uses a brand-new cache and the old one is deleted
+on activation. The worker serves navigations network-first and other assets
+stale-while-revalidate, and open tabs reload once automatically when the new worker takes
+control — so players always end up on the latest optimized version.
 
 ---
 
