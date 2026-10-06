@@ -449,6 +449,8 @@ export function packSize(typeKey) {
 // single, heavier threat rather than a wall of buffed swarmlings.
 export function rollElite(def, t, r = rand) {
   if (!def || def.boss || (def.xp || 0) < 2) return false;
-  const roll = typeof r === 'function' ? r() : rand();
+  // r is normally an RNG function, but a caller may pass a pre-rolled sample in
+  // [0,1) (deterministic replay/testing); honour it instead of discarding it.
+  const roll = typeof r === 'function' ? r() : r;
   return roll < eliteChance(t);
 }

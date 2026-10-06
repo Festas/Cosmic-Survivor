@@ -145,3 +145,12 @@ test('rollElite promotes an eligible enemy only when the roll beats the chance',
   const rate = elites / N;
   assert.ok(Math.abs(rate - ELITE.chanceMax) < 0.02, `rate ${rate} should be ~${ELITE.chanceMax}`);
 });
+
+test('rollElite accepts a pre-rolled sample instead of an RNG function', () => {
+  const eligible = Object.values(ENEMY_TYPES).find((d) => (d.xp || 0) >= 2);
+  const late = 100000; // chance pinned at ELITE.chanceMax
+  // A caller may pass a fixed number in [0,1) (deterministic replay/testing); it
+  // must be used directly rather than discarded in favour of a fresh roll.
+  assert.equal(rollElite(eligible, late, 0), true, 'pre-rolled 0 => promote');
+  assert.equal(rollElite(eligible, late, 0.999), false, 'pre-rolled 0.999 => no promote');
+});
