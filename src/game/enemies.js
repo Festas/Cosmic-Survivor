@@ -519,12 +519,190 @@ export const ENEMY_TYPES = {
   },
 };
 
+// Per-boss `cfg` for the shared bossThink brain, hoisted to module scope so the
+// abilities arrays and their fire/ambient closures are allocated ONCE at load,
+// not rebuilt every tick inside update() (that churn is measurable GC pressure
+// during a boss fight, especially on mobile). All per-fight state lives on the
+// enemy instance `e`, and there is only ever one boss alive, so sharing a single
+// frozen-in-shape cfg per boss type is safe. Keys/order match THEMES in waves.js.
+const BOSS_CFG = {
+  devourer: {
+    move: 'chase', spin: 0.8, novaColor: COLORS.danger,
+    abilities: [
+      { label: 'RADIAL BURST', windup: 0.8, cd: 2.4,
+        fire(e, w) { ringBurst(w, e, 16, 200, 12, COLORS.danger, e.spin, 4); w.shake?.(8); } },
+      { label: 'SPAWN SWARM', windup: 0.6, cd: 2.8,
+        fire(e, w) { spawnMinions(w, e, ['swarm', 'drone'], 4); } },
+      { label: 'DEVOUR CHARGE', windup: 0.9, cd: 3.0, aim: true, minPhase: 1,
+        fire(e, w) { lungeAt(e, w, 7); w.audio?.play('edash'); w.shake?.(10); } },
+      { label: 'CRIMSON NOVA', windup: 1.0, cd: 3.2, minPhase: 2,
+        fire(e, w) { novaRings(w, e, 3, 14, 180, 13, COLORS.danger, e.spin); w.shake?.(12); } },
+    ],
+  },
+  warden: {
+    move: 'strafe', spin: 2.2, novaColor: COLORS.cryo,
+    ambient(e, dt, w, ph) {
+      e._amT = (e._amT ?? 0.16) - dt;
+      if (e._amT <= 0) { e._amT = ph >= 2 ? 0.1 : 0.16; spiralEmit(w, e, 2, 0.4, 200, 10, COLORS.cryo); }
+    },
+    abilities: [
+      { label: 'FROST WALL', windup: 0.85, cd: 2.6, aim: true,
+        fire(e, w) { wallWithGap(w, e, 13, 1.7, 260, 12, COLORS.cryo); } },
+      { label: 'CROSS SWEEP', windup: 0.8, cd: 2.4,
+        fire(e, w) { ringBurst(w, e, 20, 220, 11, COLORS.cryo, e.spin, 4); ringBurst(w, e, 20, 220, 11, COLORS.shield, e.spin + 0.16, 4); } },
+      { label: 'BLINK STRIKE', windup: 0.7, cd: 2.8, aim: true, minPhase: 1,
+        fire(e, w) { lungeAt(e, w, 6); w.audio?.play('edash'); } },
+      { label: 'GLACIAL NOVA', windup: 1.0, cd: 3.2, minPhase: 2,
+        fire(e, w) { novaRings(w, e, 3, 16, 190, 12, COLORS.cryo, e.spin); w.shake?.(12); } },
+    ],
+  },
+  hivequeen: {
+    move: 'hover', spin: 1.0, novaColor: COLORS.invGreen,
+    ambient(e, dt, w, ph) {
+      e._amT = (e._amT ?? 0.7) - dt;
+      if (e._amT <= 0) { e._amT = ph >= 2 ? 0.5 : 0.8; aimedSpread(w, e, 1, 0, 230, 10, COLORS.invGreen); }
+    },
+    abilities: [
+      { label: 'BROOD HATCH', windup: 0.7, cd: 3.4,
+        fire(e, w) { spawnMinions(w, e, ['swarm', 'bomber', 'splitter'], 4); } },
+      { label: 'SPORE RING', windup: 0.85, cd: 2.6,
+        fire(e, w) { ringBurst(w, e, 18, 150, 11, COLORS.invGreen, e.spin, 4.5); } },
+      { label: 'ACID SPREAD', windup: 0.9, cd: 2.8, aim: true,
+        fire(e, w) { aimedSpread(w, e, 7, 0.14, 275, 11, COLORS.invGreen); } },
+      { label: 'HIVE FRENZY', windup: 1.0, cd: 3.6, minPhase: 2,
+        fire(e, w) { spawnMinions(w, e, ['sparkling', 'swarm'], 6); ringBurst(w, e, 16, 180, 12, COLORS.invGreen, e.spin, 4); w.shake?.(10); } },
+    ],
+  },
+  siegemarshal: {
+    move: 'strafe', spin: 1.4, novaColor: COLORS.invAmber,
+    abilities: [
+      { label: 'FLAK WALL', windup: 0.9, cd: 2.6, aim: true,
+        fire(e, w) { wallWithGap(w, e, 15, 1.8, 240, 12, COLORS.invAmber); } },
+      { label: 'ARC BARRAGE', windup: 0.85, cd: 2.8,
+        fire(e, w) { novaRings(w, e, 2, 20, 210, 12, COLORS.invAmber, e.spin); } },
+      { label: 'MORTAR LINE', windup: 0.8, cd: 3.2,
+        fire(e, w) { spawnMinions(w, e, ['mortar'], 2, 110); aimedSpread(w, e, 5, 0.16, 200, 12, COLORS.invAmber); } },
+      { label: 'SIEGE STORM', windup: 1.1, cd: 3.6, minPhase: 2,
+        fire(e, w) { novaRings(w, e, 4, 18, 200, 13, COLORS.invAmber, e.spin); w.shake?.(14); } },
+    ],
+  },
+  singularis: {
+    move: 'hover', spin: 1.2, novaColor: COLORS.void,
+    ambient(e, dt, w, ph) {
+      e._amT = (e._amT ?? 0.14) - dt;
+      if (e._amT <= 0) { e._amT = ph >= 2 ? 0.1 : 0.14; spiralEmit(w, e, 2, 0.42, 200, 12, COLORS.void); }
+    },
+    abilities: [
+      { label: 'COLLAPSE', windup: 0.85, cd: 2.8,
+        fire(e, w) { ringBurst(w, e, 18, 210, 14, COLORS.void, e.spin, 4); spawnMinions(w, e, ['swarm', 'seeder'], 4); w.shake?.(10); } },
+      { label: 'VOID LANCE', windup: 0.9, cd: 2.6, aim: true,
+        fire(e, w) { wallWithGap(w, e, 13, 1.6, 250, 13, COLORS.void); } },
+      { label: 'SINGULAR PULL', windup: 0.9, cd: 3.0, minPhase: 1,
+        fire(e, w) { novaRings(w, e, 2, 18, 195, 13, COLORS.void, e.spin); } },
+      { label: 'EVENT HORIZON', windup: 1.1, cd: 3.4, minPhase: 2,
+        fire(e, w) { novaRings(w, e, 4, 16, 200, 13, COLORS.void, e.spin); w.shake?.(16); } },
+    ],
+  },
+  mothership: {
+    move: 'hover', spin: 1.5, novaColor: COLORS.saucer,
+    ambient(e, dt, w, ph) {
+      e._amT = (e._amT ?? 0.6) - dt;
+      if (e._amT <= 0) { e._amT = ph >= 2 ? 0.4 : 0.6; aimedSpread(w, e, 3, 0.18, 250, 12, COLORS.saucer); }
+    },
+    abilities: [
+      { label: 'SPIRAL SWEEP', windup: 0.85, cd: 2.6,
+        fire(e, w) { ringBurst(w, e, 24, 210, 11, COLORS.shock, e.spin, 4); } },
+      { label: 'SUMMON FLEET', windup: 0.7, cd: 3.2,
+        fire(e, w) { spawnMinions(w, e, ['squid', 'crab', 'ufo'], 5); } },
+      { label: 'BEAM WALL', windup: 0.9, cd: 2.8, aim: true,
+        fire(e, w) { wallWithGap(w, e, 15, 1.7, 250, 12, COLORS.saucer); } },
+      { label: 'ARMADA', windup: 1.0, cd: 3.6, minPhase: 2,
+        fire(e, w) { spawnMinions(w, e, ['ufo', 'sparkling'], 6); ringBurst(w, e, 18, 200, 12, COLORS.saucer, e.spin, 4); w.shake?.(12); } },
+    ],
+  },
+  phantom: {
+    move: 'strafe', spin: 2.4, novaColor: COLORS.invMagenta,
+    abilities: [
+      { label: 'PHASE SHIFT', windup: 0.7, cd: 2.4,
+        fire(e, w) {
+          const ang = rand() * TAU, rr = 320;
+          e.x = w.player.x + Math.cos(ang) * rr; e.y = w.player.y + Math.sin(ang) * rr;
+          e.vx = 0; e.vy = 0;
+          w.particles?.burst(e.x, e.y, COLORS.invMagenta, 24, { speed: 260, life: 0.5, size: 4, budget: 480 });
+          w.shake?.(8);
+        } },
+      { label: 'SPECTRAL WALL', windup: 0.85, cd: 2.6, aim: true,
+        fire(e, w) { wallWithGap(w, e, 13, 1.6, 270, 13, COLORS.invMagenta); } },
+      { label: 'GHOST LANCE', windup: 0.8, cd: 2.4, aim: true,
+        fire(e, w) { aimedSpread(w, e, 5, 0.1, 340, 13, COLORS.invMagenta); } },
+      { label: 'HAUNT', windup: 0.9, cd: 3.2, minPhase: 1,
+        fire(e, w) { spawnMinions(w, e, ['weaver'], 3); } },
+      { label: 'SPECTRAL NOVA', windup: 1.0, cd: 3.4, minPhase: 2,
+        fire(e, w) { novaRings(w, e, 3, 16, 200, 13, COLORS.invMagenta, e.spin); w.shake?.(12); } },
+    ],
+  },
+  cryoleviathan: {
+    move: 'hover', spin: 0.8, novaColor: COLORS.cryo,
+    ambient(e, dt, w, ph) {
+      e._amT = (e._amT ?? 0.2) - dt;
+      if (e._amT <= 0) { e._amT = ph >= 2 ? 0.14 : 0.2; spiralEmit(w, e, 1, 0.5, 175, 10, COLORS.cryo); }
+    },
+    abilities: [
+      { label: 'GLACIER NOVA', windup: 0.95, cd: 2.8,
+        fire(e, w) { novaRings(w, e, 3, 18, 190, 13, COLORS.cryo, e.spin); } },
+      { label: 'ICE WALL', windup: 0.95, cd: 2.8, aim: true,
+        fire(e, w) { wallWithGap(w, e, 17, 1.9, 230, 13, COLORS.cryo); } },
+      { label: 'FROST BROOD', windup: 0.8, cd: 3.2,
+        fire(e, w) { spawnMinions(w, e, ['frostling', 'octopus'], 4); } },
+      { label: 'ABSOLUTE ZERO', windup: 1.2, cd: 3.8, minPhase: 2,
+        fire(e, w) { novaRings(w, e, 4, 20, 200, 14, COLORS.cryo, e.spin); w.shake?.(18); } },
+    ],
+  },
+  stormherald: {
+    move: 'strafe', spin: 2.6, novaColor: COLORS.shock,
+    ambient(e, dt, w, ph) {
+      e._amT = (e._amT ?? 0.4) - dt;
+      if (e._amT <= 0) { e._amT = ph >= 2 ? 0.26 : 0.4; aimedSpread(w, e, 2, 0.14, 300, 11, COLORS.shock); }
+    },
+    abilities: [
+      { label: 'CHAIN STORM', windup: 0.8, cd: 2.4,
+        fire(e, w) { novaRings(w, e, 2, 22, 250, 12, COLORS.shock, e.spin); } },
+      { label: 'THUNDER WALL', windup: 0.8, cd: 2.4, aim: true,
+        fire(e, w) { wallWithGap(w, e, 15, 1.7, 300, 13, COLORS.shock); } },
+      { label: 'STATIC FIELD', windup: 0.8, cd: 3.0,
+        fire(e, w) { spawnMinions(w, e, ['sparkling', 'orbiter'], 5); } },
+      { label: 'OVERLOAD', windup: 1.0, cd: 3.4, minPhase: 2,
+        fire(e, w) { novaRings(w, e, 4, 18, 240, 13, COLORS.shock, e.spin); w.shake?.(14); } },
+    ],
+  },
+  nemesis: {
+    move: 'strafe', spin: 3.0, novaColor: COLORS.white,
+    ambient(e, dt, w, ph) {
+      e._amT = (e._amT ?? 0.14) - dt;
+      if (e._amT <= 0) { e._amT = ph >= 2 ? 0.1 : 0.14; spiralEmit(w, e, 3, 0.36, 210, 12, COLORS.danger); }
+    },
+    abilities: [
+      { label: 'OMEGA WALL', windup: 0.85, cd: 2.4, aim: true,
+        fire(e, w) { wallWithGap(w, e, 19, 2.0, 280, 14, COLORS.danger); } },
+      { label: 'ANNIHILATE', windup: 0.9, cd: 2.6,
+        fire(e, w) { novaRings(w, e, 4, 20, 210, 14, COLORS.danger, e.spin); w.shake?.(12); } },
+      { label: 'LEGION', windup: 0.8, cd: 3.2,
+        fire(e, w) { spawnMinions(w, e, ['dasher', 'weaver', 'mortar', 'bomber'], 6); } },
+      { label: 'CRIMSON LANCE', windup: 0.8, cd: 3.0, aim: true, minPhase: 1,
+        fire(e, w) { aimedSpread(w, e, 7, 0.12, 360, 14, COLORS.danger); lungeAt(e, w, 5); w.audio?.play('edash'); } },
+      { label: 'FINAL JUDGMENT', windup: 1.2, cd: 4.0, minPhase: 2,
+        fire(e, w) { novaRings(w, e, 5, 22, 220, 15, COLORS.danger, e.spin); spawnMinions(w, e, ['sentinel'], 2, 120); w.shake?.(20); } },
+    ],
+  },
+};
+
 export const BOSS_TYPES = {
-  // Each boss is a thin `cfg` over the shared bossThink brain: distinct movement,
-  // an ambient pressure pattern and a set of telegraphed, phase-gated specials so
-  // every fight reads differently and escalates through three phases. Definition
-  // order matches the theme order in waves.js (one boss per 10-wave theme), and
-  // the hand-tuned hp ramps across the ten slots toward the wave-100 finale.
+  // Each boss is a thin wrapper over the shared bossThink brain, driven by its
+  // module-level BOSS_CFG entry (distinct movement, an ambient pressure pattern
+  // and a set of telegraphed, phase-gated specials) so every fight reads
+  // differently and escalates through three phases. Definition order matches the
+  // theme order in waves.js (one boss per 10-wave theme), and the hand-tuned hp
+  // ramps across the ten slots toward the wave-100 finale.
 
   // ---- Theme 0 · Crimson Vanguard · wave 10 --------------------------------
   // A relentless red bruiser that chases, spawns swarms and charges. The teaching
@@ -532,21 +710,7 @@ export const BOSS_TYPES = {
   devourer: {
     key: 'devourer', name: 'The Devourer', hp: 2200, speed: 50, radius: 50, damage: 24, xp: 60,
     color: '#ff3b6b', shape: 'boss', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'chase', spin: 0.8, novaColor: COLORS.danger,
-        abilities: [
-          { label: 'RADIAL BURST', windup: 0.8, cd: 2.4,
-            fire(e, w) { ringBurst(w, e, 16, 200, 12, COLORS.danger, e.spin, 4); w.shake?.(8); } },
-          { label: 'SPAWN SWARM', windup: 0.6, cd: 2.8,
-            fire(e, w) { spawnMinions(w, e, ['swarm', 'drone'], 4); } },
-          { label: 'DEVOUR CHARGE', windup: 0.9, cd: 3.0, aim: true, minPhase: 1,
-            fire(e, w) { lungeAt(e, w, 7); w.audio?.play('edash'); w.shake?.(10); } },
-          { label: 'CRIMSON NOVA', windup: 1.0, cd: 3.2, minPhase: 2,
-            fire(e, w) { novaRings(w, e, 3, 14, 180, 13, COLORS.danger, e.spin); w.shake?.(12); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.devourer); },
   },
 
   // ---- Theme 1 · Azure Sentinels · wave 20 ---------------------------------
@@ -555,25 +719,7 @@ export const BOSS_TYPES = {
   warden: {
     key: 'warden', name: 'The Warden', hp: 2700, speed: 60, radius: 46, damage: 24, xp: 75,
     color: '#51e9ff', shape: 'boss', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'strafe', spin: 2.2, novaColor: COLORS.cryo,
-        ambient(e, dt, w, ph) {
-          e._amT = (e._amT ?? 0.16) - dt;
-          if (e._amT <= 0) { e._amT = ph >= 2 ? 0.1 : 0.16; spiralEmit(w, e, 2, 0.4, 200, 10, COLORS.cryo); }
-        },
-        abilities: [
-          { label: 'FROST WALL', windup: 0.85, cd: 2.6, aim: true,
-            fire(e, w) { wallWithGap(w, e, 13, 1.7, 260, 12, COLORS.cryo); } },
-          { label: 'CROSS SWEEP', windup: 0.8, cd: 2.4,
-            fire(e, w) { ringBurst(w, e, 20, 220, 11, COLORS.cryo, e.spin, 4); ringBurst(w, e, 20, 220, 11, COLORS.shield, e.spin + 0.16, 4); } },
-          { label: 'BLINK STRIKE', windup: 0.7, cd: 2.8, aim: true, minPhase: 1,
-            fire(e, w) { lungeAt(e, w, 6); w.audio?.play('edash'); } },
-          { label: 'GLACIAL NOVA', windup: 1.0, cd: 3.2, minPhase: 2,
-            fire(e, w) { novaRings(w, e, 3, 16, 190, 12, COLORS.cryo, e.spin); w.shake?.(12); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.warden); },
   },
 
   // ---- Theme 2 · Verdant Hive · wave 30 ------------------------------------
@@ -582,25 +728,7 @@ export const BOSS_TYPES = {
   hivequeen: {
     key: 'hivequeen', name: 'The Hive Queen', hp: 3200, speed: 48, radius: 50, damage: 23, xp: 85,
     color: COLORS.invGreen, shape: 'boss', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'hover', spin: 1.0, novaColor: COLORS.invGreen,
-        ambient(e, dt, w, ph) {
-          e._amT = (e._amT ?? 0.7) - dt;
-          if (e._amT <= 0) { e._amT = ph >= 2 ? 0.5 : 0.8; aimedSpread(w, e, 1, 0, 230, 10, COLORS.invGreen); }
-        },
-        abilities: [
-          { label: 'BROOD HATCH', windup: 0.7, cd: 3.4,
-            fire(e, w) { spawnMinions(w, e, ['swarm', 'bomber', 'splitter'], 4); } },
-          { label: 'SPORE RING', windup: 0.85, cd: 2.6,
-            fire(e, w) { ringBurst(w, e, 18, 150, 11, COLORS.invGreen, e.spin, 4.5); } },
-          { label: 'ACID SPREAD', windup: 0.9, cd: 2.8, aim: true,
-            fire(e, w) { aimedSpread(w, e, 7, 0.14, 275, 11, COLORS.invGreen); } },
-          { label: 'HIVE FRENZY', windup: 1.0, cd: 3.6, minPhase: 2,
-            fire(e, w) { spawnMinions(w, e, ['sparkling', 'swarm'], 6); ringBurst(w, e, 16, 180, 12, COLORS.invGreen, e.spin, 4); w.shake?.(10); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.hivequeen); },
   },
 
   // ---- Theme 3 · Amber Legion · wave 40 ------------------------------------
@@ -609,21 +737,7 @@ export const BOSS_TYPES = {
   siegemarshal: {
     key: 'siegemarshal', name: 'The Siege Marshal', hp: 3700, speed: 52, radius: 52, damage: 25, xp: 95,
     color: COLORS.invAmber, shape: 'boss', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'strafe', spin: 1.4, novaColor: COLORS.invAmber,
-        abilities: [
-          { label: 'FLAK WALL', windup: 0.9, cd: 2.6, aim: true,
-            fire(e, w) { wallWithGap(w, e, 15, 1.8, 240, 12, COLORS.invAmber); } },
-          { label: 'ARC BARRAGE', windup: 0.85, cd: 2.8,
-            fire(e, w) { novaRings(w, e, 2, 20, 210, 12, COLORS.invAmber, e.spin); } },
-          { label: 'MORTAR LINE', windup: 0.8, cd: 3.2,
-            fire(e, w) { spawnMinions(w, e, ['mortar'], 2, 110); aimedSpread(w, e, 5, 0.16, 200, 12, COLORS.invAmber); } },
-          { label: 'SIEGE STORM', windup: 1.1, cd: 3.6, minPhase: 2,
-            fire(e, w) { novaRings(w, e, 4, 18, 200, 13, COLORS.invAmber, e.spin); w.shake?.(14); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.siegemarshal); },
   },
 
   // ---- Theme 4 · Void Choir · wave 50 --------------------------------------
@@ -632,25 +746,7 @@ export const BOSS_TYPES = {
   singularis: {
     key: 'singularis', name: 'The Singularis', hp: 4300, speed: 50, radius: 50, damage: 25, xp: 100,
     color: COLORS.void, shape: 'boss', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'hover', spin: 1.2, novaColor: COLORS.void,
-        ambient(e, dt, w, ph) {
-          e._amT = (e._amT ?? 0.14) - dt;
-          if (e._amT <= 0) { e._amT = ph >= 2 ? 0.1 : 0.14; spiralEmit(w, e, 2, 0.42, 200, 12, COLORS.void); }
-        },
-        abilities: [
-          { label: 'COLLAPSE', windup: 0.85, cd: 2.8,
-            fire(e, w) { ringBurst(w, e, 18, 210, 14, COLORS.void, e.spin, 4); spawnMinions(w, e, ['swarm', 'seeder'], 4); w.shake?.(10); } },
-          { label: 'VOID LANCE', windup: 0.9, cd: 2.6, aim: true,
-            fire(e, w) { wallWithGap(w, e, 13, 1.6, 250, 13, COLORS.void); } },
-          { label: 'SINGULAR PULL', windup: 0.9, cd: 3.0, minPhase: 1,
-            fire(e, w) { novaRings(w, e, 2, 18, 195, 13, COLORS.void, e.spin); } },
-          { label: 'EVENT HORIZON', windup: 1.1, cd: 3.4, minPhase: 2,
-            fire(e, w) { novaRings(w, e, 4, 16, 200, 13, COLORS.void, e.spin); w.shake?.(16); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.singularis); },
   },
 
   // ---- Theme 5 · Saucer Armada · wave 60 -----------------------------------
@@ -659,25 +755,7 @@ export const BOSS_TYPES = {
   mothership: {
     key: 'mothership', name: 'The Mothership', hp: 5000, speed: 50, radius: 54, damage: 25, xp: 110,
     color: COLORS.saucer, shape: 'mothership', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'hover', spin: 1.5, novaColor: COLORS.saucer,
-        ambient(e, dt, w, ph) {
-          e._amT = (e._amT ?? 0.6) - dt;
-          if (e._amT <= 0) { e._amT = ph >= 2 ? 0.4 : 0.6; aimedSpread(w, e, 3, 0.18, 250, 12, COLORS.saucer); }
-        },
-        abilities: [
-          { label: 'SPIRAL SWEEP', windup: 0.85, cd: 2.6,
-            fire(e, w) { ringBurst(w, e, 24, 210, 11, COLORS.shock, e.spin, 4); } },
-          { label: 'SUMMON FLEET', windup: 0.7, cd: 3.2,
-            fire(e, w) { spawnMinions(w, e, ['squid', 'crab', 'ufo'], 5); } },
-          { label: 'BEAM WALL', windup: 0.9, cd: 2.8, aim: true,
-            fire(e, w) { wallWithGap(w, e, 15, 1.7, 250, 12, COLORS.saucer); } },
-          { label: 'ARMADA', windup: 1.0, cd: 3.6, minPhase: 2,
-            fire(e, w) { spawnMinions(w, e, ['ufo', 'sparkling'], 6); ringBurst(w, e, 18, 200, 12, COLORS.saucer, e.spin, 4); w.shake?.(12); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.mothership); },
   },
 
   // ---- Theme 6 · Spectral Shoal · wave 70 ----------------------------------
@@ -686,29 +764,7 @@ export const BOSS_TYPES = {
   phantom: {
     key: 'phantom', name: 'The Phantom', hp: 5400, speed: 72, radius: 48, damage: 26, xp: 120,
     color: COLORS.invMagenta, shape: 'boss', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'strafe', spin: 2.4, novaColor: COLORS.invMagenta,
-        abilities: [
-          { label: 'PHASE SHIFT', windup: 0.7, cd: 2.4,
-            fire(e, w) {
-              const ang = rand() * TAU, rr = 320;
-              e.x = w.player.x + Math.cos(ang) * rr; e.y = w.player.y + Math.sin(ang) * rr;
-              e.vx = 0; e.vy = 0;
-              w.particles?.burst(e.x, e.y, COLORS.invMagenta, 24, { speed: 260, life: 0.5, size: 4, budget: 480 });
-              w.shake?.(8);
-            } },
-          { label: 'SPECTRAL WALL', windup: 0.85, cd: 2.6, aim: true,
-            fire(e, w) { wallWithGap(w, e, 13, 1.6, 270, 13, COLORS.invMagenta); } },
-          { label: 'GHOST LANCE', windup: 0.8, cd: 2.4, aim: true,
-            fire(e, w) { aimedSpread(w, e, 5, 0.1, 340, 13, COLORS.invMagenta); } },
-          { label: 'HAUNT', windup: 0.9, cd: 3.2, minPhase: 1,
-            fire(e, w) { spawnMinions(w, e, ['weaver'], 3); } },
-          { label: 'SPECTRAL NOVA', windup: 1.0, cd: 3.4, minPhase: 2,
-            fire(e, w) { novaRings(w, e, 3, 16, 200, 13, COLORS.invMagenta, e.spin); w.shake?.(12); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.phantom); },
   },
 
   // ---- Theme 7 · Glacier Maw · wave 80 -------------------------------------
@@ -717,25 +773,7 @@ export const BOSS_TYPES = {
   cryoleviathan: {
     key: 'cryoleviathan', name: 'The Cryo Leviathan', hp: 6400, speed: 42, radius: 58, damage: 27, xp: 135,
     color: COLORS.cryo, shape: 'boss', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'hover', spin: 0.8, novaColor: COLORS.cryo,
-        ambient(e, dt, w, ph) {
-          e._amT = (e._amT ?? 0.2) - dt;
-          if (e._amT <= 0) { e._amT = ph >= 2 ? 0.14 : 0.2; spiralEmit(w, e, 1, 0.5, 175, 10, COLORS.cryo); }
-        },
-        abilities: [
-          { label: 'GLACIER NOVA', windup: 0.95, cd: 2.8,
-            fire(e, w) { novaRings(w, e, 3, 18, 190, 13, COLORS.cryo, e.spin); } },
-          { label: 'ICE WALL', windup: 0.95, cd: 2.8, aim: true,
-            fire(e, w) { wallWithGap(w, e, 17, 1.9, 230, 13, COLORS.cryo); } },
-          { label: 'FROST BROOD', windup: 0.8, cd: 3.2,
-            fire(e, w) { spawnMinions(w, e, ['frostling', 'octopus'], 4); } },
-          { label: 'ABSOLUTE ZERO', windup: 1.2, cd: 3.8, minPhase: 2,
-            fire(e, w) { novaRings(w, e, 4, 20, 200, 14, COLORS.cryo, e.spin); w.shake?.(18); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.cryoleviathan); },
   },
 
   // ---- Theme 8 · Plasma Storm · wave 90 ------------------------------------
@@ -744,25 +782,7 @@ export const BOSS_TYPES = {
   stormherald: {
     key: 'stormherald', name: 'The Storm Herald', hp: 6900, speed: 64, radius: 52, damage: 27, xp: 145,
     color: COLORS.shock, shape: 'boss', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'strafe', spin: 2.6, novaColor: COLORS.shock,
-        ambient(e, dt, w, ph) {
-          e._amT = (e._amT ?? 0.4) - dt;
-          if (e._amT <= 0) { e._amT = ph >= 2 ? 0.26 : 0.4; aimedSpread(w, e, 2, 0.14, 300, 11, COLORS.shock); }
-        },
-        abilities: [
-          { label: 'CHAIN STORM', windup: 0.8, cd: 2.4,
-            fire(e, w) { novaRings(w, e, 2, 22, 250, 12, COLORS.shock, e.spin); } },
-          { label: 'THUNDER WALL', windup: 0.8, cd: 2.4, aim: true,
-            fire(e, w) { wallWithGap(w, e, 15, 1.7, 300, 13, COLORS.shock); } },
-          { label: 'STATIC FIELD', windup: 0.8, cd: 3.0,
-            fire(e, w) { spawnMinions(w, e, ['sparkling', 'orbiter'], 5); } },
-          { label: 'OVERLOAD', windup: 1.0, cd: 3.4, minPhase: 2,
-            fire(e, w) { novaRings(w, e, 4, 18, 240, 13, COLORS.shock, e.spin); w.shake?.(14); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.stormherald); },
   },
 
   // ---- Theme 9 · Dread Nemesis · wave 100 ----------------------------------
@@ -772,27 +792,7 @@ export const BOSS_TYPES = {
   nemesis: {
     key: 'nemesis', name: 'The Nemesis', hp: 9000, speed: 60, radius: 58, damage: 28, xp: 200,
     color: COLORS.invRed, shape: 'boss', boss: true, massive: true,
-    update(e, dt, world) {
-      bossThink(e, dt, world, {
-        move: 'strafe', spin: 3.0, novaColor: COLORS.white,
-        ambient(e, dt, w, ph) {
-          e._amT = (e._amT ?? 0.14) - dt;
-          if (e._amT <= 0) { e._amT = ph >= 2 ? 0.1 : 0.14; spiralEmit(w, e, 3, 0.36, 210, 12, COLORS.danger); }
-        },
-        abilities: [
-          { label: 'OMEGA WALL', windup: 0.85, cd: 2.4, aim: true,
-            fire(e, w) { wallWithGap(w, e, 19, 2.0, 280, 14, COLORS.danger); } },
-          { label: 'ANNIHILATE', windup: 0.9, cd: 2.6,
-            fire(e, w) { novaRings(w, e, 4, 20, 210, 14, COLORS.danger, e.spin); w.shake?.(12); } },
-          { label: 'LEGION', windup: 0.8, cd: 3.2,
-            fire(e, w) { spawnMinions(w, e, ['dasher', 'weaver', 'mortar', 'bomber'], 6); } },
-          { label: 'CRIMSON LANCE', windup: 0.8, cd: 3.0, aim: true, minPhase: 1,
-            fire(e, w) { aimedSpread(w, e, 7, 0.12, 360, 14, COLORS.danger); lungeAt(e, w, 5); w.audio?.play('edash'); } },
-          { label: 'FINAL JUDGMENT', windup: 1.2, cd: 4.0, minPhase: 2,
-            fire(e, w) { novaRings(w, e, 5, 22, 220, 15, COLORS.danger, e.spin); spawnMinions(w, e, ['sentinel'], 2, 120); w.shake?.(20); } },
-        ],
-      });
-    },
+    update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.nemesis); },
   },
 };
 
