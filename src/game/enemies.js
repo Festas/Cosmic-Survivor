@@ -57,34 +57,34 @@ export const ENEMY_TYPES = {
         const a = angleTo(e.x, e.y, world.player.x, world.player.y) + Math.PI / 2;
         steerTo(e, e.x + Math.cos(a) * 40, e.y + Math.sin(a) * 40, dt, 0.6);
       }
-      e.shootT = (e.shootT || randRange(0, 2)) - dt;
-      if (e.shootT <= 0 && d < 520) {
-        e.shootT = 2.2;
-        fireAt(world, e, world.player.x, world.player.y, 260, e.damage, 7, '#8affc1');
+      e.shootT = (e.shootT || randRange(0, 1.6)) - dt;
+      if (e.shootT <= 0 && d < 560) {
+        e.shootT = 1.7;
+        fireAt(world, e, world.player.x, world.player.y, 310, e.damage, 7, '#8affc1');
         world.audio?.play('espit');
       }
     },
   },
   dasher: {
-    key: 'dasher', name: 'Stalker', hp: 30, speed: 82, radius: 14, damage: 13, xp: 2,
+    key: 'dasher', name: 'Stalker', hp: 30, speed: 82, radius: 14, damage: 14, xp: 2,
     color: '#ff3df0', shape: 'arrow',
     update(e, dt, world) {
       e.state = e.state || 'approach';
-      e.timer = (e.timer ?? randRange(1, 3)) - dt;
+      e.timer = (e.timer ?? randRange(0.8, 2.2)) - dt;
       const d = dist(e.x, e.y, world.player.x, world.player.y);
       if (e.state === 'approach') {
-        steerTo(e, world.player.x, world.player.y, dt, 0.8);
-        if (e.timer <= 0 && d < 420) { e.state = 'windup'; e.timer = 0.45; }
+        steerTo(e, world.player.x, world.player.y, dt, 0.85);
+        if (e.timer <= 0 && d < 460) { e.state = 'windup'; e.timer = 0.38; }
       } else if (e.state === 'windup') {
         e.vx *= 0.8; e.vy *= 0.8;
         if (e.timer <= 0) {
           const a = angleTo(e.x, e.y, world.player.x, world.player.y);
-          e.vx = Math.cos(a) * e.speed * 5.5;
-          e.vy = Math.sin(a) * e.speed * 5.5;
-          e.state = 'dash'; e.timer = 0.32; world.audio?.play('edash');
+          e.vx = Math.cos(a) * e.speed * 6;
+          e.vy = Math.sin(a) * e.speed * 6;
+          e.state = 'dash'; e.timer = 0.34; world.audio?.play('edash');
         }
       } else if (e.state === 'dash') {
-        if (e.timer <= 0) { e.state = 'approach'; e.timer = randRange(1.4, 2.6); }
+        if (e.timer <= 0) { e.state = 'approach'; e.timer = randRange(1, 2); }
       }
     },
   },
@@ -137,10 +137,10 @@ export const ENEMY_TYPES = {
       const tx = world.player.x + Math.cos(perp) * Math.sin(e.march) * 110;
       const ty = world.player.y + Math.sin(perp) * Math.sin(e.march) * 110;
       steerTo(e, tx, ty, dt, 0.95);
-      e.shootT = (e.shootT ?? randRange(1.2, 2.8)) - dt;
-      if (e.shootT <= 0 && dist(e.x, e.y, world.player.x, world.player.y) < 560) {
-        e.shootT = randRange(2.2, 3.4);
-        fireAt(world, e, world.player.x, world.player.y, 240, e.damage, 7, COLORS.invGreen);
+      e.shootT = (e.shootT ?? randRange(1, 2.2)) - dt;
+      if (e.shootT <= 0 && dist(e.x, e.y, world.player.x, world.player.y) < 600) {
+        e.shootT = randRange(1.6, 2.6);
+        fireAt(world, e, world.player.x, world.player.y, 285, e.damage, 7, COLORS.invGreen);
         world.audio?.play('espit');
       }
     },
@@ -157,10 +157,17 @@ export const ENEMY_TYPES = {
         const a = angleTo(e.x, e.y, world.player.x, world.player.y) + Math.PI / 2;
         steerTo(e, e.x + Math.cos(a) * 80, e.y + Math.sin(a) * 80, dt, 0.8);
       }
-      e.beamT = (e.beamT ?? randRange(1, 2.4)) - dt;
-      if (e.beamT <= 0 && d < 640) {
-        e.beamT = 2;
-        fireAt(world, e, world.player.x, world.player.y, 300, e.damage, 7, COLORS.invRed);
+      e.beamT = (e.beamT ?? randRange(0.8, 2)) - dt;
+      if (e.beamT <= 0 && d < 680) {
+        e.beamT = 1.5;
+        const a = angleTo(e.x, e.y, world.player.x, world.player.y);
+        for (let k = -1; k <= 1; k += 2) {
+          const aa = a + k * 0.09;
+          world.enemyBullets.push({
+            x: e.x, y: e.y, vx: Math.cos(aa) * 330, vy: Math.sin(aa) * 330,
+            r: 7, dmg: e.damage, life: 4, color: COLORS.invRed,
+          });
+        }
         world.audio?.play('espit');
       }
     },
@@ -171,16 +178,16 @@ export const ENEMY_TYPES = {
     color: COLORS.invMagenta, shape: 'octopus',
     update(e, dt, world) {
       steerTo(e, world.player.x, world.player.y, dt, 0.7);
-      e.volleyT = (e.volleyT ?? randRange(1.6, 3)) - dt;
+      e.volleyT = (e.volleyT ?? randRange(1.2, 2.4)) - dt;
       const d = dist(e.x, e.y, world.player.x, world.player.y);
-      if (e.volleyT <= 0 && d < 560) {
-        e.volleyT = 3.4;
+      if (e.volleyT <= 0 && d < 600) {
+        e.volleyT = 2.6;
         const a = angleTo(e.x, e.y, world.player.x, world.player.y);
-        for (let k = -1; k <= 1; k++) {
-          const aa = a + k * 0.26;
+        for (let k = -2; k <= 2; k++) {
+          const aa = a + k * 0.22;
           world.enemyBullets.push({
-            x: e.x, y: e.y, vx: Math.cos(aa) * 230, vy: Math.sin(aa) * 230,
-            r: 8, dmg: e.damage, life: 3.4, color: COLORS.invMagenta,
+            x: e.x, y: e.y, vx: Math.cos(aa) * 265, vy: Math.sin(aa) * 265,
+            r: 8, dmg: e.damage, life: 3.6, color: COLORS.invMagenta,
           });
         }
         world.audio?.play('espit');
@@ -203,15 +210,15 @@ export const ENEMY_TYPES = {
         const a = angleTo(e.x, e.y, world.player.x, world.player.y) + Math.PI / 2;
         steerTo(e, e.x + Math.cos(a) * 50, e.y + Math.sin(a) * 50, dt, 0.6);
       }
-      e.sowT = (e.sowT ?? randRange(1.4, 2.6)) - dt;
-      if (e.sowT <= 0 && d < 520) {
-        e.sowT = 3.2;
-        const n = 2;
+      e.sowT = (e.sowT ?? randRange(1.2, 2.2)) - dt;
+      if (e.sowT <= 0 && d < 560) {
+        e.sowT = 2.6;
+        const n = 3;
         for (let i = 0; i < n; i++) {
           const a = (i / n) * TAU + rand() * 0.5;
           world.enemyBullets.push({
-            x: e.x, y: e.y, vx: Math.cos(a) * 55, vy: Math.sin(a) * 55,
-            r: 9, dmg: e.damage, life: 2.8, color: '#7bdcb5',
+            x: e.x, y: e.y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60,
+            r: 9, dmg: e.damage, life: 3, color: '#7bdcb5',
           });
         }
         world.audio?.play('espit');
@@ -226,10 +233,10 @@ export const ENEMY_TYPES = {
     color: COLORS.invAmber, shape: 'hex', massive: true,
     update(e, dt, world) {
       steerTo(e, world.player.x, world.player.y, dt, 0.45);
-      e.burstT = (e.burstT ?? randRange(1.8, 3)) - dt;
-      if (e.burstT <= 0 && dist(e.x, e.y, world.player.x, world.player.y) < 620) {
-        e.burstT = 3.6;
-        ringBurst(world, e, 7, 170, Math.round(e.damage * 0.7), COLORS.invAmber, e.spin, 4);
+      e.burstT = (e.burstT ?? randRange(1.4, 2.4)) - dt;
+      if (e.burstT <= 0 && dist(e.x, e.y, world.player.x, world.player.y) < 680) {
+        e.burstT = 2.8;
+        ringBurst(world, e, 10, 200, Math.round(e.damage * 0.7), COLORS.invAmber, e.spin, 4);
         world.audio?.play('bossfire');
       }
     },

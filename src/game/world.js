@@ -249,9 +249,9 @@ export class World {
     if (this.elapsed >= 70) roster.push('octopus');
     if (roster.length === 0) roster.push('swarm');
     // Wave size and arm count both grow with elapsed time.
-    const arms = this.elapsed >= 150 ? 3 : this.elapsed >= 70 ? 2 : 1;
-    const perArm = 5 + Math.floor(this.elapsed / 30); // grows over the run
-    let budget = Math.min(room, arms * perArm, 26); // hard cap protects frame budget
+    const arms = this.elapsed >= 130 ? 3 : this.elapsed >= 60 ? 2 : 1;
+    const perArm = 5 + Math.floor(this.elapsed / 24); // grows over the run
+    let budget = Math.min(room, arms * perArm, 30); // hard cap protects frame budget
     const baseDir = this.rng() * TAU;
     const gap = 58;
     for (let arm = 0; arm < arms && budget > 0; arm++) {
@@ -312,10 +312,10 @@ export class World {
     // via spawnFormation's "INVADERS INCOMING" text so the pressure stays fair.
     this.formationTimer -= dt;
     if (this.formationTimer <= 0) {
-      // Cadence tightens over the run: ~18-26s early, down to ~8-12s late game.
-      const base = Math.max(8, 20 - this.elapsed / 25);
-      this.formationTimer = base + this.rng() * 6;
-      if (this.elapsed >= 18) this.spawnFormation();
+      // Cadence tightens over the run: ~16-22s early, down to ~6-10s late game.
+      const base = Math.max(6, 16 - this.elapsed / 22);
+      this.formationTimer = base + this.rng() * 5;
+      if (this.elapsed >= 14) this.spawnFormation();
     }
   }
 

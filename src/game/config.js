@@ -115,27 +115,30 @@ export const COMBO = {
 };
 
 // Difficulty director scaling. Pure functions of elapsed seconds.
+// Tuned for a markedly steeper curve — the swarm gets denser, faster, tankier
+// and harder-hitting sooner, so runs stop feeling like a cakewalk past the
+// opening minute while the first ~30s stay gentle enough to onboard.
 export const DIRECTOR = {
   // enemies alive cap grows over time
-  baseCap: 26,
-  capPerMin: 22,
-  capMax: 200,
+  baseCap: 30,
+  capPerMin: 28,
+  capMax: 260,
   // spawn interval shrinks over time
-  spawnStart: 1.1,
-  spawnMin: 0.14,
-  spawnHalfLife: 85, // seconds for interval to approach min
+  spawnStart: 0.9,
+  spawnMin: 0.11,
+  spawnHalfLife: 68, // seconds for interval to approach min
   // global enemy stat scaling
   hpStart: 1,
-  hpPerMin: 0.56,
-  speedPerMin: 0.06,
-  speedMax: 1.85,
+  hpPerMin: 0.75,
+  speedPerMin: 0.085,
+  speedMax: 2.05,
   // enemy damage scaling over time — rank-and-file hits get harder so late-game
   // crowds stay threatening (bosses keep their hand-tuned per-pattern damage).
   dmgStart: 1,
-  dmgPerMin: 0.2,
-  dmgMax: 2.6,
+  dmgPerMin: 0.3,
+  dmgMax: 3.1,
   // boss cadence
-  bossEvery: 60, // seconds
+  bossEvery: 54, // seconds
 };
 
 // Elite affix. A growing fraction of mid-tier+ spawns are promoted to tougher,
@@ -143,14 +146,14 @@ export const DIRECTOR = {
 // the late game threatening without adding new archetypes — they are just beefed
 // up versions of the existing roster, so they never hurt readability.
 export const ELITE = {
-  unlock: 75, // seconds before any elite can appear
-  chanceStart: 0.02,
-  chancePerMin: 0.05,
-  chanceMax: 0.22,
-  hpMul: 2.6, // elites are spongy — a real speed bump, not a one-shot
-  damageMul: 1.4,
+  unlock: 55, // seconds before any elite can appear
+  chanceStart: 0.045,
+  chancePerMin: 0.075,
+  chanceMax: 0.32,
+  hpMul: 2.85, // elites are spongy — a real speed bump, not a one-shot
+  damageMul: 1.5,
   radiusMul: 1.25, // visibly larger so the threat reads at a glance
-  speedMul: 0.9, // slightly heavier/slower than their base archetype
+  speedMul: 0.92, // slightly heavier/slower than their base archetype
   xpMul: 3, // worth chasing: they drop a richer burst of XP orbs
   ring: COLORS.gold, // elite marker ring colour
 };
