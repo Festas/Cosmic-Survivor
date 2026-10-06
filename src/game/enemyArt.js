@@ -252,14 +252,16 @@ function detailBlocky(ctx, shape, r, accent, eye) {
 // Flying saucers: a lit canopy/command dome and a row of running lights along the
 // hull rim — the classic "glowing UFO" read.
 function detailSaucer(ctx, shape, r, accent, highlight, eye) {
-  // Canopy glow.
+  // Canopy glow — matches the dome ellipse proportions from enemyPath so the
+  // highlight fills the actual canopy rather than a mismatched circle.
   const domeY = shape === 'mothership' ? -r * 0.18 : -r * 0.1;
-  const domeR = shape === 'mothership' ? r * 0.5 : r * 0.45;
+  const domeRX = shape === 'mothership' ? r * 0.52 : r * 0.5;
+  const domeRY = shape === 'mothership' ? r * 0.5 : r * 0.45;
   ctx.save();
-  ctx.beginPath(); ctx.ellipse(0, domeY, domeR * 0.9, domeR * 0.9, 0, 0, TAU);
+  ctx.beginPath(); ctx.ellipse(0, domeY, domeRX * 0.9, domeRY * 0.9, 0, 0, TAU);
   ctx.clip();
   ctx.fillStyle = withAlpha(highlight, 0.9);
-  ctx.beginPath(); ctx.ellipse(0, domeY, domeR, domeR, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, domeY, domeRX, domeRY, 0, 0, TAU); ctx.fill();
   ctx.restore();
   lamp(ctx, 0, domeY, Math.max(1.6, r * 0.16), eye);
 
