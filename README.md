@@ -1,8 +1,12 @@
 # 🌌 Cosmic Survivor
 
-A fast, juicy **top-down space survivor-roguelite**. Pilot a lone starfighter against
-endless swarms of the Devourer's brood, auto-firing while you weave through bullet-hell
-chaos. Survive, level up, and draft game-warping upgrades — then do it all again, better.
+A fast, juicy **top-down space survivor-roguelite** with an **OG alien-invaders** heart and
+**Vampire Survivors × Brotato × Binding of Isaac** build-craft. Pilot a lone starfighter
+against endless invader swarms, auto-firing a growing **arsenal** while you weave through
+bullet-hell chaos. Survive, level up, draft game-warping weapons and items, **evolve** them
+into legendary forms, and ride the **Overdrive** meter to a screen-clearing rampage — then
+bank **Stardust** to permanently **ascend**, unlock new **starfighters**, dial up optional
+**Directives** and collect **Commendations** between runs.
 
 Built from scratch as a **zero-dependency** project: vanilla JavaScript ES modules,
 HTML5 Canvas 2D, and fully procedural WebAudio. No frameworks, no build step, no bundler.
@@ -41,6 +45,86 @@ already-afflicted enemy triggers a **Resonance reaction**:
 
 Stack *Resonance Cascade* to make every reaction hit even harder.
 
+### 🔆 Overdrive
+Every kill stokes the **Overdrive meter**, and chaining kills on a hot combo fills it
+faster. When it tops out, your ship enters a short **rampage**: dramatically faster
+cooldowns and bonus damage across your whole arsenal. *Overdrive Reactor* builds the meter
+quicker and extends the rampage.
+
+---
+
+## 🛠 The Hangar — permanent progression
+
+Every run now feeds a persistent meta-layer, so you grow stronger even when you lose.
+
+### ✦ Stardust
+Finish a run and you bank **Stardust**, scaled by your score, survival time, kills, level
+and bosses downed (the *Salvage Rig* upgrade multiplies the haul). Spend it in the
+**Hangar**, reachable from the start and game-over screens.
+
+### 🌟 Ascension
+A tree of **12 permanent upgrades** bought with Stardust — more max HP, damage, move speed,
+armor, regen, crit, attack speed, XP & pickup range, luck, Singularity charge, Stardust
+gain, and the capstone **Phoenix Protocol**, which revives you once per run at half HP with
+a clearing nova. Levels persist forever and layer on top of your ship and in-run drafts.
+
+### 🚀 Starfighters
+Pick from **6 ships**, each a distinct build identity with its own starter weapon, stat
+profile and accent colour:
+
+| Ship | Style | Starter | Identity |
+| ---- | ----- | ------- | -------- |
+| 🛸 **Vanguard** | Balanced all-rounder | Ion Blaster | No weaknesses (free) |
+| 🗡️ **Striker** | Glass cannon | Scatter Array | +damage & crit, less HP |
+| 🛡️ **Juggernaut** | Fortress | Pulse Nova | +HP/armor/knockback, slower |
+| ⚡ **Tempest** | Blitz | Arc Coil | +speed & haste, fragile |
+| 🔥 **Pyre** | Pyromancer | Missile Pod | Fire imbue + explosions |
+| 🌀 **Oracle** | Voidcaller | Graviton Mortar | Void imbue + supercharged Singularity |
+
+Ships beyond the Vanguard are unlocked permanently with Stardust.
+
+### 🎲 Directives
+Opt-in **challenge modifiers** toggled in the Hangar before a run. Each makes the run harder
+in some dimension — tougher or faster enemies, denser swarms, a fragile hull, bulkier bosses,
+slower leveling — and in return **multiplies the Stardust** you earn. Directives **stack**, so
+their reward multipliers compound: a bigger gamble pays out more. Your selection is remembered
+across runs and shown on the start screen and HUD.
+
+### 🏅 Commendations
+Permanent **milestone awards** earned by hitting thresholds in a single run (survive 10 minutes,
+1,000 points of score, level 20, a 3-boss run, 60 reactions…) or across your whole career
+(1,000 kills, 10 bosses, unlock every ship, finish with 4 Directives…). Each pays a one-time
+**Stardust bounty** and pops a toast when unlocked. Track them all in the Hangar's **Codex** tab.
+
+---
+
+## 🔫 Arsenal, evolutions & items
+
+Instead of a single gun, you build a **loadout of up to 6 auto-firing weapons** (Vampire
+Survivors style). Each weapon levels up independently, and when a weapon is **maxed** and you
+own the passive it craves, it **evolves** into a legendary form:
+
+| Base weapon        | Evolves into        | Requires                         |
+| ------------------ | ------------------- | -------------------------------- |
+| Ion Blaster        | **Photon Storm**    | Targeting Array (homing)         |
+| Scatter Array      | **Flak Cannon**     | high crit chance                 |
+| Arc Coil           | **Tesla Web**       | Tesla Rounds (shock imbue)       |
+| Missile Pod        | **Swarm Barrage**   | Volatile Payload (explosive)     |
+| Pulse Nova         | **Nova Collapse**   | large blast radius               |
+| Rail Lance         | **Void Lance**      | Void Rounds or heavy pierce      |
+| Graviton Mortar    | **Cluster Swarm**   | Volatile Payload (explosive)     |
+| Halo Launcher      | **Corona Burst**    | Split Barrel ×2 (+projectiles)   |
+| Arc Whip           | **Rift Reaver**     | Vampiric Circuit (lifesteal)     |
+
+**Passive items** are shared stat augments — damage, crit, haste, pierce, elemental imbues,
+drones, lifesteal, armor and more — that buff *every* weapon and ability at once, so builds
+snowball through synergy. Items come in four rarities (**Common → Rare → Epic → Legendary**)
+with stack caps, and some are gated behind what you already own.
+
+Each **level-up** offers a mix of draft cards — a brand-new weapon, a weapon upgrade, a rare
+**EVOLVE**, or a passive item — weighted by rarity (boost your odds with *Lucky Core*). Don't
+like the hand? **Reroll** it, or **Banish** a card to remove it from the run for good.
+
 ---
 
 ## 🎮 Controls
@@ -52,10 +136,12 @@ Stack *Resonance Cascade* to make every reaction hit even harder.
 | Deploy Singularity | `Shift` / `E` / `J`   | Singularity button        |
 | Pause            | `Esc` / `P`             | —                         |
 | Pick upgrade     | `1` `2` `3` or click    | Tap a card                |
+| Reroll draft     | `R` (on level-up)       | Reroll button             |
+| Banish card      | `B` (on level-up)       | Banish button             |
 | Restart          | `R` (on game over)      | Retry button              |
 
-Your weapon **auto-fires at the nearest enemy** — focus on positioning, dodging, and when
-to spend your Singularity.
+Your arsenal **auto-fires at the nearest enemy** — focus on positioning, dodging, building
+synergies, and when to spend your Singularity and Overdrive.
 
 ---
 
@@ -119,13 +205,18 @@ src/
     audio.js          #   procedural WebAudio SFX + music
     particles.js      #   pooled particle system
     camera.js         #   follow + screen-shake
-    storage.js        #   high scores & settings (localStorage)
+    storage.js        #   high scores, settings, Stardust & unlocks (localStorage)
   game/               # The game itself
     config.js         #   tuning constants + difficulty curves (pure)
     elements.js       #   Resonance elements & reactions (pure)
-    upgrades.js       #   upgrade pool & draft logic (pure)
+    weapons.js        #   weapon arsenal, evolutions & firing (pure)
+    upgrades.js       #   level-up draft: weapons, evolves & items (pure)
+    meta.js           #   permanent Ascension upgrades & Stardust (pure)
+    ships.js          #   playable starfighter catalogue (pure)
+    modifiers.js      #   Directives: opt-in challenge modifiers (pure)
+    achievements.js   #   Commendations: milestone awards (pure)
     enemies.js        #   enemy/boss definitions & behaviors
-    player.js         #   the ship: movement, firing, dash, singularity
+    player.js         #   the ship: movement, arsenal firing, dash, overdrive
     world.js          #   simulation + rendering orchestrator
     background.js     #   parallax starfield & nebula
 tools/                # Zero-dep dev server, build, and check scripts
@@ -133,15 +224,19 @@ tests/                # Unit tests for the pure game logic
 ```
 
 The modules in `engine/utils.js` and the `game/` data modules (`config`, `elements`,
-`upgrades`, `enemies`) are intentionally **DOM-free and pure**, which keeps the core game
-logic unit-testable in plain Node.
+`weapons`, `upgrades`, `meta`, `ships`, `modifiers`, `achievements`, `enemies`) are
+intentionally **DOM-free and pure**, which keeps the core game logic unit-testable in plain
+Node.
 
 ---
 
 ## 🧪 Testing
 
 - **Unit tests** (`npm test`) cover the deterministic logic: RNG determinism, difficulty
-  scaling, XP curves, elemental reactions, and the upgrade draft.
+  scaling, XP curves, elemental reactions, the weapon arsenal (defs, leveling, evolutions),
+  the level-up draft (weapons, evolves, items, reroll/banish gating), the meta-progression
+  (Ascension costs, bonus aggregation, Stardust rewards), the starfighter catalogue, the
+  Directives (difficulty/economy folding) and the Commendations (threshold checks).
 - The rendering/input layers are verified by running the game in a real browser.
 
 ---

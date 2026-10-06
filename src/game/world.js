@@ -15,19 +15,29 @@ import { Player } from './player.js';
 import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize } from './enemies.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
 import { draftUpgrades } from './upgrades.js';
+import { weaponDef, addOrLevelWeapon, evolveWeapon, createWeaponInst } from './weapons.js';
 import { Background } from './background.js';
+import { shipById, DEFAULT_SHIP_ID } from './ships.js';
+import { computeMetaBonus, createMetaBonus, stardustForRun } from './meta.js';
+import { computeDirectiveEffect, createDirectiveEffect } from './modifiers.js';
 
 // Lightweight uniform spatial grid for enemy broad-phase queries.
 // Cells are addressed with packed integer keys (instead of string keys) to cut
 // allocation/GC and speed up Map lookups on the hot query path.
 class Grid {
-  constructor(cell) { this.cell = cell; this.inv = 1 / cell; this.map = new Map(); }
-  clear() { this.map.clear(); }
+  constructor(cell) { this.cell = cell; this.inv = 1 / cell; this.map = new Map(); this._pool = []; }
+  // Salvage the per-cell arrays into a freelist instead of dropping them, so the
+  // every-step rebuild stops minting garbage arrays (a measurable GC cost when
+  // 150+ enemies are on screen during boss waves).
+  clear() {
+    for (const a of this.map.values()) { a.length = 0; this._pool.push(a); }
+    this.map.clear();
+  }
   insert(e) {
     const cx = Math.floor(e.x * this.inv), cy = Math.floor(e.y * this.inv);
     const k = (cx + 0x8000) * 0x10000 + (cy + 0x8000);
     let a = this.map.get(k);
-    if (!a) { a = []; this.map.set(k, a); }
+    if (!a) { a = this._pool.pop() || []; this.map.set(k, a); }
     a.push(e);
   }
   query(x, y, r, out) {
@@ -59,12 +69,32 @@ export class World {
     this.background = new Background();
     this.grid = new Grid(80);
     this._q = [];
+    // Floating damage numbers are pooled and merged (see addDamageText): during a
+    // boss fight the player can land hundreds of hits/second, and spawning a fresh
+    // rising number per hit was a major render + GC cost.
+    this._textPool = [];
+    this.maxTexts = 160;
 
     this.reset();
   }
 
-  reset() {
+  reset(config = {}) {
     this.player = new Player();
+    // Apply the chosen ship identity and persistent meta bonuses to the fresh
+    // loadout before anything reads it. Ship first (swaps starter weapon + gives
+    // its stat identity), then meta on top, then derive hp from the final maxHp.
+    this.shipId = config.shipId || DEFAULT_SHIP_ID;
+    this.metaBonus = config.metaLevels ? computeMetaBonus(config.metaLevels)
+      : (config.metaBonus || createMetaBonus());
+    // Active challenge directives fold into one difficulty/economy effect object
+    // that spawn, damage, XP and reward code read. Neutral (all 1s) when none set.
+    this.directives = Array.isArray(config.directives) ? config.directives.slice() : [];
+    this.diff = this.directives.length ? computeDirectiveEffect(this.directives)
+      : createDirectiveEffect();
+    this.applyLoadout(this.player, this.shipId, this.metaBonus);
+    // Directive XP modifier layers on top of the loadout's xpMul.
+    this.player.stats.xpMul *= this.diff.xpMul;
+
     this.camera.x = this.player.x;
     this.camera.y = this.player.y;
     this.enemies = [];
@@ -78,12 +108,16 @@ export class World {
 
     this.elapsed = 0;
     this.spawnTimer = 0.6;
+    this.formationTimer = 22;
     this.nextBossAt = DIRECTOR.bossEvery;
     this.bossActive = null;
     this.bossWarn = 0;
 
     this.score = 0;
     this.kills = 0;
+    this.bossKills = 0;
+    this.reactions = 0;
+    this.revives = this.metaBonus.revives || 0;
     this.streak = 0;
     this.comboTimer = 0;
     this.level = 1;
@@ -102,6 +136,34 @@ export class World {
     this.flash = 0;
   }
 
+  // Configure a fresh player with a ship identity + persistent meta bonus.
+  applyLoadout(player, shipId, bonus) {
+    const ship = shipById(shipId);
+    const s = player.stats;
+    // Ship starter weapon (replaces the default Ion Blaster when different).
+    if (ship.weapon && ship.weapon !== 'ion') {
+      player.weapons = [createWeaponInst(ship.weapon)];
+    }
+    // Ship identity modifiers, then permanent meta bonuses layered on top.
+    ship.apply(s);
+    s.maxHp += bonus.maxHpAdd;
+    s.weaponDamageMul *= bonus.damageMul;
+    s.moveSpeed *= bonus.moveSpeedMul;
+    s.armor += bonus.armorAdd;
+    s.regen += bonus.regenAdd;
+    s.luck = (s.luck || 0) + bonus.luckAdd;
+    s.critChance += bonus.critAdd;
+    s.cooldownMul *= bonus.hasteMul;
+    s.xpMul *= bonus.xpMul;
+    s.pickupRadius *= bonus.pickupMul;
+    s.singularityChargeMul *= bonus.singChargeMul;
+    // Clamp and derive starting HP from the final maxHp.
+    s.maxHp = Math.max(1, Math.round(s.maxHp));
+    player.hp = s.maxHp;
+    player.shipColor = ship.color;
+    player.syncDrones();
+  }
+
   get multiplier() { return comboMultiplier(this.streak); }
   get threat() { return Math.floor(this.elapsed / 30) + 1; }
 
@@ -111,19 +173,24 @@ export class World {
   requestBulletTime(scale, dur) { this.bulletTimeScale = scale; this.bulletTime = Math.max(this.bulletTime, dur); }
 
   // -------------------------------------------------------- spawning
+  // Directive-adjusted concurrent-enemy cap (capMul widens/narrows the budget).
+  capNow() { return Math.floor(enemyCap(this.elapsed) * (this.diff?.capMul || 1)); }
+
   spawnEnemy(typeKey, x, y) {
     const isBoss = !!BOSS_TYPES[typeKey];
     const def = isBoss ? BOSS_TYPES[typeKey] : ENEMY_TYPES[typeKey];
     if (!def) return null;
-    const hpS = hpScale(this.elapsed);
-    const spS = speedScale(this.elapsed);
+    const d = this.diff || createDirectiveEffect();
+    // Bosses use bossHpMul; rank-and-file use the time-based hp curve × hpMul.
+    const hp = isBoss ? def.hp * d.bossHpMul : def.hp * hpScale(this.elapsed) * d.hpMul;
+    const speed = (isBoss ? def.speed : def.speed * speedScale(this.elapsed)) * d.speedMul;
     const e = {
       type: def, key: typeKey, boss: !!def.boss,
       x, y, vx: 0, vy: 0, kx: 0, ky: 0,
-      hp: def.hp * (isBoss ? 1 : hpS),
-      maxHp: def.hp * (isBoss ? 1 : hpS),
+      hp,
+      maxHp: hp,
       radius: def.radius,
-      speed: def.speed * (isBoss ? 1 : spS),
+      speed,
       damage: def.damage,
       xp: def.xp,
       color: def.color,
@@ -149,6 +216,36 @@ export class World {
     return this.spawnEnemy(typeKey, x, y);
   }
 
+  // Occasional "fleet" wave: an evenly-spaced row of invaders that materialises
+  // just outside the viewport on one side, for that classic descending-formation
+  // feel. Strictly bounded by enemyCap so a wave can never blow the enemy budget
+  // (keeps the frame budget safe on later, denser waves).
+  spawnFormation() {
+    const room = this.capNow() - this.enemies.length;
+    if (room < 4) return; // not enough headroom for a meaningful row
+    // Pick an unlocked invader type for the fleet.
+    const roster = [];
+    if (this.elapsed >= 15) roster.push('squid');
+    if (this.elapsed >= 30) roster.push('crab');
+    if (this.elapsed >= 70) roster.push('octopus');
+    if (roster.length === 0) roster.push('swarm');
+    const key = pick(roster, this.rng);
+    const count = Math.min(room, 5 + Math.floor(this.rng() * 4)); // 5-8, budget-capped
+    // Approach direction (which side the fleet comes from) + perpendicular spread.
+    const dir = this.rng() * TAU;
+    const cx = this.player.x + Math.cos(dir) * ((this.viewW / 2) + 200);
+    const cy = this.player.y + Math.sin(dir) * ((this.viewH / 2) + 200);
+    const perp = dir + Math.PI / 2;
+    const gap = 58;
+    for (let i = 0; i < count; i++) {
+      const off = (i - (count - 1) / 2) * gap;
+      const x = clamp(cx + Math.cos(perp) * off, 40, ARENA.w - 40);
+      const y = clamp(cy + Math.sin(perp) * off, 40, ARENA.h - 40);
+      this.spawnEnemy(key, x, y);
+    }
+    this.addText(this.player.x, this.player.y - 110, 'INVADERS INCOMING', COLORS.invGreen, 20);
+  }
+
   updateDirector(dt) {
     // Boss handling
     if (this.bossWarn > 0) {
@@ -172,38 +269,63 @@ export class World {
 
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
-      this.spawnTimer += spawnInterval(this.elapsed);
-      if (this.enemies.length < enemyCap(this.elapsed)) {
+      this.spawnTimer += spawnInterval(this.elapsed) * (this.diff?.spawnMul || 1);
+      if (this.enemies.length < this.capNow()) {
         const key = pickEnemyType(this.elapsed, this.rng);
         const n = packSize(key);
         for (let i = 0; i < n; i++) this.spawnRing(key);
       }
+    }
+
+    // Occasional invader-formation wave, layered on top of the trickle (never
+    // replacing it). Scheduled from formationTimer, initialised in reset().
+    this.formationTimer -= dt;
+    if (this.formationTimer <= 0) {
+      this.formationTimer = 16 + this.rng() * 10; // next wave in ~16-26s
+      if (this.elapsed >= 18) this.spawnFormation();
     }
   }
 
   // -------------------------------------------------------- bullets
   spawnBullet(x, y, angle, opts = {}) {
     const s = this.player.stats;
+    const speed = (opts.speed ?? s.bulletSpeed) * (s.projectileSpeedMul || 1);
     this.bullets.push({
       x, y,
-      vx: Math.cos(angle) * s.bulletSpeed,
-      vy: Math.sin(angle) * s.bulletSpeed,
-      r: opts.drone ? s.bulletRadius * 0.8 : s.bulletRadius,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: opts.radius ?? (opts.drone ? s.bulletRadius * 0.8 : s.bulletRadius),
       dmg: opts.damage ?? s.damage,
       crit: !!opts.crit,
-      pierce: s.pierce,
-      life: s.bulletLife,
-      homing: s.homing,
-      knockback: s.knockback,
+      pierce: opts.pierce ?? s.pierce,
+      life: opts.life ?? s.bulletLife,
+      homing: opts.homing ?? s.homing,
+      knockback: opts.knockback ?? s.knockback,
       hits: null,
       angle,
       drone: !!opts.drone,
+      tint: opts.tint || null,
+      glow: opts.glow || null,
+      explodeR: opts.explodeR || 0,
+      explodeDmg: opts.explodeDmg || 0,
     });
+  }
+
+  // A quick expanding shockwave ring (pure cosmetic) used by AoE weapons. Drawn
+  // with cheap pooled particles so it respects the particle budget during swarms.
+  ring(x, y, radius, color) {
+    const n = Math.min(26, Math.max(10, Math.round(radius / 10)));
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * TAU;
+      this.particles.spawn(x + Math.cos(a) * radius * 0.35, y + Math.sin(a) * radius * 0.35, color, {
+        angle: a, speed: radius * 2.4, life: 0.26, size: 2.5, budget: 420,
+      });
+    }
   }
 
   muzzle(x, y, angle) {
     for (let i = 0; i < 3; i++) {
-      this.particles.spawn(x, y, COLORS.player, { angle: angle + randRange(-0.3, 0.3), speed: 260, life: 0.18, size: 2 });
+      this.particles.spawn(x, y, COLORS.player, { angle: angle + randRange(-0.3, 0.3), speed: 260, life: 0.18, size: 2, budget: 320 });
     }
   }
 
@@ -223,7 +345,7 @@ export class World {
       e.ky += Math.sin(a) * opts.knockback;
     }
     if (opts.text !== false) {
-      this.addText(e.x, e.y - e.radius - 6, String(rounded), opts.crit ? COLORS.gold : (opts.color || COLORS.white), opts.crit ? 20 : 14);
+      this.addDamageText(e, rounded, opts.crit ? COLORS.gold : (opts.color || COLORS.white), opts.crit ? 20 : 14);
     }
     if (opts.crit) this.audio?.play('crit'); else if (opts.source === 'bullet') this.audio?.play('hit');
     // lifesteal
@@ -254,6 +376,12 @@ export class World {
     this.score += points;
     this.player.addCharge(e.boss ? 40 : SINGULARITY.chargePerKill);
 
+    // Overdrive meter: kills stoke the rampage gauge. Combo streak adds a little
+    // extra so chaining kills fills it faster (Brotato/Isaac-style payoff).
+    const odGain = (e.boss ? 34 : (e.massive ? 7 : 2.4)) * (this.player.stats.overdriveRate || 1)
+      * (1 + Math.min(1.2, this.streak * 0.012));
+    this.player.overdrive = Math.min(100, this.player.overdrive + odGain);
+
     // death FX
     const col = e.color;
     this.particles.burst(e.x, e.y, col, e.boss ? 80 : (e.massive ? 26 : 12), { speed: e.boss ? 420 : 220, life: 0.6, size: e.boss ? 4 : 3 });
@@ -281,7 +409,7 @@ export class World {
       this.explode(e.x, e.y, 110, edmg, COLORS.fire);
     }
 
-    if (e.boss) { this.bossActive = null; this.flash = 0.6; this.addText(e.x, e.y - 80, 'BOSS DOWN!', COLORS.gold, 30); }
+    if (e.boss) { this.bossActive = null; this.bossKills++; this.flash = 0.6; this.addText(e.x, e.y - 80, 'BOSS DOWN!', COLORS.gold, 30); }
   }
 
   explode(x, y, r, dmg, color) {
@@ -300,9 +428,10 @@ export class World {
   // reaction descriptor from elements.js resolved spatially here
   applyReaction(r, x, y, source) {
     const mult = this.player.stats.elementMul;
+    this.reactions = (this.reactions || 0) + 1;
     this.addText(x, y - 30, r.name.toUpperCase(), r.color, 18);
     this.audio?.play('reaction');
-    this.particles.burst(x, y, r.color, 24, { speed: 300, life: 0.5, size: 3 });
+    this.particles.burst(x, y, r.color, 12, { speed: 300, life: 0.5, size: 3, budget: 360 });
     this.flash = Math.max(this.flash, 0.18);
     if (r.type === 'burst' || r.type === 'field') {
       this.explodeReaction(x, y, (r.radius || 100), (r.damage || 30) * mult, r.color, r.knockback || 120);
@@ -323,7 +452,7 @@ export class World {
 
   explodeReaction(x, y, r, dmg, color, knock) {
     this.damageEnemiesInRadius(x, y, r, dmg, { source: 'reaction', color, knockback: knock });
-    for (let i = 0; i < 2; i++) this.particles.spawn(x, y, color, { speed: 60, life: 0.4, size: r * 0.12 });
+    for (let i = 0; i < 2; i++) this.particles.spawn(x, y, color, { speed: 60, life: 0.4, size: r * 0.12, budget: 300 });
   }
 
   chainLightning(x, y, jumps, dmg, radius, origin) {
@@ -351,7 +480,7 @@ export class World {
       const t = i / seg;
       const px = lerp(x1, x2, t) + randRange(-8, 8);
       const py = lerp(y1, y2, t) + randRange(-8, 8);
-      this.particles.spawn(px, py, color, { speed: 20, life: 0.22, size: 2.5 });
+      this.particles.spawn(px, py, color, { speed: 20, life: 0.22, size: 2.5, budget: 300 });
     }
   }
 
@@ -415,9 +544,9 @@ export class World {
         }
       }
       // accretion particles
-      if (chance(0.9)) {
+      if (chance(0.5)) {
         const p = randOnCircle(sg.x, sg.y, sg.pullRadius * randRange(0.5, 1));
-        this.particles.spawn(p.x, p.y, pick([COLORS.void, COLORS.shock, COLORS.white]), { vx: (sg.x - p.x) * 2, vy: (sg.y - p.y) * 2, life: 0.5, size: 2 });
+        this.particles.spawn(p.x, p.y, pick([COLORS.void, COLORS.shock, COLORS.white]), { vx: (sg.x - p.x) * 2, vy: (sg.y - p.y) * 2, life: 0.5, size: 2, budget: 500 });
       }
       if (sg.t >= sg.duration && !sg.imploded) {
         sg.imploded = true;
@@ -450,7 +579,43 @@ export class World {
 
   // -------------------------------------------------------- text popups
   addText(x, y, text, color, size = 14) {
-    this.texts.push({ x: x + randRange(-6, 6), y, vy: -42, life: 0.9, maxLife: 0.9, text, color, size });
+    const t = this._textPool.pop() || {};
+    t.x = x + randRange(-6, 6); t.y = y; t.vy = -42;
+    t.life = 0.9; t.maxLife = 0.9; t.text = text; t.color = color; t.size = size;
+    t.num = 0; t.owner = null;
+    this._pushText(t);
+    return t;
+  }
+
+  _pushText(t) {
+    const texts = this.texts;
+    if (texts.length >= this.maxTexts) {
+      // Recycle the oldest text (texts are pushed in age order) to bound work.
+      const old = texts.shift();
+      if (old.owner && old.owner._dmgText === old) old.owner._dmgText = null;
+      this._textPool.push(old);
+    }
+    texts.push(t);
+  }
+
+  // Merge repeated damage on the same enemy into a single rising number so that a
+  // storm of hits produces one growing total instead of hundreds of overlapping
+  // fillText draws. Falls back to a fresh text when none is active on the enemy.
+  addDamageText(e, amount, color, size) {
+    const cur = e._dmgText;
+    if (cur && cur.owner === e && cur.life > cur.maxLife * 0.45) {
+      cur.num += amount;
+      cur.text = String(cur.num);
+      cur.life = cur.maxLife;
+      cur.x = e.x + randRange(-4, 4);
+      cur.y = e.y - e.radius - 6;
+      if (size > cur.size) cur.size = size;
+      if (color === COLORS.gold) cur.color = color;
+      return cur;
+    }
+    const t = this.addText(e.x, e.y - e.radius - 6, String(amount), color, size);
+    t.num = amount; t.owner = e; e._dmgText = t;
+    return t;
   }
 
   // -------------------------------------------------------- pickups & xp
@@ -468,16 +633,52 @@ export class World {
     this.audio?.play('levelup');
     this.flash = Math.max(this.flash, 0.3);
     this.particles.burst(this.player.x, this.player.y, COLORS.xp, 30, { speed: 260, life: 0.6 });
+    this.rerollsLeft = (this.player.stats.rerolls || 0) + 1;
+    this.banishLeft = (this.player.stats.banishes || 0) + 1;
     const choices = draftUpgrades(this.player, 3, this.rng);
     this.pendingChoices = choices;
     this.state = 'levelup';
     if (this.onLevelUp) this.onLevelUp(choices);
   }
 
+  // Re-roll the current level-up offer (limited uses per level).
+  rerollChoices() {
+    if (this.state !== 'levelup' || this.rerollsLeft <= 0) return false;
+    this.rerollsLeft--;
+    this.pendingChoices = draftUpgrades(this.player, 3, this.rng);
+    this.audio?.play('ui');
+    if (this.onLevelUp) this.onLevelUp(this.pendingChoices);
+    return true;
+  }
+
+  // Banish one offered card (remove it from this run) and redraw a fresh set.
+  banishChoice(card) {
+    if (this.state !== 'levelup' || this.banishLeft <= 0 || !card) return false;
+    this.banishLeft--;
+    this.player.banished[card.id] = true;
+    this.pendingChoices = draftUpgrades(this.player, 3, this.rng);
+    this.audio?.play('ui');
+    if (this.onLevelUp) this.onLevelUp(this.pendingChoices);
+    return true;
+  }
+
   applyUpgrade(up) {
-    up.apply(this.player.stats);
-    this.player.upgradeCounts[up.id] = (this.player.upgradeCounts[up.id] || 0) + 1;
-    this.player.hp = Math.min(this.player.stats.maxHp, this.player.hp);
+    const p = this.player;
+    if (up.kind === 'item') {
+      up.apply(p.stats);
+      p.upgradeCounts[up.id] = (p.upgradeCounts[up.id] || 0) + 1;
+    } else if (up.kind === 'weapon-new' || up.kind === 'weapon-up') {
+      addOrLevelWeapon(p, up.weaponId);
+    } else if (up.kind === 'evolve') {
+      const inst = p.weapons.find((w) => w.id === up.weaponId);
+      if (inst) { evolveWeapon(p, inst); this.flash = Math.max(this.flash, 0.4); this.audio?.play('implode'); }
+    } else if (typeof up.apply === 'function') {
+      // Legacy stat-only upgrade.
+      up.apply(p.stats);
+      if (up.id) p.upgradeCounts[up.id] = (p.upgradeCounts[up.id] || 0) + 1;
+    }
+    p.syncDrones();
+    p.hp = Math.min(p.stats.maxHp, p.hp);
     this.pendingChoices = null;
     this.state = 'playing';
     this.audio?.play('ui');
@@ -522,7 +723,35 @@ export class World {
     this.background.update(dt, this.player.vx, this.player.vy);
     this.camera.follow(this.player.x, this.player.y, dt);
 
-    if (!this.player.alive && this.state === 'playing') this.endRun();
+    if (!this.player.alive && this.state === 'playing') {
+      if (this.revives > 0) this.revivePlayer();
+      else this.endRun();
+    }
+  }
+
+  // Phoenix Protocol: spend a stored revive to bring the player back mid-run with
+  // half HP, brief invulnerability and a clearing nova so you aren't instantly
+  // re-killed. Driven by the meta bonus (this.revives) set at run start.
+  revivePlayer() {
+    this.revives--;
+    const p = this.player;
+    p.alive = true;
+    p.hp = Math.max(1, Math.round(p.stats.maxHp * 0.5));
+    p.invuln = Math.max(p.invuln, 2.2);
+    p.overdriveTime = Math.max(p.overdriveTime, 3);
+    this.flash = 0.8;
+    this.shake(24);
+    this.hitStopFor(0.1);
+    this.audio?.play('levelup');
+    this.addText(p.x, p.y - 50, 'PHOENIX REVIVE', COLORS.fire, 30);
+    this.particles.burst(p.x, p.y, COLORS.fire, 60, { speed: 360, life: 0.8 });
+    // clear nearby threats so the revive actually lands
+    for (const e of this.enemies.slice()) {
+      if (e.alive && !e.boss && dist2(p.x, p.y, e.x, e.y) < 360 * 360) {
+        this.damageEnemy(e, 400, { source: 'explosion', knockback: 420 });
+      }
+    }
+    for (const b of this.enemyBullets) b.life = 0;
   }
 
   step(dt, cmd) {
@@ -588,12 +817,20 @@ export class World {
       const b = this.bullets[i];
       b.life -= dt;
       if (b.life <= 0) { this.bullets.splice(i, 1); continue; }
-      // homing
+      // homing — reacquiring a target is a grid query, so only re-scan a few
+      // times per second (or when the current target dies) and steer toward the
+      // cached target every frame. Steering feel is unchanged; query count drops ~6x.
       if (b.homing > 0) {
-        let best = null, bestD = 300 * 300;
-        this.grid.query(b.x, b.y, 300, this._q);
-        for (const e of this._q) { if (!e.alive) continue; const d = dist2(b.x, b.y, e.x, e.y); if (d < bestD) { bestD = d; best = e; } }
-        if (best) {
+        b._htime = (b._htime || 0) - dt;
+        if (!b._target || !b._target.alive || b._htime <= 0) {
+          b._htime = 0.1;
+          let best = null, bestD = 300 * 300;
+          this.grid.query(b.x, b.y, 300, this._q);
+          for (const e of this._q) { if (!e.alive) continue; const d = dist2(b.x, b.y, e.x, e.y); if (d < bestD) { bestD = d; best = e; } }
+          b._target = best;
+        }
+        const best = b._target;
+        if (best && best.alive) {
           const desired = angleTo(b.x, b.y, best.x, best.y);
           b.angle = b.angle ?? Math.atan2(b.vy, b.vx);
           let diff = ((desired - b.angle + Math.PI) % TAU) - Math.PI;
@@ -603,7 +840,7 @@ export class World {
         }
       }
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (chance(0.5)) this.particles.spawn(b.x, b.y, b.crit ? COLORS.gold : COLORS.player, { speed: 10, life: 0.18, size: b.r * 0.7 });
+      if (chance(0.25)) this.particles.spawn(b.x, b.y, b.tint || (b.crit ? COLORS.gold : COLORS.player), { speed: 10, life: 0.18, size: b.r * 0.7, budget: 700 });
 
       // collide with enemies
       this.grid.query(b.x, b.y, b.r + 30, this._q);
@@ -621,6 +858,7 @@ export class World {
           } else { consumed = true; break; }
         }
       }
+      if (consumed && b.explodeR > 0) this.explode(b.x, b.y, b.explodeR, b.explodeDmg, b.tint || COLORS.fire);
       if (consumed || b.x < 0 || b.y < 0 || b.x > ARENA.w || b.y > ARENA.h) this.bullets.splice(i, 1);
     }
   }
@@ -628,7 +866,7 @@ export class World {
   hitEnemyWithBullet(b, e) {
     const s = this.player.stats;
     this.damageEnemy(e, b.dmg, { crit: b.crit, source: 'bullet', knockback: b.knockback, angle: Math.atan2(b.vy, b.vx), lifesteal: true });
-    this.particles.burst(b.x, b.y, COLORS.white, 3, { speed: 140, life: 0.2, size: 2 });
+    this.particles.burst(b.x, b.y, COLORS.white, 2, { speed: 140, life: 0.2, size: 2, budget: 500 });
     if (!e.alive) return;
     // elemental imbues -> possible reactions
     for (const key of ['fire', 'cryo', 'shock', 'void']) {
@@ -646,7 +884,7 @@ export class World {
       const b = this.enemyBullets[i];
       b.life -= dt;
       b.x += b.vx * dt; b.y += b.vy * dt;
-      if (chance(0.3)) this.particles.spawn(b.x, b.y, b.color, { speed: 8, life: 0.2, size: b.r * 0.6 });
+      if (chance(0.15)) this.particles.spawn(b.x, b.y, b.color, { speed: 8, life: 0.2, size: b.r * 0.6, budget: 700 });
       const rr = p.radius + b.r;
       if (dist2(b.x, b.y, p.x, p.y) < rr * rr) {
         p.takeDamage(b.dmg, this);
@@ -706,7 +944,11 @@ export class World {
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const t = this.texts[i];
       t.life -= dt; t.y += t.vy * dt; t.vy *= Math.pow(0.1, dt);
-      if (t.life <= 0) this.texts.splice(i, 1);
+      if (t.life <= 0) {
+        if (t.owner && t.owner._dmgText === t) t.owner._dmgText = null;
+        this.texts.splice(i, 1);
+        this._textPool.push(t);
+      }
     }
   }
 
@@ -716,10 +958,25 @@ export class World {
     this.flash = 0.5;
     const summary = {
       score: this.score, time: this.elapsed, level: this.level, kills: this.kills,
+      bossKills: this.bossKills || 0,
+      reactions: this.reactions || 0,
+      shipId: this.shipId,
+      directives: this.directives ? this.directives.length : 0,
     };
     const { newBest } = this.store ? this.store.recordRun(summary) : { newBest: false };
     summary.newBest = newBest;
     summary.highScore = this.store ? this.store.get().highScore : this.score;
+
+    // Award Stardust (meta currency) for this run, scaled by the salvage meta and
+    // by the combined Stardust bonus of any active challenge directives.
+    const base = stardustForRun(summary);
+    const earned = Math.floor(base * (this.metaBonus?.stardustMul || 1) * (this.diff?.stardustMul || 1));
+    summary.stardust = earned;
+    if (this.store?.addStardust) {
+      this.store.addStardust(earned);
+      summary.stardustTotal = this.store.get().stardust;
+    }
+
     if (this.onGameOver) this.onGameOver(summary);
   }
 
@@ -784,11 +1041,12 @@ export class World {
       ctx.restore();
     }
     ctx.globalAlpha = p.invuln > 0 && !p.dashing ? (Math.sin(performance.now() / 40) * 0.3 + 0.6) : 1;
-    // glow body
-    ctx.shadowColor = COLORS.playerGlow;
+    // glow body (tinted by the chosen ship's accent colour)
+    const hull = p.shipColor || COLORS.player;
+    ctx.shadowColor = p.shipColor || COLORS.playerGlow;
     ctx.shadowBlur = p.dashing ? 30 : 16;
     ctx.rotate(p.aimAngle);
-    ctx.fillStyle = p.hitFlash > 0 ? '#fff' : COLORS.player;
+    ctx.fillStyle = p.hitFlash > 0 ? '#fff' : hull;
     ctx.beginPath();
     ctx.moveTo(p.radius + 4, 0);
     ctx.lineTo(-p.radius, -p.radius * 0.8);
@@ -872,6 +1130,57 @@ export class World {
         for (let i = 0; i < 10; i++) { const a = (i / 10) * TAU; const rr = r * (i % 2 ? 0.7 : 1); const fn = i === 0 ? 'moveTo' : 'lineTo'; ctx[fn](Math.cos(a) * rr, Math.sin(a) * rr); }
         ctx.closePath(); break;
       }
+      // ---- retro pixel invaders (built from symmetric blocks / saucer ovals) --
+      case 'crab': {
+        const u = r / 5;
+        ctx.rect(-3 * u, -2 * u, 6 * u, 4 * u);   // body
+        ctx.rect(-5 * u, -u, 2 * u, u);           // left arm
+        ctx.rect(3 * u, -u, 2 * u, u);            // right arm
+        ctx.rect(-4 * u, -3 * u, u, u);           // left eye-stalk
+        ctx.rect(3 * u, -3 * u, u, u);            // right eye-stalk
+        ctx.rect(-3 * u, 2 * u, u, 2 * u);        // left leg
+        ctx.rect(2 * u, 2 * u, u, 2 * u);         // right leg
+        ctx.rect(-u, 2 * u, 2 * u, u);            // centre legs
+        break;
+      }
+      case 'squid': {
+        const u = r / 5;
+        ctx.rect(-2 * u, -3 * u, 4 * u, 3 * u);   // head
+        ctx.rect(-3 * u, 0, 6 * u, 2 * u);        // shoulders
+        ctx.rect(-3 * u, 2 * u, u, 2 * u);        // tentacles
+        ctx.rect(-u, 2 * u, u, 2 * u);
+        ctx.rect(0, 2 * u, u, 2 * u);
+        ctx.rect(2 * u, 2 * u, u, 2 * u);
+        break;
+      }
+      case 'octopus': {
+        const u = r / 5;
+        ctx.rect(-2 * u, -4 * u, 4 * u, 2 * u);   // crown
+        ctx.rect(-4 * u, -2 * u, 8 * u, 3 * u);   // body
+        ctx.rect(-4 * u, u, u, 3 * u);            // six legs
+        ctx.rect(-2 * u, u, u, 3 * u);
+        ctx.rect(-u, u, u, 3 * u);
+        ctx.rect(0, u, u, 3 * u);
+        ctx.rect(u, u, u, 3 * u);
+        ctx.rect(3 * u, u, u, 3 * u);
+        break;
+      }
+      case 'ufo': {
+        ctx.ellipse(0, r * 0.15, r, r * 0.42, 0, 0, TAU);       // saucer disc
+        ctx.moveTo(r * 0.5, -r * 0.1);
+        ctx.ellipse(0, -r * 0.1, r * 0.5, r * 0.45, 0, 0, TAU); // dome
+        break;
+      }
+      case 'mothership': {
+        ctx.ellipse(0, r * 0.12, r, r * 0.34, 0, 0, TAU);        // wide hull
+        ctx.moveTo(r * 0.52, -r * 0.18);
+        ctx.ellipse(0, -r * 0.18, r * 0.52, r * 0.5, 0, 0, TAU); // command dome
+        ctx.moveTo(-r * 0.48, r * 0.3);
+        ctx.ellipse(-r * 0.68, r * 0.3, r * 0.2, r * 0.16, 0, 0, TAU); // left pod
+        ctx.moveTo(r * 0.88, r * 0.3);
+        ctx.ellipse(r * 0.68, r * 0.3, r * 0.2, r * 0.16, 0, 0, TAU);  // right pod
+        break;
+      }
       default: ctx.arc(0, 0, r, 0, TAU);
     }
     ctx.fill();
@@ -898,13 +1207,13 @@ export class World {
     ctx.globalCompositeOperation = 'lighter';
     for (const b of this.bullets) {
       if (b.x < bnd.minX || b.x > bnd.maxX || b.y < bnd.minY || b.y > bnd.maxY) continue;
-      const color = b.crit ? COLORS.gold : COLORS.player;
-      const glow = b.crit ? COLORS.gold : COLORS.playerGlow;
-      // A bullet's radius/crit never change, so resolve its glow sprite once and
-      // cache it on the bullet — avoids rebuilding the key string every frame.
+      const color = b.tint || (b.crit ? COLORS.gold : COLORS.player);
+      const glow = b.glow || (b.crit ? COLORS.gold : COLORS.playerGlow);
+      // A bullet's radius/crit/tint never change, so resolve its glow sprite once
+      // and cache it on the bullet — avoids rebuilding the key string every frame.
       let spr = b._spr;
       if (spr === undefined) {
-        spr = glowSprite('b|' + b.r + '|' + (b.crit ? 1 : 0), b.r * 2.2, 12, (g) => {
+        spr = glowSprite('b|' + b.r + '|' + (b.crit ? 1 : 0) + '|' + color, b.r * 2.2, 12, (g) => {
           g.fillStyle = color; g.shadowColor = glow; g.shadowBlur = 12;
           g.beginPath(); g.ellipse(0, 0, b.r * 2.2, b.r, 0, 0, TAU); g.fill();
         });
@@ -1104,6 +1413,8 @@ export class World {
       dashMax: DASH.cooldown * this.player.stats.dashCooldownMul,
       enemies: this.enemies.length,
       boss: this.bossActive,
+      revives: this.revives || 0,
+      directives: this.directives ? this.directives.length : 0,
     };
   }
 }

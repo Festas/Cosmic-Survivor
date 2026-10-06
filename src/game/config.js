@@ -17,6 +17,14 @@ export const COLORS = {
   danger: '#ff3b6b',
   white: '#ffffff',
   shield: '#64f0ff',
+  // Retro "OG alien invaders" accent palette (additive — safe to reference from
+  // enemy defs and bullet colours; does not alter any existing key).
+  invGreen: '#5dff7a',
+  invCyan: '#5de0ff',
+  invMagenta: '#ff5df0',
+  invRed: '#ff4d6a',
+  invAmber: '#ffd23d',
+  saucer: '#9dff4d',
 };
 
 export const ARENA = {

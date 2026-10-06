@@ -40,6 +40,11 @@ export class Particles {
   }
 
   spawn(x, y, color, opts = {}) {
+    // Backpressure: low-priority cosmetic effects (trails, hit sparks) pass a
+    // `budget` and yield when the pool is nearly drained, so important bursts
+    // (deaths, implosions, reactions) always have room and the render loop never
+    // churns through a fully-saturated pool — the dominant boss-fight cost.
+    if (opts.budget !== undefined && this.pool.length <= opts.budget) return null;
     const p = this.pool.pop();
     if (!p) return null;
     const speed = opts.speed ?? 120;
@@ -61,7 +66,7 @@ export class Particles {
   }
 
   burst(x, y, color, count, opts = {}) {
-    for (let i = 0; i < count; i++) this.spawn(x, y, color, opts);
+    for (let i = 0; i < count; i++) if (!this.spawn(x, y, color, opts)) break;
   }
 
   update(dt) {

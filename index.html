@@ -23,6 +23,8 @@
         <div class="hud-left">
           <div class="chip"><span class="chip-label">THREAT</span><span id="threat">1</span></div>
           <div class="chip"><span class="chip-label">ENEMIES</span><span id="enemies">0</span></div>
+          <div id="revive-chip" class="chip revive hidden"><span class="chip-label">PHOENIX</span><span id="revive-n">0</span></div>
+          <div id="directive-chip" class="chip directive hidden"><span class="chip-label">DIRECTIVES</span><span id="directive-n">0</span></div>
         </div>
         <div class="hud-center">
           <div id="timer">0:00</div>
@@ -39,6 +41,8 @@
         <div class="bars">
           <div class="bar health"><i id="health-fill"></i><span id="health-text">100</span></div>
           <div class="bar xp"><i id="xp-fill"></i><span id="level-text">LV 1</span></div>
+          <div class="bar overdrive" id="overdrive-bar"><i id="od-fill"></i><span id="od-text">OVERDRIVE</span></div>
+          <div id="loadout" class="loadout" aria-hidden="true"></div>
         </div>
         <div class="abilities">
           <div id="ability-sing" class="ability"><div class="ring"><svg viewBox="0 0 44 44"><circle class="track" cx="22" cy="22" r="19"></circle><circle id="sing-arc" class="arc" cx="22" cy="22" r="19"></circle></svg><span class="ico">🌀</span></div><span class="key">SHIFT</span></div>
@@ -59,14 +63,30 @@
     <!-- Start screen -->
     <div id="start" class="overlay">
       <div class="panel">
+        <div class="stardust-pill" title="Stardust — earn it in runs, spend it in the Hangar">✦ <b id="start-stardust">0</b> Stardust</div>
         <h1 class="title">COSMIC SURVIVOR</h1>
-        <p class="tagline">Bend gravity. Blink through time. Detonate the void.</p>
+        <p class="tagline">Hold the line against the alien swarm. Stack weapons. Evolve. Overdrive.</p>
         <div class="features">
-          <div><b>🌀 Singularity</b><span>Deploy a black hole that devours swarms, then implodes.</span></div>
-          <div><b>💨 Phase Dash</b><span>Blink through danger — triggers bullet-time &amp; i-frames.</span></div>
-          <div><b>✴️ Resonance</b><span>Chain Fire · Cryo · Shock · Void for explosive reactions.</span></div>
+          <div><b>🔫 Arsenal</b><span>Auto-fire up to 6 weapons at once — then evolve them into legendary forms.</span></div>
+          <div><b>🔆 Overdrive</b><span>Chain kills to fill the meter and unleash a damage &amp; fire-rate rampage.</span></div>
+          <div><b>✴️ Resonance</b><span>Imbue Fire · Cryo · Shock · Void for screen-clearing reactions.</span></div>
         </div>
-        <button id="play-btn" class="btn">▶ LAUNCH</button>
+        <div class="ship-pick">
+          <button id="ship-prev" class="ship-nav" aria-label="Previous ship">◀</button>
+          <div class="ship-pick-mid">
+            <div class="ship-pick-icon" id="ship-pick-icon">🛸</div>
+            <div class="ship-pick-info">
+              <div class="ship-pick-name" id="ship-pick-name">Vanguard</div>
+              <div class="ship-pick-tag" id="ship-pick-tag">Balanced · reliable all-rounder</div>
+            </div>
+          </div>
+          <button id="ship-next" class="ship-nav" aria-label="Next ship">▶</button>
+        </div>
+        <div class="start-actions">
+          <button id="play-btn" class="btn">▶ LAUNCH</button>
+          <button id="hangar-btn" class="btn btn-ghost">🛠 HANGAR</button>
+        </div>
+        <div id="start-directives" class="start-directives hidden" title="Active challenge Directives — more risk, more Stardust"></div>
         <div class="controls-hint">
           <span><kbd>WASD</kbd> Move</span>
           <span><kbd>Space</kbd> Dash</span>
@@ -82,13 +102,46 @@
       </div>
     </div>
 
+    <!-- Hangar (ships + ascension meta-progression) -->
+    <div id="hangar" class="overlay hidden">
+      <div class="panel hangar-panel">
+        <div class="hangar-head">
+          <h2 class="hangar-title">🛠 HANGAR</h2>
+          <div class="stardust-pill big">✦ <b id="hangar-stardust">0</b> Stardust</div>
+        </div>
+        <div class="pilot-record" id="pilot-record">
+          <div class="rec"><span class="rec-k">Runs</span><b id="rec-runs">0</b></div>
+          <div class="rec"><span class="rec-k">Best</span><b id="rec-best">0</b></div>
+          <div class="rec"><span class="rec-k">Survived</span><b id="rec-time">0:00</b></div>
+          <div class="rec"><span class="rec-k">Kills</span><b id="rec-kills">0</b></div>
+          <div class="rec"><span class="rec-k">Lifetime ✦</span><b id="rec-ls">0</b></div>
+        </div>
+        <div class="hangar-tabs">
+          <button id="tab-ships" class="tab active">STARFIGHTERS</button>
+          <button id="tab-meta" class="tab">ASCENSION</button>
+          <button id="tab-directives" class="tab">DIRECTIVES</button>
+          <button id="tab-codex" class="tab">CODEX</button>
+        </div>
+        <div id="hangar-ships" class="hangar-body ship-grid"></div>
+        <div id="hangar-meta" class="hangar-body meta-grid hidden"></div>
+        <div id="hangar-directives" class="hangar-body directive-grid hidden"></div>
+        <div id="hangar-codex" class="hangar-body codex-grid hidden"></div>
+        <button id="hangar-close" class="btn">✔ DONE</button>
+      </div>
+    </div>
+
+
     <!-- Level up draft -->
     <div id="levelup" class="overlay hidden">
       <div class="panel levelup-panel">
         <h2 class="levelup-title">LEVEL&nbsp;UP</h2>
         <p class="levelup-sub">Choose an augment</p>
         <div id="cards" class="cards"></div>
-        <div class="draft-hint">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> to pick</div>
+        <div class="draft-tools">
+          <button id="reroll-btn" class="btn btn-ghost btn-sm">🎲 Reroll <b id="reroll-n">0</b></button>
+          <button id="banish-btn" class="btn btn-ghost btn-sm">🚫 Banish <b id="banish-n">0</b></button>
+        </div>
+        <div class="draft-hint">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> to pick · <kbd>R</kbd> reroll · <kbd>B</kbd> banish</div>
       </div>
     </div>
 
@@ -113,11 +166,17 @@
         <h2 id="go-title">SYSTEM&nbsp;FAILURE</h2>
         <div id="go-newbest" class="newbest hidden">★ NEW BEST ★</div>
         <div id="go-score" class="go-score">0</div>
+        <div id="go-stardust" class="go-stardust">✦ +0 Stardust</div>
+        <div id="go-commends" class="go-commends hidden"></div>
         <div id="go-stats" class="run-stats"></div>
         <button id="retry-btn" class="btn">↻ RETRY</button>
+        <button id="go-hangar-btn" class="btn btn-ghost">🛠 HANGAR</button>
       </div>
     </div>
   </div>
+
+  <!-- transient unlock toasts (commendations) -->
+  <div id="toast" class="toast-wrap" aria-live="polite"></div>
 
   <script type="module" src="src/main.js"></script>
 </body>
