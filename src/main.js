@@ -42,8 +42,45 @@ function resize() {
   world.viewW = w;
   world.viewH = h;
   world.camera.resize(w, h);
+  fitOverlays();
 }
 window.addEventListener('resize', resize);
+
+// ---- Overlay auto-fit ------------------------------------------------------
+// Keep every menu/overlay fully on-screen without scrolling. The Hangar is the
+// one intentional exception (it has its own internal scroll), so it is not in
+// this list. Each eligible panel is measured at its natural size and scaled down
+// just enough to fit the viewport, then kept centred. It never upscales, so a
+// panel that already fits stays crisp at 1:1.
+const FIT_OVERLAYS = ['start', 'levelup', 'pause', 'gameover'];
+function fitOverlay(id) {
+  const overlay = $(id);
+  if (!overlay || overlay.classList.contains('hidden')) return;
+  const panel = overlay.querySelector('.panel');
+  if (!panel) return;
+  // offsetWidth/Height are the untransformed layout sizes, so an already-applied
+  // scale never feeds back into the measurement.
+  const w = panel.offsetWidth;
+  const h = panel.offsetHeight;
+  if (!w || !h) return;
+  const s = Math.min(1, (overlay.clientWidth * 0.98) / w, (overlay.clientHeight * 0.98) / h);
+  panel.style.transform = `translate(-50%, -50%) scale(${s})`;
+}
+function fitOverlays() { for (const id of FIT_OVERLAYS) fitOverlay(id); }
+
+// Re-fit whenever a panel's content changes (level-up cards, game-over
+// commendations, directive summaries) or it is shown/hidden. A ResizeObserver on
+// each panel catches all of these — toggling display:none -> natural size fires
+// it — and setting a CSS transform does not change the observed box, so there is
+// no feedback loop.
+if (typeof ResizeObserver === 'function') {
+  const ro = new ResizeObserver(() => fitOverlays());
+  for (const id of FIT_OVERLAYS) {
+    const panel = $(id) && $(id).querySelector('.panel');
+    if (panel) ro.observe(panel);
+  }
+}
+window.addEventListener('orientationchange', fitOverlays);
 
 // ------------------------------------------------------------- settings
 function applySettingsToUI() {

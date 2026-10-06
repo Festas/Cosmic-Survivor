@@ -159,6 +159,20 @@ html, body {
   text-align: center;
   box-shadow: 0 0 60px rgba(81,233,255,0.12), inset 0 0 40px rgba(81,233,255,0.04);
 }
+
+/* Auto-fit overlays: never page-scroll — the panel is centred and scaled down
+   just enough (never up) to fit the viewport, so everything is always on screen.
+   The Hangar is intentionally NOT a .fit overlay: it keeps its own internal
+   scroll (see .hangar-body) because its content is meant to be browsed. The
+   scale factor itself is applied from main.js (fitOverlays); this only sets up
+   the absolute, centred, transform-friendly positioning. */
+.overlay.fit { display: block; overflow: hidden; }
+.overlay.fit .panel {
+  position: absolute; top: 50%; left: 50%; margin: 0;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  will-change: transform;
+}
 .title {
   font-size: clamp(30px, 7vw, 54px); font-weight: 900; letter-spacing: 3px;
   background: linear-gradient(90deg, #51e9ff, #b06bff, #ff3df0);
