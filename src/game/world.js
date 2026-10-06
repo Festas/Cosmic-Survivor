@@ -69,6 +69,10 @@ export class World {
     this.background = new Background();
     this.grid = new Grid(80);
     this._q = [];
+    // Reused per-frame buffer of on-screen elites, so their marker rings can be
+    // drawn in a dedicated pass *above* the enemy-bullet layer (readability)
+    // without a second cull/scan or per-frame allocation.
+    this._eliteFrame = [];
     // Floating damage numbers are pooled and merged (see addDamageText): during a
     // boss fight the player can land hundreds of hits/second, and spawning a fresh
     // rising number per hit was a major render + GC cost.
@@ -1023,6 +1027,7 @@ export class World {
     this.drawPickups(ctx);
     this.drawEnemies(ctx);
     this.drawEnemyBullets(ctx);
+    this.drawEliteRings(ctx);
     this.drawPlayer(ctx);
     this.drawBullets(ctx);
     this.particles.render(ctx, this.camera.viewBounds(40));
@@ -1108,6 +1113,8 @@ export class World {
     // so off-screen enemies cost nothing, and blit cached glow sprites instead
     // of paying ctx.shadowBlur per enemy every frame.
     const b = this.camera.viewBounds(160);
+    const elites = this._eliteFrame;
+    elites.length = 0;
     for (const e of this.enemies) {
       if (!e.alive) continue;
       if (e.x < b.minX || e.x > b.maxX || e.y < b.minY || e.y > b.maxY) continue;
@@ -1147,30 +1154,37 @@ export class World {
       }
       ctx.restore();
 
-      // Elite marker: a crisp, non-rotating gold glow ring just outside the body.
-      // Baked into a cached glow sprite (keyed by integer radius) so it costs a
-      // single blit per frame and never pays per-frame shadowBlur.
-      if (e.elite) {
-        const rr = e.radius + 5;
-        const key = 'elite|' + Math.round(rr);
-        const ring = glowSprite(key, rr, 10, (g) => {
-          g.shadowColor = ELITE.ring; g.shadowBlur = 10;
-          g.strokeStyle = ELITE.ring; g.lineWidth = 2.5;
-          g.beginPath(); g.arc(0, 0, rr, 0, TAU); g.stroke();
-        });
-        if (ring) {
-          ctx.drawImage(ring.canvas, e.x - ring.off, e.y - ring.off);
-        } else {
-          ctx.save();
-          ctx.shadowColor = ELITE.ring; ctx.shadowBlur = 10;
-          ctx.strokeStyle = ELITE.ring; ctx.lineWidth = 2.5;
-          ctx.beginPath(); ctx.arc(e.x, e.y, rr, 0, TAU); ctx.stroke();
-          ctx.restore();
-        }
-      }
+      // Defer the elite marker ring to drawEliteRings() so it lands on top of the
+      // enemy-bullet layer and always reads as an at-a-glance threat cue.
+      if (e.elite) elites.push(e);
 
       if (e.boss) this.drawBossBar(ctx, e);
       else if (e.maxHp > 60 && e.hp < e.maxHp) this.drawHpBar(ctx, e);
+    }
+  }
+
+  // Elite markers: a crisp, non-rotating gold glow ring just outside each elite's
+  // body. Drawn after the enemy bullets (so the cue is never buried under fire)
+  // from a cached glow sprite (keyed by integer radius) — a single blit each,
+  // never a per-frame shadowBlur. Fed by the reused this._eliteFrame buffer.
+  drawEliteRings(ctx) {
+    for (const e of this._eliteFrame) {
+      if (!e.alive) continue;
+      const rr = e.radius + 5;
+      const ring = glowSprite('elite|' + Math.round(rr), rr, 10, (g) => {
+        g.shadowColor = ELITE.ring; g.shadowBlur = 10;
+        g.strokeStyle = ELITE.ring; g.lineWidth = 2.5;
+        g.beginPath(); g.arc(0, 0, rr, 0, TAU); g.stroke();
+      });
+      if (ring) {
+        ctx.drawImage(ring.canvas, e.x - ring.off, e.y - ring.off);
+      } else {
+        ctx.save();
+        ctx.shadowColor = ELITE.ring; ctx.shadowBlur = 10;
+        ctx.strokeStyle = ELITE.ring; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(e.x, e.y, rr, 0, TAU); ctx.stroke();
+        ctx.restore();
+      }
     }
   }
 
