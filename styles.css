@@ -64,10 +64,31 @@ html, body {
   font-size: clamp(26px, 5vw, 42px); font-weight: 800; letter-spacing: 2px;
   color: #fff; text-shadow: 0 0 18px rgba(81,233,255,0.6);
 }
-#boss-bar { margin-top: 6px; width: min(70vw, 460px); }
-#boss-name { font-size: 11px; letter-spacing: 3px; color: var(--danger); }
-.boss-track { height: 8px; background: rgba(0,0,0,0.5); border: 1px solid var(--danger); border-radius: 6px; overflow: hidden; margin-top: 2px; }
-.boss-track i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff3b6b, #ff8a3d); transition: width 0.1s; }
+#boss-bar { margin-top: 8px; width: min(76vw, 520px); animation: boss-pulse 1.4s ease-in-out infinite; }
+#boss-name {
+  font-size: 13px; font-weight: 800; letter-spacing: 4px; color: var(--danger);
+  text-shadow: 0 0 10px rgba(255,59,107,0.8), 0 0 22px rgba(255,59,107,0.4);
+}
+.boss-track {
+  height: 11px; background: rgba(0,0,0,0.55); border: 1px solid var(--danger); border-radius: 7px;
+  overflow: hidden; margin-top: 3px; position: relative;
+  box-shadow: 0 0 14px rgba(255,59,107,0.45), inset 0 0 8px rgba(0,0,0,0.6);
+}
+.boss-track i {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(90deg, #ff2d5e, #ff6a3d 60%, #ffd447);
+  box-shadow: 0 0 12px rgba(255,120,80,0.8);
+  transition: width 0.1s;
+}
+/* Segment ticks + a travelling sheen so the gauge reads as a heavy boss meter. */
+.boss-track::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(90deg, transparent 0, transparent calc(25% - 1px), rgba(6,10,22,0.85) calc(25% - 1px), rgba(6,10,22,0.85) 25%);
+}
+@keyframes boss-pulse {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,59,107,0.4)); }
+  50% { filter: drop-shadow(0 0 8px rgba(255,59,107,0.85)); }
+}
 
 .hud-right { text-align: right; }
 #score { font-size: clamp(22px, 4vw, 34px); font-weight: 800; color: var(--gold); text-shadow: 0 0 14px rgba(255,212,71,0.5); }
@@ -158,6 +179,20 @@ html, body {
   padding: clamp(20px, 4vw, 38px);
   text-align: center;
   box-shadow: 0 0 60px rgba(81,233,255,0.12), inset 0 0 40px rgba(81,233,255,0.04);
+}
+
+/* Auto-fit overlays: never page-scroll — the panel is centred and scaled down
+   just enough (never up) to fit the viewport, so everything is always on screen.
+   The Hangar is intentionally NOT a .fit overlay: it keeps its own internal
+   scroll (see .hangar-body) because its content is meant to be browsed. The
+   scale factor itself is applied from main.js (fitOverlays); this only sets up
+   the absolute, centred, transform-friendly positioning. */
+.overlay.fit { display: block; overflow: hidden; }
+.overlay.fit .panel {
+  position: absolute; top: 50%; left: 50%; margin: 0;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  will-change: transform;
 }
 .title {
   font-size: clamp(30px, 7vw, 54px); font-weight: 900; letter-spacing: 3px;
