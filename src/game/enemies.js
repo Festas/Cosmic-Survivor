@@ -20,12 +20,12 @@ function fireAt(world, e, tx, ty, speed, dmg, r, color) {
   });
 }
 
-function ringBurst(world, e, count, speed, dmg, color, offset = 0) {
+function ringBurst(world, e, count, speed, dmg, color, offset = 0, life = 4) {
   for (let i = 0; i < count; i++) {
     const a = offset + (i / count) * TAU;
     world.enemyBullets.push({
       x: e.x, y: e.y, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed,
-      r: 8, dmg, life: 5, color: color || COLORS.void,
+      r: 8, dmg, life, color: color || COLORS.void,
     });
   }
 }
@@ -174,13 +174,13 @@ export const ENEMY_TYPES = {
       e.volleyT = (e.volleyT ?? randRange(1.6, 3)) - dt;
       const d = dist(e.x, e.y, world.player.x, world.player.y);
       if (e.volleyT <= 0 && d < 560) {
-        e.volleyT = 2.8;
+        e.volleyT = 3.4;
         const a = angleTo(e.x, e.y, world.player.x, world.player.y);
         for (let k = -1; k <= 1; k++) {
-          const aa = a + k * 0.22;
+          const aa = a + k * 0.26;
           world.enemyBullets.push({
             x: e.x, y: e.y, vx: Math.cos(aa) * 230, vy: Math.sin(aa) * 230,
-            r: 8, dmg: e.damage, life: 4.5, color: COLORS.invMagenta,
+            r: 8, dmg: e.damage, life: 3.4, color: COLORS.invMagenta,
           });
         }
         world.audio?.play('espit');
@@ -205,8 +205,8 @@ export const ENEMY_TYPES = {
       }
       e.sowT = (e.sowT ?? randRange(1.4, 2.6)) - dt;
       if (e.sowT <= 0 && d < 520) {
-        e.sowT = 2.6;
-        const n = 3;
+        e.sowT = 3.2;
+        const n = 2;
         for (let i = 0; i < n; i++) {
           const a = (i / n) * TAU + rand() * 0.5;
           world.enemyBullets.push({
@@ -228,8 +228,8 @@ export const ENEMY_TYPES = {
       steerTo(e, world.player.x, world.player.y, dt, 0.45);
       e.burstT = (e.burstT ?? randRange(1.8, 3)) - dt;
       if (e.burstT <= 0 && dist(e.x, e.y, world.player.x, world.player.y) < 620) {
-        e.burstT = 3.0;
-        ringBurst(world, e, 9, 170, Math.round(e.damage * 0.7), COLORS.invAmber, e.spin);
+        e.burstT = 3.6;
+        ringBurst(world, e, 7, 170, Math.round(e.damage * 0.7), COLORS.invAmber, e.spin, 4);
         world.audio?.play('bossfire');
       }
     },
@@ -246,8 +246,8 @@ export const BOSS_TYPES = {
       e.sumT = (e.sumT ?? 4) - dt;
       e.spin = (e.spin || 0) + dt * 0.8;
       if (e.ringT <= 0) {
-        e.ringT = 3.0;
-        ringBurst(world, e, 20, 190, 12, COLORS.danger, e.spin);
+        e.ringT = 3.2;
+        ringBurst(world, e, 14, 190, 12, COLORS.danger, e.spin, 4);
         world.audio?.play('bossfire');
         world.shake(8);
       }
@@ -270,10 +270,10 @@ export const BOSS_TYPES = {
         else { const a = angleTo(e.x, e.y, world.player.x, world.player.y) + Math.PI / 2; steerTo(e, e.x + Math.cos(a) * 60, e.y + Math.sin(a) * 60, dt); }
         e.spiralT = (e.spiralT ?? 0.12) - dt;
         if (e.spiralT <= 0) {
-          e.spiralT = 0.12;
+          e.spiralT = 0.18;
           for (let k = 0; k < 2; k++) {
             const a = e.spin + k * Math.PI;
-            world.enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(a) * 210, vy: Math.sin(a) * 210, r: 7, dmg: 10, life: 5, color: COLORS.cryo });
+            world.enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(a) * 210, vy: Math.sin(a) * 210, r: 7, dmg: 10, life: 3.5, color: COLORS.cryo });
           }
         }
         if (e.timer <= 0) { e.state = 'charge'; e.timer = 0.5; }
@@ -312,13 +312,13 @@ export const BOSS_TYPES = {
       if (e.phase === 'volley') {
         e.volleyT = (e.volleyT ?? 0.6) - dt;
         if (e.volleyT <= 0) {
-          e.volleyT = 0.5;
+          e.volleyT = 0.7;
           const a = angleTo(e.x, e.y, world.player.x, world.player.y);
           for (let k = -1; k <= 1; k++) {
             const aa = a + k * 0.18;
             world.enemyBullets.push({
               x: e.x, y: e.y, vx: Math.cos(aa) * 250, vy: Math.sin(aa) * 250,
-              r: 8, dmg: 12, life: 5, color: COLORS.saucer,
+              r: 8, dmg: 12, life: 3.8, color: COLORS.saucer,
             });
           }
           world.audio?.play('espit');
@@ -327,13 +327,13 @@ export const BOSS_TYPES = {
       } else if (e.phase === 'sweep') {
         e.sweepT = (e.sweepT ?? 0.1) - dt;
         if (e.sweepT <= 0) {
-          e.sweepT = 0.1;
-          e.sweepA = (e.sweepA || 0) + 0.42; // rotate the emitter -> spiral
-          for (let k = 0; k < 3; k++) {
-            const a = e.sweepA + k * (TAU / 3);
+          e.sweepT = 0.14;
+          e.sweepA = (e.sweepA || 0) + 0.5; // rotate the emitter -> spiral
+          for (let k = 0; k < 2; k++) {
+            const a = e.sweepA + k * Math.PI;
             world.enemyBullets.push({
               x: e.x, y: e.y, vx: Math.cos(a) * 200, vy: Math.sin(a) * 200,
-              r: 7, dmg: 11, life: 5, color: COLORS.shock,
+              r: 7, dmg: 11, life: 3.5, color: COLORS.shock,
             });
           }
         }
@@ -375,13 +375,13 @@ export const BOSS_TYPES = {
       if (e.phase === 'spiral') {
         e.emitT = (e.emitT ?? 0.09) - dt;
         if (e.emitT <= 0) {
-          e.emitT = 0.09;
-          e.sweepA = (e.sweepA || 0) + 0.34; // rotate the emitter -> spiral
-          for (let k = 0; k < 3; k++) {
-            const a = e.sweepA + k * (TAU / 3);
+          e.emitT = 0.14;
+          e.sweepA = (e.sweepA || 0) + 0.42; // rotate the emitter -> spiral
+          for (let k = 0; k < 2; k++) {
+            const a = e.sweepA + k * Math.PI;
             world.enemyBullets.push({
               x: e.x, y: e.y, vx: Math.cos(a) * 200, vy: Math.sin(a) * 200,
-              r: 8, dmg: 12, life: 5, color: COLORS.void,
+              r: 8, dmg: 12, life: 3.5, color: COLORS.void,
             });
           }
         }
@@ -389,7 +389,7 @@ export const BOSS_TYPES = {
       } else if (e.phase === 'collapse') {
         e.vx *= 0.9; e.vy *= 0.9; // brace, then erupt
         if (e.timer <= 0) {
-          ringBurst(world, e, 26, 210, 14, COLORS.void, e.spin);
+          ringBurst(world, e, 18, 210, 14, COLORS.void, e.spin, 4);
           world.audio?.play('bossfire'); world.shake(12);
           const n = 4;
           const base = angleTo(e.x, e.y, world.player.x, world.player.y);
