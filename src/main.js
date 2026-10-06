@@ -665,5 +665,17 @@ window.__game = { world: () => world, start: startRun };
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
+    // When a freshly deployed service worker takes control, reload once so the
+    // running game swaps to the new code instead of the stale cached version.
+    // Only returning visitors already have a controller, so first loads are spared
+    // a needless reload.
+    if (navigator.serviceWorker.controller) {
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloaded) return;
+        reloaded = true;
+        window.location.reload();
+      });
+    }
   });
 }
