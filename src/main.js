@@ -115,10 +115,23 @@ const HANGAR_TABS = ['ships', 'meta', 'directives', 'codex'];
 
 function openHangar() {
   renderHangar();
+  // The Hangar can be opened from the start screen *or* the game-over screen.
+  // Game-over sits later in the DOM than the Hangar, so if it stayed visible it
+  // would paint on top and swallow every click (the old "stuck on death" bug).
+  // Hide it (and the HUD) so the Hangar is always the top, interactive overlay.
+  $('gameover').classList.add('hidden');
+  $('hud').classList.add('hidden');
   $('hangar').classList.remove('hidden');
 }
 function closeHangar() {
+  // Always return to the main menu: the Hangar is only reachable while not
+  // actively playing (start screen or after death), so "Done" should land on a
+  // clean, fully-interactive start screen regardless of where we came from.
   $('hangar').classList.add('hidden');
+  $('gameover').classList.add('hidden');
+  $('hud').classList.add('hidden');
+  started = false;
+  $('start').classList.remove('hidden');
   refreshStart();
 }
 

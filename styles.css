@@ -134,13 +134,24 @@ html, body {
 /* ---------------------------------------------------------- Overlays */
 .overlay {
   position: absolute; inset: 0; z-index: 10;
-  display: flex; align-items: center; justify-content: center;
+  /* flex-start + margin:auto on the panel keeps short panels centred while
+     letting tall panels (many commendations, the level-up draft, the Hangar)
+     scroll from the top instead of overflowing off-screen with unreachable
+     buttons. Vertical padding respects notch / home-indicator safe areas. */
+  display: flex; align-items: flex-start; justify-content: center;
+  overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   background: radial-gradient(circle at 50% 40%, rgba(10,14,40,0.75), rgba(3,4,12,0.94));
   backdrop-filter: blur(3px);
-  padding: 20px;
+  padding:
+    max(20px, env(safe-area-inset-top))
+    max(20px, env(safe-area-inset-right))
+    max(20px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
 }
 .panel {
   width: min(560px, 94vw);
+  margin: auto; /* centre within the scroll area; top stays reachable when tall */
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 18px;
