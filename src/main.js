@@ -115,10 +115,23 @@ const HANGAR_TABS = ['ships', 'meta', 'directives', 'codex'];
 
 function openHangar() {
   renderHangar();
+  // The Hangar can be opened from the start screen *or* the game-over screen.
+  // Game-over sits later in the DOM than the Hangar, so if it stayed visible it
+  // would paint on top and swallow every click (the old "stuck on death" bug).
+  // Hide it (and the HUD) so the Hangar is always the top, interactive overlay.
+  $('gameover').classList.add('hidden');
+  $('hud').classList.add('hidden');
   $('hangar').classList.remove('hidden');
 }
 function closeHangar() {
+  // Always return to the main menu: the Hangar is only reachable while not
+  // actively playing (start screen or after death), so "Done" should land on a
+  // clean, fully-interactive start screen regardless of where we came from.
   $('hangar').classList.add('hidden');
+  $('gameover').classList.add('hidden');
+  $('hud').classList.add('hidden');
+  started = false;
+  $('start').classList.remove('hidden');
   refreshStart();
 }
 
@@ -490,11 +503,49 @@ function statRows(obj) {
 }
 
 // ------------------------------------------------------------- touch
+let touchEnabled = false;
+let touchBound = false;
+const touchEls = {};
+const JOY_TRAVEL = 42; // px the knob travels from centre at full tilt
+
 function maybeShowTouch() {
   const touch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-  if (touch) {
-    $('touch-controls').classList.remove('hidden');
+  if (!touch) return;
+  touchEnabled = true;
+  if (!touchBound) {
+    touchBound = true;
+    touchEls.wrap = $('touch-controls');
+    touchEls.ring = $('joy-ring');
+    touchEls.knob = $('joy-knob');
+    touchEls.hint = $('joy-hint');
     input.bindButton($('btn-dash'), $('btn-sing'));
+  }
+}
+
+// Single source of truth for the mobile HUD: only visible while actively
+// playing, and the joystick ring/knob snap to wherever the thumb is held.
+function updateTouch() {
+  if (!touchEnabled) return;
+  const show = started && !paused && world.state === 'playing';
+  const wrap = touchEls.wrap;
+  if (wrap) wrap.classList.toggle('hidden', !show);
+  if (!show) return;
+
+  const joy = input.joy;
+  const ring = touchEls.ring;
+  const knob = touchEls.knob;
+  const hint = touchEls.hint;
+  if (joy.active) {
+    if (ring) {
+      ring.classList.add('active');
+      ring.style.left = joy.baseX + 'px';
+      ring.style.top = joy.baseY + 'px';
+    }
+    if (knob) knob.style.transform = `translate(${joy.dx * JOY_TRAVEL}px, ${joy.dy * JOY_TRAVEL}px)`;
+    if (hint) hint.classList.add('off');
+  } else {
+    if (ring) ring.classList.remove('active');
+    if (hint) hint.classList.remove('off');
   }
 }
 
@@ -610,6 +661,8 @@ function frame(now) {
     world.background.update(dt);
     world.render(ctx);
   }
+
+  updateTouch();
 
   requestAnimationFrame(frame);
 }

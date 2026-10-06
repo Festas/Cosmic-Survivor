@@ -2,8 +2,8 @@
 // reactions, leveling, scoring and rendering. Coordinates the whole run.
 
 import {
-  ARENA, COLORS, SINGULARITY, DASH, COMBO, DIRECTOR,
-  spawnInterval, enemyCap, hpScale, speedScale, xpForLevel, comboMultiplier,
+  ARENA, COLORS, PLAYER, SINGULARITY, DASH, COMBO, DIRECTOR, ELITE,
+  spawnInterval, enemyCap, hpScale, speedScale, dmgScale, xpForLevel, comboMultiplier,
 } from './config.js';
 import {
   TAU, clamp, lerp, dist, dist2, angleTo, rand, randRange, randOnCircle, chance, pick,
@@ -12,7 +12,7 @@ import { Camera } from '../engine/camera.js';
 import { Particles } from '../engine/particles.js';
 import { glowSprite } from '../engine/sprites.js';
 import { Player } from './player.js';
-import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize } from './enemies.js';
+import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize, rollElite } from './enemies.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
 import { draftUpgrades } from './upgrades.js';
 import { weaponDef, addOrLevelWeapon, evolveWeapon, createWeaponInst } from './weapons.js';
@@ -69,6 +69,10 @@ export class World {
     this.background = new Background();
     this.grid = new Grid(80);
     this._q = [];
+    // Reused per-frame buffer of on-screen elites, so their marker rings can be
+    // drawn in a dedicated pass *above* the enemy-bullet layer (readability)
+    // without a second cull/scan or per-frame allocation.
+    this._eliteFrame = [];
     // Floating damage numbers are pooled and merged (see addDamageText): during a
     // boss fight the player can land hundreds of hits/second, and spawning a fresh
     // rising number per hit was a major render + GC cost.
@@ -184,6 +188,8 @@ export class World {
     // Bosses use bossHpMul; rank-and-file use the time-based hp curve × hpMul.
     const hp = isBoss ? def.hp * d.bossHpMul : def.hp * hpScale(this.elapsed) * d.hpMul;
     const speed = (isBoss ? def.speed : def.speed * speedScale(this.elapsed)) * d.speedMul;
+    // Rank-and-file damage ramps with time (bosses keep their tuned damage).
+    const damage = isBoss ? def.damage : def.damage * dmgScale(this.elapsed);
     const e = {
       type: def, key: typeKey, boss: !!def.boss,
       x, y, vx: 0, vy: 0, kx: 0, ky: 0,
@@ -191,13 +197,25 @@ export class World {
       maxHp: hp,
       radius: def.radius,
       speed,
-      damage: def.damage,
+      damage,
       xp: def.xp,
       color: def.color,
       status: createStatus(),
       hitFlash: 0, spin: rand() * TAU, alive: true, contactT: 0,
       massive: !!def.massive,
     };
+    // Elite promotion: a time-gated chance to turn a mid-tier+ spawn into a
+    // heavier, XP-rich variant (gold ring drawn in renderEnemies). Scaling is
+    // applied on top of the director curves so elites stay relative to the wave.
+    if (!isBoss && rollElite(def, this.elapsed, this.rng)) {
+      e.elite = true;
+      e.hp *= ELITE.hpMul;
+      e.maxHp *= ELITE.hpMul;
+      e.damage *= ELITE.damageMul;
+      e.radius *= ELITE.radiusMul;
+      e.speed *= ELITE.speedMul;
+      e.xp = Math.max(1, Math.round(e.xp * ELITE.xpMul));
+    }
     this.enemies.push(e);
     if (e.boss) { this.bossActive = e; }
     return e;
@@ -216,10 +234,11 @@ export class World {
     return this.spawnEnemy(typeKey, x, y);
   }
 
-  // Occasional "fleet" wave: an evenly-spaced row of invaders that materialises
-  // just outside the viewport on one side, for that classic descending-formation
-  // feel. Strictly bounded by enemyCap so a wave can never blow the enemy budget
-  // (keeps the frame budget safe on later, denser waves).
+  // "Fleet" wave: evenly-spaced rows of invaders that materialise just outside the
+  // viewport. Early waves are a single row; as the run escalates they become 2-3
+  // simultaneous arms (a pincer) that converge from different sides, so a camping
+  // player is surrounded and must move, while a kiting player can punch through a
+  // single arm. Strictly bounded by enemyCap so a wave can never blow the budget.
   spawnFormation() {
     const room = this.capNow() - this.enemies.length;
     if (room < 4) return; // not enough headroom for a meaningful row
@@ -229,21 +248,30 @@ export class World {
     if (this.elapsed >= 30) roster.push('crab');
     if (this.elapsed >= 70) roster.push('octopus');
     if (roster.length === 0) roster.push('swarm');
-    const key = pick(roster, this.rng);
-    const count = Math.min(room, 5 + Math.floor(this.rng() * 4)); // 5-8, budget-capped
-    // Approach direction (which side the fleet comes from) + perpendicular spread.
-    const dir = this.rng() * TAU;
-    const cx = this.player.x + Math.cos(dir) * ((this.viewW / 2) + 200);
-    const cy = this.player.y + Math.sin(dir) * ((this.viewH / 2) + 200);
-    const perp = dir + Math.PI / 2;
+    // Wave size and arm count both grow with elapsed time.
+    const arms = this.elapsed >= 150 ? 3 : this.elapsed >= 70 ? 2 : 1;
+    const perArm = 5 + Math.floor(this.elapsed / 30); // grows over the run
+    let budget = Math.min(room, arms * perArm, 26); // hard cap protects frame budget
+    const baseDir = this.rng() * TAU;
     const gap = 58;
-    for (let i = 0; i < count; i++) {
-      const off = (i - (count - 1) / 2) * gap;
-      const x = clamp(cx + Math.cos(perp) * off, 40, ARENA.w - 40);
-      const y = clamp(cy + Math.sin(perp) * off, 40, ARENA.h - 40);
-      this.spawnEnemy(key, x, y);
+    for (let arm = 0; arm < arms && budget > 0; arm++) {
+      const key = pick(roster, this.rng);
+      const count = Math.min(budget, perArm);
+      budget -= count;
+      // Spread arms around the player (pincer); jitter so it is not perfectly even.
+      const dir = baseDir + (arm / arms) * TAU + (this.rng() - 0.5) * 0.4;
+      const cx = this.player.x + Math.cos(dir) * ((this.viewW / 2) + 200);
+      const cy = this.player.y + Math.sin(dir) * ((this.viewH / 2) + 200);
+      const perp = dir + Math.PI / 2;
+      for (let i = 0; i < count; i++) {
+        const off = (i - (count - 1) / 2) * gap;
+        const x = clamp(cx + Math.cos(perp) * off, 40, ARENA.w - 40);
+        const y = clamp(cy + Math.sin(perp) * off, 40, ARENA.h - 40);
+        this.spawnEnemy(key, x, y);
+      }
     }
-    this.addText(this.player.x, this.player.y - 110, 'INVADERS INCOMING', COLORS.invGreen, 20);
+    const label = arms >= 2 ? 'PINCER INCOMING' : 'INVADERS INCOMING';
+    this.addText(this.player.x, this.player.y - 110, label, COLORS.invGreen, 20);
   }
 
   updateDirector(dt) {
@@ -277,11 +305,16 @@ export class World {
       }
     }
 
-    // Occasional invader-formation wave, layered on top of the trickle (never
-    // replacing it). Scheduled from formationTimer, initialised in reset().
+    // Invader-formation wave, layered on top of the trickle (never replacing it).
+    // These are the main anti-camp pressure: as the run goes on they arrive more
+    // often and as multi-sided pincers, so a stationary player gets surrounded and
+    // must reposition, while a mover can carve a lane through one arm. Telegraphed
+    // via spawnFormation's "INVADERS INCOMING" text so the pressure stays fair.
     this.formationTimer -= dt;
     if (this.formationTimer <= 0) {
-      this.formationTimer = 16 + this.rng() * 10; // next wave in ~16-26s
+      // Cadence tightens over the run: ~18-26s early, down to ~8-12s late game.
+      const base = Math.max(8, 20 - this.elapsed / 25);
+      this.formationTimer = base + this.rng() * 6;
       if (this.elapsed >= 18) this.spawnFormation();
     }
   }
@@ -348,9 +381,9 @@ export class World {
       this.addDamageText(e, rounded, opts.crit ? COLORS.gold : (opts.color || COLORS.white), opts.crit ? 20 : 14);
     }
     if (opts.crit) this.audio?.play('crit'); else if (opts.source === 'bullet') this.audio?.play('hit');
-    // lifesteal
+    // lifesteal (budgeted so leeching from a dense swarm can't fully out-heal it)
     if (opts.lifesteal && this.player.stats.lifesteal > 0) {
-      this.player.heal(rounded * this.player.stats.lifesteal);
+      this.player.lifestealHeal(rounded * this.player.stats.lifesteal);
     }
     if (e.hp <= 0) this.killEnemy(e, opts);
   }
@@ -802,9 +835,11 @@ export class World {
       e.contactT = Math.max(0, e.contactT - dt);
       const rr = e.radius + p.radius;
       if (e.contactT <= 0 && dist2(e.x, e.y, p.x, p.y) < rr * rr) {
-        const dealt = p.takeDamage(e.damage, this);
+        // Short contact i-frames (not the full projectile window) so that being
+        // surrounded keeps dealing damage — you must keep moving, not turtle.
+        const dealt = p.takeDamage(e.damage, this, PLAYER.contactInvuln);
         if (dealt > 0) {
-          e.contactT = 0.5;
+          e.contactT = PLAYER.contactCooldown;
           const a = angleTo(p.x, p.y, e.x, e.y);
           p.x -= Math.cos(a) * 6; p.y -= Math.sin(a) * 6;
         }
@@ -990,8 +1025,9 @@ export class World {
     this.drawSingularities(ctx, 'under');
     this.drawOrbs(ctx);
     this.drawPickups(ctx);
-    this.drawEnemyBullets(ctx);
     this.drawEnemies(ctx);
+    this.drawEnemyBullets(ctx);
+    this.drawEliteRings(ctx);
     this.drawPlayer(ctx);
     this.drawBullets(ctx);
     this.particles.render(ctx, this.camera.viewBounds(40));
@@ -1077,6 +1113,8 @@ export class World {
     // so off-screen enemies cost nothing, and blit cached glow sprites instead
     // of paying ctx.shadowBlur per enemy every frame.
     const b = this.camera.viewBounds(160);
+    const elites = this._eliteFrame;
+    elites.length = 0;
     for (const e of this.enemies) {
       if (!e.alive) continue;
       if (e.x < b.minX || e.x > b.maxX || e.y < b.minY || e.y > b.maxY) continue;
@@ -1091,6 +1129,13 @@ export class World {
         g.shadowColor = glowColor; g.shadowBlur = blur;
         g.fillStyle = fill;
         this.drawShape(g, shape, r);
+        // Crisp dark outline (no glow) so the body always reads as a solid
+        // object against the bloom and the enemy fire drawn on top of it.
+        g.shadowBlur = 0;
+        g.lineJoin = 'round';
+        g.lineWidth = Math.max(1.6, r * 0.14);
+        g.strokeStyle = 'rgba(4,7,18,0.9)';
+        g.stroke();
       });
       ctx.save();
       ctx.translate(e.x, e.y);
@@ -1102,11 +1147,47 @@ export class World {
         ctx.fillStyle = fill;
         this.drawShape(ctx, shape, r);
         ctx.shadowBlur = 0;
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = Math.max(1.6, r * 0.14);
+        ctx.strokeStyle = 'rgba(4,7,18,0.9)';
+        ctx.stroke();
       }
       ctx.restore();
 
+      // Defer the elite marker ring to drawEliteRings() so it lands on top of the
+      // enemy-bullet layer and always reads as an at-a-glance threat cue.
+      if (e.elite) elites.push(e);
+
       if (e.boss) this.drawBossBar(ctx, e);
       else if (e.maxHp > 60 && e.hp < e.maxHp) this.drawHpBar(ctx, e);
+    }
+  }
+
+  // Elite markers: a crisp, non-rotating gold glow ring just outside each elite's
+  // body. Drawn after the enemy bullets (so the cue is never buried under fire)
+  // from a cached glow sprite (keyed by integer radius) — a single blit each,
+  // never a per-frame shadowBlur. Fed by the reused this._eliteFrame buffer.
+  drawEliteRings(ctx) {
+    for (const e of this._eliteFrame) {
+      // Defensive only: the buffer holds elites that were alive during the cull
+      // and rendering never kills anything, so this never fires today — but it
+      // keeps a ring from ever floating over a corpse if the draw order changes.
+      if (!e.alive) continue;
+      const rr = e.radius + 5;
+      const ring = glowSprite('elite|' + Math.round(rr), rr, 10, (g) => {
+        g.shadowColor = ELITE.ring; g.shadowBlur = 10;
+        g.strokeStyle = ELITE.ring; g.lineWidth = 2.5;
+        g.beginPath(); g.arc(0, 0, rr, 0, TAU); g.stroke();
+      });
+      if (ring) {
+        ctx.drawImage(ring.canvas, e.x - ring.off, e.y - ring.off);
+      } else {
+        ctx.save();
+        ctx.shadowColor = ELITE.ring; ctx.shadowBlur = 10;
+        ctx.strokeStyle = ELITE.ring; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(e.x, e.y, rr, 0, TAU); ctx.stroke();
+        ctx.restore();
+      }
     }
   }
 
@@ -1236,27 +1317,40 @@ export class World {
 
   drawEnemyBullets(ctx) {
     const bnd = this.camera.viewBounds(50);
-    ctx.globalCompositeOperation = 'lighter';
+    // Enemy fire reads as a solid, high-contrast *danger pellet*: a dark rim, a
+    // saturated body in the firer's colour, and a white-hot core, with only a
+    // tight glow. Drawn source-over (not additive) and on top of the enemies, so
+    // incoming shots never blend into the enemy bloom the way the old additive
+    // same-colour dots did — the core/rim make them unmistakably projectiles.
     for (const b of this.enemyBullets) {
       if (b.x < bnd.minX || b.x > bnd.maxX || b.y < bnd.minY || b.y > bnd.maxY) continue;
-      // Radius/colour are fixed for a bullet's lifetime: cache its sprite so the
-      // key string isn't rebuilt per bullet per frame (boss patterns spawn many).
       let spr = b._spr;
       if (spr === undefined) {
-        spr = glowSprite('eb|' + b.r + '|' + b.color, b.r, 10, (g) => {
-          g.fillStyle = b.color; g.shadowColor = b.color; g.shadowBlur = 10;
-          g.beginPath(); g.arc(0, 0, b.r, 0, TAU); g.fill();
+        const r = b.r;
+        const blur = Math.max(5, r * 0.7);
+        spr = glowSprite('eb2|' + r + '|' + b.color, r + 2.5, blur, (g) => {
+          g.shadowColor = b.color; g.shadowBlur = blur;
+          g.fillStyle = 'rgba(8,2,12,0.92)';
+          g.beginPath(); g.arc(0, 0, r + 1.5, 0, TAU); g.fill();
+          g.shadowBlur = 0;
+          g.fillStyle = b.color;
+          g.beginPath(); g.arc(0, 0, r, 0, TAU); g.fill();
+          g.fillStyle = '#ffffff';
+          g.beginPath(); g.arc(0, 0, Math.max(1.6, r * 0.42), 0, TAU); g.fill();
         });
         b._spr = spr;
       }
       if (spr) {
         ctx.drawImage(spr.canvas, b.x - spr.off, b.y - spr.off);
       } else {
-        ctx.fillStyle = b.color; ctx.shadowColor = b.color; ctx.shadowBlur = 10;
+        ctx.fillStyle = 'rgba(8,2,12,0.92)';
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 1.5, 0, TAU); ctx.fill();
+        ctx.fillStyle = b.color;
         ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(1.6, b.r * 0.42), 0, TAU); ctx.fill();
       }
     }
-    ctx.globalCompositeOperation = 'source-over';
     ctx.shadowBlur = 0;
   }
 
