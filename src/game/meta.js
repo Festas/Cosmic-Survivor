@@ -138,16 +138,16 @@ export function canBuyMeta(def, levels, stardust) {
 // the reward is predictable and testable. The `salvage` meta multiplier is
 // applied by the caller (World) via bonus.stardustMul.
 //
-// Tuned deliberately lean: a run should pay out enough to chip away at the
-// Hangar, not bankroll it in one sitting — so Ascension upgrades stay a
-// meaningful, challenging grind rather than an instant unlock. The divisors and
-// per-source weights below are intentionally stingy (roughly half the early
-// payout) to keep the long-haul grind feeling earned rather than handed out.
+// Tuned deliberately lean: a run should pay out only a trickle toward the
+// Hangar, never bankroll it — Ascension is a long-haul grind. Stardust is now
+// just one of three economies (see idle.js: Nebula + Singularity Cores), so this
+// per-run payout is kept especially stingy; the idle Station and its premium
+// Cores are meant to carry the heavier late-game progression.
 export function stardustForRun({ score = 0, time = 0, kills = 0, level = 1, bossKills = 0 } = {}) {
-  const fromScore = score / 380;
-  const fromTime = time / 30;
-  const fromKills = kills / 26;
-  const fromLevel = Math.max(0, level - 1) * 0.5;
-  const fromBoss = bossKills * 10;
+  const fromScore = score / 680;
+  const fromTime = time / 54;
+  const fromKills = kills / 46;
+  const fromLevel = Math.max(0, level - 1) * 0.3;
+  const fromBoss = bossKills * 6;
   return Math.max(0, Math.floor(fromScore + fromTime + fromKills + fromLevel + fromBoss));
 }

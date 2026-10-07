@@ -74,6 +74,29 @@ const BOSS_SHAPES = new Set([
 // Half-angle of the Devourer's open maw (shared by the silhouette and its fangs).
 const MAW_HALF = 0.46;
 
+// Ascension-tier heat tints for cycled (post-wave-100) bosses. Index 0 = tier 2
+// (heated gold), 1 = tier 3 (ember orange), 2 = tier 4 (hot red-orange), 3 =
+// tier 5+ (white-hot). Drawn from the existing gold/fire palette so the escalation
+// reads as "overheating armour" rather than a new colour scheme. The escalation is
+// deliberately CLAMPED at tier 5 (see tierLevel): beyond that the look is unchanged
+// and only the badge's "+" marks the higher repeat.
+const TIER_TINTS = ['#ffd447', '#ff8a3d', '#ff6a4a', '#fff2d8'];
+
+// Clamp a raw tier (1..∞) to the 1..5 escalation band used by all ascension art,
+// so very high repeats don't make the visuals explode. Non-finite/low inputs
+// collapse to 1 (= no ascension treatment).
+function tierLevel(tier) {
+  const t = Math.floor(Number(tier) || 1);
+  return t < 1 ? 1 : t > 5 ? 5 : t;
+}
+
+// Resolve the heat tint for a clamped tier level (2..5). Pure lookup; only ever
+// called for ascension art (tier >= 2).
+function tierTint(lvl) {
+  const i = lvl - 2;
+  return TIER_TINTS[i < 0 ? 0 : i > 3 ? 3 : i];
+}
+
 // True for shapes that should be drawn upright (pixel art / saucers / bosses look
 // wrong tumbling at a random angle). world.drawEnemies uses this to decide spin.
 export function isUpright(shape) {
@@ -342,9 +365,14 @@ function rimLight(ctx, shape, r, fill) {
 // base silhouette, a volumetric form-shading pass (upper-left key light),
 // shape-specific plating/eyes, a lit rim, and a crisp dark outline so the body
 // always reads against bloom and the enemy fire on top of it.
-//   opts = { fill, glow, blur, accent, highlight, eye }
+//   opts = { fill, glow, blur, accent, highlight, eye, tier }
+// `tier` (default 1) is the post-wave-100 "Ascension" repeat index threaded in by
+// the caller (and folded into the sprite cache key there). For tier === 1 the
+// output is byte-for-byte identical to before; for a BOSS shape at tier >= 2 an
+// extra baked "ascension" overlay is layered on top. `tier` is ignored entirely
+// for non-boss shapes.
 export function drawEnemyBody(ctx, shape, r, opts) {
-  const { fill, glow, blur = 0, accent, highlight, eye } = opts;
+  const { fill, glow, blur = 0, accent, highlight, eye, tier = 1 } = opts;
 
   // 1) Glowing base silhouette (bakes the outer bloom via shadowBlur).
   enemyPath(ctx, shape, r);
@@ -371,6 +399,10 @@ export function drawEnemyBody(ctx, shape, r, opts) {
   ctx.lineWidth = Math.max(1.6, r * 0.14);
   ctx.strokeStyle = 'rgba(4,7,18,0.9)';
   ctx.stroke();
+
+  // 6) Ascension overlay for cycled bosses — only for boss silhouettes at tier 2+.
+  // Guarded so tier 1 (normal play) stays pixel-identical to the above.
+  if (tier >= 2 && BOSS_SHAPES.has(shape)) bossAscension(ctx, shape, r, tier, opts);
 }
 
 // Faceted craft (drone/swarm/spitter/dasher/splitter/brute/seeder/sentinel):
@@ -719,14 +751,129 @@ function flourishNemesis(ctx, r, accent, highlight, eye) {
   lamp(ctx, 0, 0, Math.max(1.5, r * 0.1), eye, accent);
 }
 
+// ---------------------------------------------------------------------------
+// Ascension overlay (post-wave-100 boss repeats). Layered on top of the finished
+// boss hull inside drawEnemyBody, so it is baked into the sprite exactly once —
+// no per-frame cost. Everything here is a pure function of (shape, r, tier, opts)
+// with NO randomness, so the cached sprite is stable. The caller folds `tier`
+// into the sprite cache key. All geometry is kept within ~r * 1.12 so it never
+// exceeds the baked sprite box, and every gradient is feature-guarded with a flat
+// fallback so a minimal mock ctx (no gradient factories) still fills/strokes.
+function bossAscension(ctx, shape, r, tier, opts) {
+  const { highlight } = opts;
+  const lvl = tierLevel(tier);          // 2..5 here (tier >= 2 is guaranteed by caller)
+  const m = (lvl - 1) / 4;              // escalation 0.25 (tier 2) .. 1.0 (tier 5+)
+  const tint = tierTint(lvl);
+
+  // (a) Tier-coloured edge heat: hot at the rim, fading inward, clipped to the
+  // hull so only the armour edge glows. Feature-guarded radial, flat-stroke
+  // fallback that still tints the inner rim.
+  ctx.save();
+  enemyPath(ctx, shape, r);
+  ctx.clip();
+  if (typeof ctx.createRadialGradient === 'function') {
+    const hg = ctx.createRadialGradient(0, 0, r * 0.45, 0, 0, r);
+    hg.addColorStop(0, withAlpha(tint, 0));
+    hg.addColorStop(0.72, withAlpha(tint, 0.08 + 0.14 * m));
+    hg.addColorStop(1, withAlpha(tint, 0.28 + 0.30 * m));
+    ctx.fillStyle = hg;
+    ctx.fillRect(-r * 1.2, -r * 1.2, r * 2.4, r * 2.4);
+  } else {
+    enemyPath(ctx, shape, r);
+    ctx.lineWidth = Math.max(1.5, r * 0.08);
+    ctx.strokeStyle = withAlpha(tint, 0.2 + 0.2 * m);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // (b) Hot corona rim: a glowing tinted stroke on the silhouette (baked blur, so
+  // free per frame). Width/alpha/glow escalate with tier, staying inside the box.
+  ctx.save();
+  enemyPath(ctx, shape, r);
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(1.5, r * (0.03 + 0.035 * m));
+  ctx.strokeStyle = withAlpha(tint, 0.5 + 0.4 * m);
+  ctx.shadowColor = tint;
+  ctx.shadowBlur = r * (0.12 + 0.16 * m);   // <= r*0.28; glow stays within the sprite box
+  ctx.stroke();
+  ctx.restore();
+
+  // (c) Crown of small spikes around the silhouette — more of them at higher tiers.
+  // Base seated just inside the rim, tips at r*1.10 (within the r*1.12 budget).
+  const spikes = 8 + (lvl - 2) * 2;         // 8, 10, 12, 14 for tiers 2..5
+  const baseR = r * 0.94, tipR = r * 1.10, bw = r * 0.05;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(1, r * 0.02);
+  ctx.shadowColor = tint;
+  ctx.shadowBlur = r * 0.10 * m;
+  for (let i = 0; i < spikes; i++) {
+    const a = (i / spikes) * TAU - Math.PI / 2;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    const px = -dy, py = dx;              // perpendicular for the spike base
+    ctx.beginPath();
+    ctx.moveTo(dx * baseR + px * bw, dy * baseR + py * bw);
+    ctx.lineTo(dx * tipR, dy * tipR);
+    ctx.lineTo(dx * baseR - px * bw, dy * baseR - py * bw);
+    ctx.closePath();
+    ctx.fillStyle = withAlpha(tint, 0.85);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(4,7,18,0.8)';
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // (d) Tier badge: a legible row of pips near the core seat so the player can read
+  // the exact tier. Clipped to the hull so it can never poke out or clip the box.
+  // Up to 5 pips (the escalation cap); a small "+" tick marks any repeat past 5.
+  ctx.save();
+  enemyPath(ctx, shape, r);
+  ctx.clip();
+  const pips = lvl;                       // 2..5 pips (lvl already clamped)
+  const over = Math.floor(Number(tier) || 1) > 5;
+  const by = r * 0.52, pr = r * 0.05, gap = r * 0.13;
+  const span = (pips - 1) * gap;
+  const halfW = span / 2 + pr * 2.2 + (over ? pr * 2 : 0);
+  // Dark seating plate so the pips read against any hull colour.
+  ctx.fillStyle = 'rgba(6,10,22,0.6)';
+  ctx.beginPath();
+  ctx.ellipse(over ? pr : 0, by, halfW, pr * 1.9, 0, 0, TAU);
+  ctx.fill();
+  for (let i = 0; i < pips; i++) {
+    const cx = -span / 2 + i * gap;
+    ctx.shadowColor = tint; ctx.shadowBlur = pr * 1.6;
+    ctx.fillStyle = withAlpha(tint, 0.95);
+    ctx.beginPath(); ctx.arc(cx, by, pr, 0, TAU); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = withAlpha('#ffffff', 0.85);
+    ctx.beginPath(); ctx.arc(cx - pr * 0.25, by - pr * 0.25, pr * 0.4, 0, TAU); ctx.fill();
+  }
+  if (over) {
+    const plusX = span / 2 + gap;
+    ctx.strokeStyle = withAlpha(highlight || '#ffffff', 0.95);
+    ctx.lineWidth = Math.max(1, r * 0.025);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(plusX - pr * 0.7, by); ctx.lineTo(plusX + pr * 0.7, by);
+    ctx.moveTo(plusX, by - pr * 0.7); ctx.lineTo(plusX, by + pr * 0.7);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 // Animated boss energy core — drawn LIVE each frame at the boss centre (origin).
 // Two counter-rotating energy arcs orbit a pulsing plasma core, giving the boss
 // an unmistakable, menacing presence without touching the cached swarm path.
-//   opts = { time, color, ring }
+//   opts = { time, color, ring, tier }
 export function drawBossCore(ctx, r, opts) {
-  const { time = 0, color, ring } = opts;
+  const { time = 0, color, ring, tier = 1 } = opts;
   const rg = ring || color;
   const pulse = 0.82 + Math.sin(time * 3.2) * 0.18;
+  // Ascension escalation (clamped at tier 5). Zero for normal play so tier 1 is
+  // visually unchanged; grows gently toward 1 for the hottest repeats.
+  const lvl = tierLevel(tier);
+  const m = (lvl - 1) / 4;
+  const tint = tierTint(lvl);
 
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -755,6 +902,24 @@ export function drawBossCore(ctx, r, opts) {
     ctx.beginPath(); ctx.arc(hx, hy, hr, 0, TAU); ctx.fill();
   }
 
+  // Hotter ascension flare — a broad, tinted additive bloom that grows gently with
+  // tier so cycled bosses read as "overheating". Live (not clipped) and only ever
+  // drawn for the 1-2 bosses on screen; reaches ~r*1.25 at the cap.
+  if (tier >= 2) {
+    if (typeof ctx.createRadialGradient === 'function') {
+      const fr = r * (0.85 + 0.4 * m) * pulse;
+      const fg = ctx.createRadialGradient(0, 0, 0, 0, 0, fr);
+      fg.addColorStop(0, withAlpha(tint, 0.30 + 0.25 * m));
+      fg.addColorStop(0.5, withAlpha(tint, 0.12));
+      fg.addColorStop(1, withAlpha(tint, 0));
+      ctx.fillStyle = fg;
+      ctx.beginPath(); ctx.arc(0, 0, fr, 0, TAU); ctx.fill();
+    } else {
+      ctx.fillStyle = withAlpha(tint, 0.12 + 0.08 * m);
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, TAU); ctx.fill();
+    }
+  }
+
   // Outer rotating energy arcs.
   ctx.shadowColor = rg; ctx.shadowBlur = r * 0.3;
   ctx.strokeStyle = withAlpha(rg, 0.9);
@@ -770,6 +935,21 @@ export function drawBossCore(ctx, r, opts) {
   for (let k = 0; k < 2; k++) {
     const a = -time * 2.3 + k * Math.PI;
     ctx.beginPath(); ctx.arc(0, 0, r * 0.74, a, a + Math.PI * 0.5); ctx.stroke();
+  }
+
+  // Extra ascension ring — a brighter, tinted outer ring that only spins up for
+  // cycled bosses. Three short segments at ~r*1.2 (within the live ~r*1.3 reach),
+  // escalating in width/brightness with tier.
+  if (tier >= 2) {
+    ctx.shadowColor = tint; ctx.shadowBlur = r * 0.18;
+    ctx.strokeStyle = withAlpha(tint, 0.55 + 0.35 * m);
+    ctx.lineWidth = Math.max(1.5, r * (0.03 + 0.03 * m));
+    const rr = r * (1.14 + 0.06 * m);
+    const seg = Math.PI * (0.42 + 0.12 * m);
+    for (let k = 0; k < 3; k++) {
+      const a = time * 2.0 + k * (TAU / 3);
+      ctx.beginPath(); ctx.arc(0, 0, rr, a, a + seg); ctx.stroke();
+    }
   }
 
   ctx.restore();

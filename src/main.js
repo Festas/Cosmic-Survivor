@@ -9,6 +9,11 @@ import { RARITY } from './game/upgrades.js';
 import { weaponDef } from './game/weapons.js';
 import { SHIPS, shipById, DEFAULT_SHIP_ID } from './game/ships.js';
 import { META_UPGRADES, metaCost } from './game/meta.js';
+import {
+  GENERATORS, generatorCost, generatorBulkCost, maxAffordable, baseRate, totalRate,
+  prestigeGain, prestigeMultiplier, mainBoostMultiplier, PRESTIGE_BASE,
+  SPECIAL_UPGRADES, specialCost, canBuySpecial, offlineGain, OFFLINE_CAP_SECONDS,
+} from './game/idle.js';
 import { DIRECTIVES, DIRECTIVE_BY_ID, directiveStardustMultiplier } from './game/modifiers.js';
 import { ACHIEVEMENTS, evaluateAchievements } from './game/achievements.js';
 import { formatNumber, formatTime } from './engine/utils.js';
@@ -142,13 +147,14 @@ function cycleShip(dir) {
 // Refresh the start screen's Stardust balance + ship summary.
 function refreshStart() {
   $('start-stardust').textContent = formatNumber(store.stardust);
+  updateStartNebula();
   updateShipPick();
   updateStartDirectives();
 }
 
 // ---- Hangar overlay ----
 let hangarTab = 'ships';
-const HANGAR_TABS = ['ships', 'meta', 'directives', 'codex'];
+const HANGAR_TABS = ['ships', 'meta', 'station', 'directives', 'codex'];
 
 function openHangar() {
   renderHangar();
@@ -187,6 +193,7 @@ function renderHangar() {
   renderPilotRecord();
   renderShips();
   renderMeta();
+  renderStation();
   renderDirectives();
   renderCodex();
   setHangarTab(hangarTab);
@@ -265,6 +272,121 @@ function renderMeta() {
     });
     wrap.appendChild(row);
   }
+}
+
+// ---- Orbital Station: the idle/AFK layer (Nebula → Cores → premium buffs) ----
+// Rebuilt wholesale on open and ~5×/s while visible so the live Nebula balance,
+// production rate and affordability all tick in real time. Small (6+6 rows) so a
+// full rebuild is far cheaper than hand-patching every number.
+let stationBuyQty = 1; // 1 | 10 | 'max'
+
+function stationRateMult() {
+  const idle = store.getIdle();
+  return prestigeMultiplier(idle.lifetimeCores) * mainBoostMultiplier(store.getRunProfile());
+}
+
+function renderStation() {
+  const wrap = $('hangar-station');
+  if (!wrap) return;
+  const idle = store.getIdle();
+  const profile = store.getRunProfile();
+  const mult = stationRateMult();
+  const rate = totalRate(idle, profile);
+  const gain = prestigeGain(idle.lifetimeNebula);
+  // Lifetime Nebula needed for the next Core = PRESTIGE_BASE·(cores+1)³.
+  const nextCoreAt = PRESTIGE_BASE * Math.pow(gain + 1, 3);
+  const prestigePct = Math.max(0, Math.min(100, (idle.lifetimeNebula / nextCoreAt) * 100));
+  const boostPct = Math.round((mainBoostMultiplier(profile) - 1) * 100);
+
+  const qtyBtns = [1, 10, 'max'].map((q) =>
+    `<button class="btn btn-sm st-qty${stationBuyQty === q ? ' active' : ''}" data-qty="${q}">${q === 'max' ? 'MAX' : '×' + q}</button>`).join('');
+
+  let html = `
+    <div class="station-head">
+      <div class="st-cur st-neb"><span class="st-k">⬡ Nebula</span><b>${formatNumber(idle.nebula)}</b><span class="st-sub">${rate >= 100 ? formatNumber(rate) : rate.toFixed(1)}/s</span></div>
+      <div class="st-cur st-core"><span class="st-k">🌀 Cores</span><b>${formatNumber(idle.cores)}</b><span class="st-sub">×${prestigeMultiplier(idle.lifetimeCores).toFixed(2)} output</span></div>
+    </div>
+    <div class="station-note">Your Station mines <b>Nebula</b> in real time — even while the tab is closed. Spend it on generators, then <b>Collapse</b> for <b>Singularity Cores</b> that buy permanent run buffs. Run progress boosts production: <b>+${boostPct}%</b> from your record.</div>
+    <div class="prestige-row">
+      <div class="prestige-info">
+        <div class="prestige-title">🌀 Collapse Station</div>
+        <div class="prestige-sub">${gain > 0 ? `Mint <b>${formatNumber(gain)}</b> Core${gain === 1 ? '' : 's'} · resets generators &amp; Nebula` : `Reach ${formatNumber(nextCoreAt)} lifetime Nebula for your first Core`}</div>
+        <div class="prestige-bar"><span style="width:${prestigePct}%"></span></div>
+      </div>
+      <button class="btn prestige-btn"${gain > 0 ? '' : ' disabled'}>COLLAPSE</button>
+    </div>
+    <div class="station-sec">GENERATORS <span class="st-qtyrow">${qtyBtns}</span></div>
+    <div class="gen-list">`;
+
+  for (const def of GENERATORS) {
+    const owned = idle.generators[def.id] || 0;
+    const qty = stationBuyQty === 'max' ? Math.max(1, maxAffordable(def, owned, idle.nebula)) : stationBuyQty;
+    const cost = generatorBulkCost(def, owned, qty);
+    const afford = idle.nebula >= cost && (stationBuyQty !== 'max' || maxAffordable(def, owned, idle.nebula) > 0);
+    const contrib = def.rate * owned * mult;
+    html += `
+      <div class="gen-row${owned > 0 ? ' owned' : ''}">
+        <div class="gen-ico">${def.icon}</div>
+        <div class="gen-main">
+          <div class="gen-name">${def.name} <span class="gen-owned">×${formatNumber(owned)}</span></div>
+          <div class="gen-desc">${def.desc}</div>
+          <div class="gen-rate">${owned > 0 ? `${contrib >= 100 ? formatNumber(contrib) : contrib.toFixed(1)} ⬡/s` : `${def.rate} ⬡/s each`}</div>
+        </div>
+        <button class="btn btn-sm gen-buy" data-id="${def.id}"${afford ? '' : ' disabled'}>
+          <span class="gb-q">${stationBuyQty === 'max' ? 'MAX ' + formatNumber(qty) : '×' + qty}</span>
+          <span class="gb-c">⬡ ${formatNumber(cost)}</span>
+        </button>
+      </div>`;
+  }
+  html += `</div><div class="station-sec">CORE UPGRADES <span class="st-sec-sub">spent on every run</span></div><div class="special-list">`;
+
+  for (const def of SPECIAL_UPGRADES) {
+    const level = idle.special[def.id] || 0;
+    const maxed = level >= def.max;
+    const cost = specialCost(def, level);
+    const afford = canBuySpecial(def, idle.special, idle.cores);
+    const pips = Array.from({ length: def.max }, (_, i) => `<span class="pip${i < level ? ' on' : ''}"></span>`).join('');
+    const btn = maxed
+      ? '<div class="meta-max">MAX</div>'
+      : `<button class="btn btn-sm special-buy" data-id="${def.id}"${afford ? '' : ' disabled'}>🌀 ${formatNumber(cost)}</button>`;
+    html += `
+      <div class="special-row${maxed ? ' maxed' : ''}">
+        <div class="meta-ico">${def.icon}</div>
+        <div class="meta-main">
+          <div class="meta-name">${def.name} <span class="meta-lvl">${level}/${def.max}</span></div>
+          <div class="meta-desc">${def.desc}${def.effect ? ` · now <b>${def.effect(Math.max(1, level))}</b>` : ''}</div>
+          <div class="meta-pips">${pips}</div>
+        </div>
+        <div class="meta-action">${btn}</div>
+      </div>`;
+  }
+  html += '</div>';
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.st-qty').forEach((b) => b.addEventListener('click', () => {
+    const q = b.dataset.qty;
+    stationBuyQty = q === 'max' ? 'max' : +q;
+    audio.play('ui');
+    renderStation();
+  }));
+  wrap.querySelector('.prestige-btn')?.addEventListener('click', () => {
+    const got = store.prestigeIdle();
+    if (got > 0) {
+      audio.play('gameover');
+      showToast(`<span class="t-ico">🌀</span><div class="t-body"><b>Station Collapsed</b><span>+${formatNumber(got)} Singularity Core${got === 1 ? '' : 's'}</span></div>`);
+      renderStation();
+    }
+  });
+  wrap.querySelectorAll('.gen-buy').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.id;
+    const def = GENERATORS.find((g) => g.id === id);
+    const owned = store.getIdle().generators[id] || 0;
+    const qty = stationBuyQty === 'max' ? maxAffordable(def, owned, store.getIdle().nebula) : stationBuyQty;
+    if (store.buyGenerator(id, qty) > 0) { audio.play('pickup'); renderStation(); }
+  }));
+  wrap.querySelectorAll('.special-buy').forEach((b) => b.addEventListener('click', () => {
+    if (store.buySpecial(b.dataset.id)) { audio.play('pickup'); renderStation(); }
+  }));
 }
 
 // ---- Directives: opt-in challenge modifiers (more risk → more Stardust) ----
@@ -361,6 +483,7 @@ function startRun() {
     shipId: store.getSelectedShip(),
     metaLevels: store.getMeta(),
     directives: store.getDirectives().slice(),
+    idleSpecial: store.getIdle().special,
   });
   bindWorld();
   resize();
@@ -469,6 +592,15 @@ function showGameOver(summary) {
   const goSd = $('go-stardust');
   goSd.textContent = `✦ +${formatNumber(earned)} Stardust  ·  ${formatNumber(total)} total`;
   goSd.classList.toggle('none', earned <= 0);
+
+  // Nebula burst for the Orbital Station (idle layer) — shown only when earned so
+  // the game-over panel stays clean for brand-new players.
+  const goNeb = $('go-nebula');
+  if (goNeb) {
+    const neb = summary.nebula || 0;
+    goNeb.textContent = `⬡ +${formatNumber(neb)} Nebula  ·  ${formatNumber(summary.nebulaTotal || store.getIdle().nebula)} banked`;
+    goNeb.classList.toggle('hidden', neb <= 0);
+  }
 
   const gc = $('go-commends');
   if (gc) {
@@ -679,6 +811,73 @@ function updateHud() {
   lastMultTier = tier;
 }
 
+// ------------------------------------------------------------- idle layer
+// The Orbital Station mines Nebula in real time, on top of whatever else is on
+// screen (menus or an active run). We accumulate fractional Nebula each frame and
+// commit whole units to the Store, persisting to localStorage only periodically
+// to avoid hammering it every frame.
+let idleAccum = 0;   // fractional Nebula not yet committed to the Store
+let idleSaveT = 0;   // seconds since the idle state was last persisted
+let stationRefreshT = 0; // throttle for live Station re-renders while it's open
+
+function tickIdle(dt) {
+  const idle = store.getIdle();
+  const rate = totalRate(idle, store.getRunProfile());
+  idleAccum += rate * dt;
+  if (idleAccum >= 1) {
+    const whole = Math.floor(idleAccum);
+    idleAccum -= whole;
+    idle.nebula += whole;
+    idle.lifetimeNebula += whole;
+  }
+  // Persist (and stamp lastTick for offline catch-up) at most every 5s.
+  idleSaveT += dt;
+  if (idleSaveT >= 5) {
+    idleSaveT = 0;
+    idle.lastTick = Date.now();
+    store.save();
+  }
+  // Live-refresh the Station tab (if open) a few times a second.
+  if (!started && !$('hangar').classList.contains('hidden') && hangarTab === 'station') {
+    stationRefreshT += dt;
+    if (stationRefreshT >= 0.2) { stationRefreshT = 0; renderStation(); }
+  }
+  // Keep the start-screen Nebula pill ticking too.
+  if (!started && !$('start').classList.contains('hidden')) updateStartNebula();
+}
+
+// Grant offline/elapsed Nebula earned since the last recorded tick, then re-stamp.
+function catchUpOffline() {
+  const idle = store.getIdle();
+  const nowMs = Date.now();
+  if (idle.lastTick > 0) {
+    const seconds = (nowMs - idle.lastTick) / 1000;
+    const rate = totalRate(idle, store.getRunProfile());
+    const gain = Math.floor(offlineGain(rate, seconds));
+    if (gain > 0) {
+      store.addNebula(gain);
+      const capped = seconds > OFFLINE_CAP_SECONDS;
+      showToast(`<span class="t-ico">⬡</span><div class="t-body"><b>Welcome back</b><span>Station mined +${formatNumber(gain)} Nebula${capped ? ' (max)' : ''}</span></div>`);
+    }
+  }
+  store.setIdleTick(nowMs);
+}
+
+// Refresh just the start-screen Nebula pill (balance + live rate).
+function updateStartNebula() {
+  const el = $('start-nebula');
+  if (!el) return;
+  const idle = store.getIdle();
+  el.textContent = formatNumber(idle.nebula);
+  const rateEl = $('start-nebula-rate');
+  if (rateEl) {
+    const rate = totalRate(idle, store.getRunProfile());
+    rateEl.textContent = rate > 0 ? `+${rate >= 100 ? formatNumber(rate) : rate.toFixed(1)}/s` : '';
+  }
+  const pill = $('start-nebula-pill');
+  if (pill) pill.classList.toggle('hidden', idle.nebula <= 0 && baseRate(idle.generators) <= 0);
+}
+
 // ------------------------------------------------------------- main loop
 let last = performance.now();
 function frame(now) {
@@ -686,6 +885,9 @@ function frame(now) {
   last = now;
 
   const cmd = input.poll();
+
+  // The idle Station runs alongside everything — menus and active runs alike.
+  tickIdle(dt);
 
   if (started) {
     if (cmd.pause) togglePause();
@@ -725,6 +927,7 @@ $('go-hangar-btn').addEventListener('click', openHangar);
 $('hangar-close').addEventListener('click', closeHangar);
 $('tab-ships').addEventListener('click', () => setHangarTab('ships'));
 $('tab-meta').addEventListener('click', () => setHangarTab('meta'));
+$('tab-station').addEventListener('click', () => setHangarTab('station'));
 $('tab-directives').addEventListener('click', () => setHangarTab('directives'));
 $('tab-codex').addEventListener('click', () => setHangarTab('codex'));
 $('ship-prev').addEventListener('click', () => cycleShip(-1));
@@ -748,10 +951,15 @@ $('quit-btn').addEventListener('click', () => {
 
 // pause when the tab loses focus mid-run
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && started && world.state === 'playing') togglePause(true);
+  if (document.hidden) {
+    // Stamp the idle tick + persist so offline catch-up resumes accurately.
+    store.setIdleTick(Date.now());
+    if (started && world.state === 'playing') togglePause(true);
+  }
 });
 
 applySettingsToUI();
+catchUpOffline();
 refreshStart();
 resize();
 requestAnimationFrame(frame);

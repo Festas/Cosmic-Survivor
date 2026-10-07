@@ -16,13 +16,14 @@ import { paletteFor, drawEnemyBody, drawBossCore, isUpright, enemyPath, withAlph
 import { drawShipBody, drawDroneBody } from './shipArt.js';
 import { Player } from './player.js';
 import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize, rollElite } from './enemies.js';
-import { THEMES, themeIndexForWave, bossKeyForWave, pickFromRoster } from './waves.js';
+import { THEMES, themeIndexForWave, bossKeyForWave, bossTierForWave, pickFromRoster } from './waves.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
 import { draftUpgrades } from './upgrades.js';
 import { weaponDef, addOrLevelWeapon, evolveWeapon, createWeaponInst } from './weapons.js';
 import { Background } from './background.js';
 import { shipById, DEFAULT_SHIP_ID } from './ships.js';
 import { computeMetaBonus, createMetaBonus, stardustForRun } from './meta.js';
+import { applyIdleBonus, nebulaForRun } from './idle.js';
 import { computeDirectiveEffect, createDirectiveEffect } from './modifiers.js';
 
 // Lightweight uniform spatial grid for enemy broad-phase queries.
@@ -94,6 +95,9 @@ export class World {
     this.shipId = config.shipId || DEFAULT_SHIP_ID;
     this.metaBonus = config.metaLevels ? computeMetaBonus(config.metaLevels)
       : (config.metaBonus || createMetaBonus());
+    // Premium idle "special" upgrades (bought with Singularity Cores) fold their
+    // buffs on top of Ascension, so the Orbital Station visibly empowers each run.
+    if (config.idleSpecial) applyIdleBonus(this.metaBonus, config.idleSpecial);
     // Active challenge directives fold into one difficulty/economy effect object
     // that spawn, damage, XP and reward code read. Neutral (all 1s) when none set.
     this.directives = Array.isArray(config.directives) ? config.directives.slice() : [];
@@ -229,6 +233,10 @@ export class World {
       hitFlash: 0, spin: rand() * TAU, alive: true, contactT: 0,
       massive: !!def.massive,
     };
+    // Ascension tier: how many times the 10-boss roster has been cleared (1 for
+    // waves 10–100, 2 for 110–200, …). The boss art escalates with it so cycled
+    // repeats read as visibly stronger, not identical reskins.
+    if (isBoss) e.bossTier = bossTierForWave(this.wave);
     // Elite promotion: a time-gated chance to turn a mid-tier+ spawn into a
     // heavier, XP-rich variant (gold ring drawn in renderEnemies). Scaling is
     // applied on top of the director curves so elites stay relative to the wave.
@@ -1102,6 +1110,15 @@ export class World {
       summary.stardustTotal = this.store.get().stardust;
     }
 
+    // main → idle: actively finishing a run also mints a Nebula burst for the
+    // Orbital Station, so the two economies feed each other (see game/idle.js).
+    const nebula = nebulaForRun(summary);
+    summary.nebula = nebula;
+    if (this.store?.addNebula) {
+      this.store.addNebula(nebula);
+      summary.nebulaTotal = this.store.getIdle().nebula;
+    }
+
     if (this.onGameOver) this.onGameOver(summary);
   }
 
@@ -1247,13 +1264,17 @@ export class World {
       const blur = dom ? 14 : (e.boss ? 24 : 6);
       const shape = e.type.shape;
       const r = e.radius;
+      // Ascension tier drives the boss art escalation; 1 for everything non-boss
+      // and for the first roster cycle. Baked into the sprite key so a tier-2 boss
+      // never reuses the tier-1 cached sprite.
+      const tier = e.bossTier || 1;
       // Plating/rim/eye palette derives from the enemy's own base colour (not the
       // possibly white/cryo `fill`), so it stays stable through hit-flash/freeze.
       const pal = paletteFor(e.color);
       const spr = glowSprite(
-        'e|' + shape + '|' + r + '|' + fill + '|' + glowColor + '|' + blur + '|' + e.color,
+        'e|' + shape + '|' + r + '|' + fill + '|' + glowColor + '|' + blur + '|' + e.color + '|' + tier,
         r, blur,
-        (g) => drawEnemyBody(g, shape, r, { fill, glow: glowColor, blur, accent: pal.accent, highlight: pal.highlight, eye: pal.eye }),
+        (g) => drawEnemyBody(g, shape, r, { fill, glow: glowColor, blur, accent: pal.accent, highlight: pal.highlight, eye: pal.eye, tier }),
       );
       ctx.save();
       ctx.translate(e.x, e.y);
@@ -1263,14 +1284,14 @@ export class World {
       if (spr) {
         ctx.drawImage(spr.canvas, -spr.off, -spr.off);
       } else {
-        drawEnemyBody(ctx, shape, r, { fill, glow: glowColor, blur, accent: pal.accent, highlight: pal.highlight, eye: pal.eye });
+        drawEnemyBody(ctx, shape, r, { fill, glow: glowColor, blur, accent: pal.accent, highlight: pal.highlight, eye: pal.eye, tier });
       }
       // Live animated energy core makes the boss fight feel epic. Only a couple of
       // bosses are ever on screen, so this per-frame glow is negligible.
       if (e.boss) {
         // Random per-boss phase so multiple bosses don't pulse in lockstep.
         if (e._coreT === undefined) e._coreT = rand() * 6;
-        drawBossCore(ctx, r, { time: now + e._coreT, color: e.color, ring: pal.highlight });
+        drawBossCore(ctx, r, { time: now + e._coreT, color: e.color, ring: pal.highlight, tier });
       }
       ctx.restore();
 

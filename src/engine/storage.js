@@ -1,5 +1,10 @@
 // storage.js — safe localStorage wrapper for high scores and settings.
 
+import {
+  createIdleState, GENERATOR_BY_ID, generatorBulkCost, prestigeGain,
+  SPECIAL_BY_ID, specialCost, canBuySpecial,
+} from '../game/idle.js';
+
 const KEY = 'cosmic-survivor:v1';
 
 const DEFAULT = {
@@ -17,6 +22,8 @@ const DEFAULT = {
   ship: 'vanguard',     // last-selected ship id
   achievements: [],     // unlocked commendation ids
   directives: [],       // active challenge-directive ids (carried across runs)
+  // ---- Idle layer ("Orbital Station") -----------------------------------
+  idle: createIdleState(), // Nebula/Cores economy; see game/idle.js
   settings: { muted: false, shake: true, music: true },
 };
 
@@ -32,11 +39,37 @@ function load() {
       ships: Array.isArray(data.ships) && data.ships.length ? data.ships : ['vanguard'],
       achievements: Array.isArray(data.achievements) ? [...data.achievements] : [],
       directives: Array.isArray(data.directives) ? [...data.directives] : [],
+      idle: mergeIdle(data.idle),
       settings: { ...DEFAULT.settings, ...(data.settings || {}) },
     };
   } catch {
     return freshDefault();
   }
+}
+
+// Merge a persisted idle blob onto a pristine state so new fields (added in
+// later versions) always exist and nested maps are fresh, non-shared objects.
+function mergeIdle(saved) {
+  const base = createIdleState();
+  if (!saved || typeof saved !== 'object') return base;
+  base.nebula = Math.max(0, +saved.nebula || 0);
+  base.lifetimeNebula = Math.max(0, +saved.lifetimeNebula || 0);
+  base.cores = Math.max(0, +saved.cores || 0);
+  base.lifetimeCores = Math.max(0, +saved.lifetimeCores || 0);
+  base.lastTick = Math.max(0, +saved.lastTick || 0);
+  if (saved.generators && typeof saved.generators === 'object') {
+    for (const id in GENERATOR_BY_ID) {
+      const n = Math.max(0, Math.floor(+saved.generators[id] || 0));
+      if (n > 0) base.generators[id] = n;
+    }
+  }
+  if (saved.special && typeof saved.special === 'object') {
+    for (const id in SPECIAL_BY_ID) {
+      const n = Math.max(0, Math.floor(+saved.special[id] || 0));
+      if (n > 0) base.special[id] = Math.min(n, SPECIAL_BY_ID[id].max);
+    }
+  }
+  return base;
 }
 
 // A pristine copy of DEFAULT with fresh (non-shared) object/array fields.
@@ -47,6 +80,7 @@ function freshDefault() {
     ships: ['vanguard'],
     achievements: [],
     directives: [],
+    idle: createIdleState(),
     settings: { ...DEFAULT.settings },
   };
 }
@@ -158,4 +192,80 @@ export const Store = {
     return true;
   },
   clearDirectives() { this.data.directives = []; this.save(); },
+
+  // ---- Idle layer ("Orbital Station") ------------------------------------
+  getIdle() {
+    if (!this.data.idle || typeof this.data.idle !== 'object') this.data.idle = createIdleState();
+    return this.data.idle;
+  },
+
+  // The run-profile that feeds the main → idle production boost.
+  getRunProfile() {
+    return {
+      lifetimeStardust: this.data.lifetimeStardust || 0,
+      bestLevel: this.data.bestLevel || 0,
+      bossKillsTotal: this.data.bossKillsTotal || 0,
+    };
+  },
+
+  // Credit produced Nebula (from a tick, offline catch-up, or a run burst).
+  addNebula(amount) {
+    const n = Math.max(0, Math.floor(amount || 0));
+    if (n === 0) return this.getIdle().nebula;
+    const idle = this.getIdle();
+    idle.nebula += n;
+    idle.lifetimeNebula += n;
+    this.save();
+    return idle.nebula;
+  },
+
+  // Stamp the last production tick (epoch ms); used for offline catch-up.
+  setIdleTick(ms) {
+    this.getIdle().lastTick = Math.max(0, Math.floor(ms || 0));
+    this.save();
+  },
+
+  // Spend Nebula to buy `qty` units of a generator. Returns units actually bought.
+  buyGenerator(id, qty = 1) {
+    const def = GENERATOR_BY_ID[id];
+    if (!def) return 0;
+    const idle = this.getIdle();
+    const owned = Math.max(0, Math.floor(idle.generators[id] || 0));
+    const n = Math.max(0, Math.floor(qty));
+    if (n === 0) return 0;
+    const cost = generatorBulkCost(def, owned, n);
+    if (idle.nebula < cost) return 0;
+    idle.nebula -= cost;
+    idle.generators[id] = owned + n;
+    this.save();
+    return n;
+  },
+
+  // Collapse the station: mint Cores from this epoch's lifetime Nebula and reset
+  // generators + Nebula. Returns the number of Cores gained (0 if below threshold).
+  prestigeIdle() {
+    const idle = this.getIdle();
+    const gain = prestigeGain(idle.lifetimeNebula);
+    if (gain <= 0) return 0;
+    idle.cores += gain;
+    idle.lifetimeCores += gain;
+    idle.nebula = 0;
+    idle.lifetimeNebula = 0;
+    idle.generators = Object.create(null);
+    this.save();
+    return gain;
+  },
+
+  // Spend Cores to raise a special (premium) run upgrade by one level.
+  buySpecial(id) {
+    const def = SPECIAL_BY_ID[id];
+    if (!def) return false;
+    const idle = this.getIdle();
+    if (!canBuySpecial(def, idle.special, idle.cores)) return false;
+    const cur = Math.max(0, Math.floor(idle.special[id] || 0));
+    idle.cores -= specialCost(def, cur);
+    idle.special[id] = cur + 1;
+    this.save();
+    return true;
+  },
 };

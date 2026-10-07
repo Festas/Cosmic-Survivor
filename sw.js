@@ -35,6 +35,7 @@ const ASSETS = [
   './src/game/background.js',
   './src/game/ships.js',
   './src/game/meta.js',
+  './src/game/idle.js',
   './src/game/modifiers.js',
   './src/game/achievements.js',
 ];

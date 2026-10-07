@@ -93,6 +93,15 @@ export function bossKeyForWave(wave) {
   return THEMES[bossIndexForWave(wave)].boss;
 }
 
+// 1-based "Ascension Tier" of a boss wave: how many times the 10-boss roster has
+// been cleared. Waves 10–100 → tier 1, 110–200 → tier 2, 210–300 → tier 3, …
+// The run's exponential scale (config.bossWaveScale) already makes repeats far
+// tankier; the tier is the readable label the boss art uses to look the part.
+export function bossTierForWave(wave) {
+  const n = Math.max(1, Math.round(wave / WAVE.bossEvery)); // 1-based boss number
+  return Math.floor((n - 1) / WAVE.bossCount) + 1;
+}
+
 // Weighted pick of an enemy key from a theme roster. Accepts either an RNG
 // function or a pre-rolled sample in [0,1) (deterministic replay/testing).
 export function pickFromRoster(theme, r = rand) {

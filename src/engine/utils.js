@@ -94,11 +94,15 @@ export function weightedPick(items, weightKey = 'weight', r = rng) {
   return items[items.length - 1];
 }
 
-// Format large numbers compactly (12345 -> "12.3K").
+// Format large numbers compactly (12345 -> "12.3K"). Scales through K/M/B/T and
+// beyond (Qa/Qi) so the idle economy's large Nebula balances stay readable.
 export function formatNumber(n) {
   if (n < 1000) return String(Math.floor(n));
-  if (n < 1e6) return (n / 1e3).toFixed(n < 1e4 ? 1 : 0) + 'K';
-  return (n / 1e6).toFixed(n < 1e7 ? 1 : 0) + 'M';
+  const units = ['K', 'M', 'B', 'T', 'Qa', 'Qi'];
+  let u = -1;
+  let v = n;
+  while (v >= 1000 && u < units.length - 1) { v /= 1000; u += 1; }
+  return v.toFixed(v < 10 ? 1 : 0) + units[u];
 }
 
 export function formatTime(seconds) {
