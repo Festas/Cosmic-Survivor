@@ -14,6 +14,7 @@ import {
   prestigeGain, prestigeMultiplier, mainBoostMultiplier, PRESTIGE_BASE,
   SPECIAL_UPGRADES, specialCost, canBuySpecial, offlineGain, OFFLINE_CAP_SECONDS,
   generatorMilestoneMultiplier, generatorMilestoneProgress, MILESTONE_STEP, MILESTONE_BONUS,
+  clickYield, clickUpgradeCost, CLICK_UPGRADE,
 } from './game/idle.js';
 import { DIRECTIVES, DIRECTIVE_BY_ID, directiveStardustMultiplier } from './game/modifiers.js';
 import { ACHIEVEMENTS, evaluateAchievements } from './game/achievements.js';
@@ -155,11 +156,10 @@ function refreshStart() {
 
 // ---- Hangar overlay ----
 let hangarTab = 'ships';
-const HANGAR_TABS = ['ships', 'meta', 'station', 'directives', 'codex'];
+const HANGAR_TABS = ['ships', 'meta', 'directives', 'codex'];
 
 function openHangar(tab) {
-  // Optionally jump straight to a specific tab (e.g. the start-screen STATION
-  // shortcut opens the Hangar on the Orbital Station).
+  // Optionally jump straight to a specific tab.
   if (tab && HANGAR_TABS.includes(tab)) hangarTab = tab;
   renderHangar();
   // The Hangar can be opened from the start screen *or* the game-over screen.
@@ -197,7 +197,6 @@ function renderHangar() {
   renderPilotRecord();
   renderShips();
   renderMeta();
-  renderStation();
   renderDirectives();
   renderCodex();
   setHangarTab(hangarTab);
@@ -278,24 +277,102 @@ function renderMeta() {
   }
 }
 
-// ---- Orbital Station: the idle/AFK layer (Nebula → Cores → premium buffs) ----
-// Rebuilt wholesale on open and ~5×/s while visible so the live Nebula balance,
-// production rate and affordability all tick in real time. Small (6+6 rows) so a
-// full rebuild is far cheaper than hand-patching every number.
+// ---- Orbital Station: a standalone Cookie-Clicker-style idle layer ----------
+// A dedicated overlay (NOT a Hangar tab). It mines Nebula in real time; a manual
+// "big cookie" tap bootstraps the economy from zero, generators automate it, the
+// Mining Laser upgrades the tap, and Collapse prestiges it for Cores that buy
+// permanent run buffs. The scrollable store is rebuilt on open / on purchase /
+// ~5×/s for affordability; the header + tap gain tick every frame via
+// updateStationLive() so the live balance is always smooth.
 let stationBuyQty = 1; // 1 | 10 | 'max'
+let stationRefreshT = 0; // throttle for live store re-renders while open
+let tapSoundT = 0;       // last tap-sound timestamp (ms) for throttling
+
+function stationOpen() { return !$('station').classList.contains('hidden'); }
+
+function openStation() {
+  audio.play('ui');
+  renderStation();
+  updateStationLive();
+  // Make the Station the sole top, interactive overlay (same reasoning as the
+  // Hangar): hide the other menus/HUD so nothing paints over it or steals clicks.
+  $('gameover').classList.add('hidden');
+  $('hangar').classList.add('hidden');
+  $('hud').classList.add('hidden');
+  $('start').classList.add('hidden');
+  $('station').classList.remove('hidden');
+}
+function closeStation() {
+  $('station').classList.add('hidden');
+  started = false;
+  $('start').classList.remove('hidden');
+  refreshStart();
+}
 
 function stationRateMult() {
   const idle = store.getIdle();
   return prestigeMultiplier(idle.lifetimeCores) * mainBoostMultiplier(store.getRunProfile());
 }
 
+// Cheap per-frame refresh of the always-visible header + tap gain. No innerHTML
+// rebuild, so it is safe to call every frame while the Station is open.
+function updateStationLive() {
+  if (!stationOpen()) return;
+  const idle = store.getIdle();
+  const profile = store.getRunProfile();
+  const rate = totalRate(idle, profile);
+  const neb = $('station-nebula'); if (neb) neb.textContent = formatNumber(idle.nebula);
+  const rt = $('station-rate'); if (rt) rt.textContent = `${rate >= 100 ? formatNumber(rate) : rate.toFixed(1)}/s`;
+  const cr = $('station-cores'); if (cr) cr.textContent = formatNumber(idle.cores);
+  const cm = $('station-core-mult'); if (cm) cm.textContent = `×${prestigeMultiplier(idle.lifetimeCores).toFixed(2)}`;
+  const tg = $('station-tap-gain');
+  if (tg) {
+    const per = Math.max(1, Math.round(clickYield(idle, profile)));
+    tg.textContent = `+${formatNumber(per)} ⬡`;
+  }
+}
+
+// Manual mining tap — the Cookie-Clicker "big cookie". Mints Nebula, floats a
+// "+N", and gives light (throttled) audio/visual feedback.
+function stationTap(ev) {
+  if (ev && ev.button != null && ev.button !== 0) return; // left / touch only
+  const got = store.tapNebula();
+  spawnTapFx(got, ev);
+  updateStationLive();
+  const btn = $('station-tap');
+  if (btn) { btn.classList.remove('punch'); void btn.offsetWidth; btn.classList.add('punch'); }
+  const now = performance.now();
+  if (now - tapSoundT > 55) { tapSoundT = now; audio.play('pickup'); }
+  // Refresh the store promptly so newly-affordable buy buttons light up.
+  renderStation();
+}
+
+// Floating "+N" that drifts up from the tap point (or the button centre).
+function spawnTapFx(amount, ev) {
+  const fx = $('station-tapfx');
+  if (!fx) return;
+  const pop = document.createElement('span');
+  pop.className = 'tap-pop';
+  pop.textContent = `+${formatNumber(amount)}`;
+  const rect = fx.getBoundingClientRect();
+  let x = rect.width / 2;
+  let y = rect.height / 2;
+  if (ev && typeof ev.clientX === 'number' && rect.width) {
+    x = ev.clientX - rect.left;
+    y = ev.clientY - rect.top;
+  }
+  pop.style.left = `${x}px`;
+  pop.style.top = `${y}px`;
+  fx.appendChild(pop);
+  setTimeout(() => pop.remove(), 760);
+}
+
 function renderStation() {
-  const wrap = $('hangar-station');
+  const wrap = $('station-store');
   if (!wrap) return;
   const idle = store.getIdle();
   const profile = store.getRunProfile();
   const mult = stationRateMult();
-  const rate = totalRate(idle, profile);
   const gain = prestigeGain(idle.lifetimeNebula);
   // Lifetime Nebula needed for the next Core = PRESTIGE_BASE·(cores+1)³.
   const nextCoreAt = PRESTIGE_BASE * Math.pow(gain + 1, 3);
@@ -305,12 +382,30 @@ function renderStation() {
   const qtyBtns = [1, 10, 'max'].map((q) =>
     `<button class="btn btn-sm st-qty${stationBuyQty === q ? ' active' : ''}" data-qty="${q}">${q === 'max' ? 'MAX' : '×' + q}</button>`).join('');
 
+  // --- Manual-mining upgrade (Mining Laser): raises the per-tap yield ---------
+  const clickLvl = idle.clickLevel || 0;
+  const clickCost = clickUpgradeCost(clickLvl);
+  const clickAfford = idle.nebula >= clickCost;
+  const perTap = Math.max(1, Math.round(clickYield(idle, profile)));
+  const clickRow = `
+    <div class="station-sec"><span class="st-sec-head">MANUAL MINING <span class="st-sec-sub">tap the beam above</span></span></div>
+    <div class="gen-list">
+      <div class="gen-row${clickLvl > 0 ? ' owned' : ''}">
+        <div class="gen-ico">${CLICK_UPGRADE.icon}</div>
+        <div class="gen-main">
+          <div class="gen-name">${CLICK_UPGRADE.name} <span class="gen-owned">Lv ${formatNumber(clickLvl)}</span></div>
+          <div class="gen-desc">${CLICK_UPGRADE.desc}</div>
+          <div class="gen-rate">${formatNumber(perTap)} ⬡ per tap</div>
+        </div>
+        <button class="btn btn-sm click-buy"${clickAfford ? '' : ' disabled'}>
+          <span class="gb-q">+${formatNumber(CLICK_UPGRADE.power)} power</span>
+          <span class="gb-c">⬡ ${formatNumber(clickCost)}</span>
+        </button>
+      </div>
+    </div>`;
+
   let html = `
-    <div class="station-head">
-      <div class="st-cur st-neb"><span class="st-k">⬡ Nebula</span><b>${formatNumber(idle.nebula)}</b><span class="st-sub">${rate >= 100 ? formatNumber(rate) : rate.toFixed(1)}/s</span></div>
-      <div class="st-cur st-core"><span class="st-k">🌀 Cores</span><b>${formatNumber(idle.cores)}</b><span class="st-sub">×${prestigeMultiplier(idle.lifetimeCores).toFixed(2)} output</span></div>
-    </div>
-    <div class="station-note">Your Station mines <b>Nebula</b> in real time — even while the tab is closed. Spend it on generators, then <b>Collapse</b> for <b>Singularity Cores</b> that buy permanent run buffs. Run progress boosts production: <b>+${boostPct}%</b> from your record.</div>
+    <div class="station-note">Your Station mines <b>Nebula</b> in real time — even while the tab is closed. <b>Tap the beam</b> to mine by hand, buy <b>generators</b> to automate it, then <b>Collapse</b> for <b>Singularity Cores</b> that buy permanent run buffs. Run progress boosts production: <b>+${boostPct}%</b> from your record.</div>
     <div class="prestige-row">
       <div class="prestige-info">
         <div class="prestige-title">🌀 Collapse Station</div>
@@ -319,6 +414,7 @@ function renderStation() {
       </div>
       <button class="btn prestige-btn"${gain > 0 ? '' : ' disabled'}>COLLAPSE</button>
     </div>
+    ${clickRow}
     <div class="station-sec"><span class="st-sec-head">GENERATORS <span class="st-sec-sub">every ${MILESTONE_STEP} → +${Math.round(MILESTONE_BONUS * 100)}%</span></span><span class="st-qtyrow">${qtyBtns}</span></div>
     <div class="gen-list">`;
 
@@ -349,7 +445,7 @@ function renderStation() {
         </button>
       </div>`;
   }
-  html += `</div><div class="station-sec">CORE UPGRADES <span class="st-sec-sub">spent on every run</span></div><div class="special-list">`;
+  html += `</div><div class="station-sec"><span class="st-sec-head">CORE UPGRADES <span class="st-sec-sub">spent on every run</span></span></div><div class="special-list">`;
 
   for (const def of SPECIAL_UPGRADES) {
     const level = idle.special[def.id] || 0;
@@ -373,6 +469,7 @@ function renderStation() {
   }
   html += '</div>';
   wrap.innerHTML = html;
+  updateStationLive();
 
   wrap.querySelectorAll('.st-qty').forEach((b) => b.addEventListener('click', () => {
     const q = b.dataset.qty;
@@ -380,6 +477,9 @@ function renderStation() {
     audio.play('ui');
     renderStation();
   }));
+  wrap.querySelector('.click-buy')?.addEventListener('click', () => {
+    if (store.buyClickUpgrade()) { audio.play('pickup'); renderStation(); }
+  });
   wrap.querySelector('.prestige-btn')?.addEventListener('click', () => {
     const got = store.prestigeIdle();
     if (got > 0) {
@@ -829,7 +929,6 @@ function updateHud() {
 // to avoid hammering it every frame.
 let idleAccum = 0;   // fractional Nebula not yet committed to the Store
 let idleSaveT = 0;   // seconds since the idle state was last persisted
-let stationRefreshT = 0; // throttle for live Station re-renders while it's open
 
 function tickIdle(dt) {
   const idle = store.getIdle();
@@ -848,8 +947,10 @@ function tickIdle(dt) {
     idle.lastTick = Date.now();
     store.save();
   }
-  // Live-refresh the Station tab (if open) a few times a second.
-  if (!started && !$('hangar').classList.contains('hidden') && hangarTab === 'station') {
+  // Keep the open Station overlay live: smooth header/tap gain every frame, and
+  // a throttled store rebuild so affordability (buy buttons) refreshes a few ×/s.
+  if (stationOpen()) {
+    updateStationLive();
     stationRefreshT += dt;
     if (stationRefreshT >= 0.2) { stationRefreshT = 0; renderStation(); }
   }
@@ -940,13 +1041,25 @@ $('banish-btn').addEventListener('click', toggleBanishMode);
 // Hangar + ship picker
 $('hangar-btn').addEventListener('click', () => openHangar());
 $('go-hangar-btn').addEventListener('click', () => openHangar());
-$('station-btn').addEventListener('click', () => { audio.play('ui'); openHangar('station'); });
 $('hangar-close').addEventListener('click', closeHangar);
+
+// Orbital Station — its own standalone overlay (opened from the start screen),
+// not a Hangar tab. The 🛰 STATION button and the Nebula pill both open it.
+$('station-btn').addEventListener('click', openStation);
+$('station-close').addEventListener('click', closeStation);
+const stationTapBtn = $('station-tap');
+if (stationTapBtn) {
+  // pointerdown gives an instant, mobile-friendly tap (no 300ms click delay);
+  // preventDefault stops text selection and synthetic mouse events.
+  stationTapBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); stationTap(e); });
+  stationTapBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); stationTap(); }
+  });
+}
 
 // The start-screen Nebula pill doubles as a shortcut into the Orbital Station.
 const startNebulaPill = $('start-nebula-pill');
 if (startNebulaPill) {
-  const openStation = () => { audio.play('ui'); openHangar('station'); };
   startNebulaPill.addEventListener('click', openStation);
   startNebulaPill.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openStation(); }
@@ -954,7 +1067,6 @@ if (startNebulaPill) {
 }
 $('tab-ships').addEventListener('click', () => setHangarTab('ships'));
 $('tab-meta').addEventListener('click', () => setHangarTab('meta'));
-$('tab-station').addEventListener('click', () => setHangarTab('station'));
 $('tab-directives').addEventListener('click', () => setHangarTab('directives'));
 $('tab-codex').addEventListener('click', () => setHangarTab('codex'));
 $('ship-prev').addEventListener('click', () => cycleShip(-1));
@@ -985,7 +1097,7 @@ document.addEventListener('visibilitychange', () => {
     if (started && world.state === 'playing') togglePause(true);
   } else {
     catchUpOffline(false); // silent: award the gap, no toast for a quick glance away
-    if (!$('hangar').classList.contains('hidden') && hangarTab === 'station') renderStation();
+    if (stationOpen()) renderStation();
     if (!started && !$('start').classList.contains('hidden')) updateStartNebula();
   }
 });

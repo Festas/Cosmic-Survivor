@@ -7,6 +7,8 @@ import {
   OFFLINE_CAP_SECONDS, PRESTIGE_BASE, nebulaForRun, specialCost, canBuySpecial,
   applyIdleBonus, MILESTONE_STEP, MILESTONE_BONUS, milestonesReached,
   generatorMilestoneMultiplier, generatorMilestoneProgress,
+  BASE_CLICK, CLICK_RATE_FRACTION, CLICK_UPGRADE, CLICK_POWER_STEP,
+  clickPower, clickUpgradeCost, clickYield,
 } from '../src/game/idle.js';
 import { createMetaBonus } from '../src/game/meta.js';
 
@@ -16,6 +18,7 @@ test('createIdleState is a neutral, empty save', () => {
   assert.equal(s.lifetimeNebula, 0);
   assert.equal(s.cores, 0);
   assert.equal(s.lifetimeCores, 0);
+  assert.equal(s.clickLevel, 0);
   assert.equal(baseRate(s.generators), 0);
   assert.equal(Object.keys(s.generators).length, 0);
   assert.equal(Object.keys(s.special).length, 0);
@@ -222,4 +225,68 @@ test('applyIdleBonus folds owned special levels into a meta-style bonus', () => 
   assert.deepEqual(applyIdleBonus(createMetaBonus(), {}), createMetaBonus());
   const clamped = applyIdleBonus(createMetaBonus(), { aegis_core: 999, bogus: 3 });
   assert.equal(clamped.maxHpAdd, 30 * SPECIAL_BY_ID.aegis_core.max);
+});
+
+// ---- Manual mining (the Cookie-Clicker "big cookie") ----------------------
+
+test('manual-mining constants are sane', () => {
+  assert.ok(BASE_CLICK >= 1, 'a bare tap always mints at least 1');
+  assert.ok(CLICK_RATE_FRACTION > 0 && CLICK_RATE_FRACTION < 1);
+  assert.equal(CLICK_POWER_STEP, CLICK_UPGRADE.power);
+  assert.ok(CLICK_UPGRADE.id && CLICK_UPGRADE.name && CLICK_UPGRADE.icon && CLICK_UPGRADE.desc);
+  assert.ok(CLICK_UPGRADE.baseCost > 0 && CLICK_UPGRADE.costGrowth > 1 && CLICK_UPGRADE.power > 0);
+});
+
+test('clickPower is BASE_CLICK plus a flat step per level', () => {
+  assert.equal(clickPower(0), BASE_CLICK);
+  assert.equal(clickPower(1), BASE_CLICK + CLICK_POWER_STEP);
+  assert.equal(clickPower(5), BASE_CLICK + CLICK_POWER_STEP * 5);
+  assert.equal(clickPower(-3), BASE_CLICK, 'negative levels clamp to zero');
+  assert.equal(clickPower(2.9), BASE_CLICK + CLICK_POWER_STEP * 2, 'fractional levels floor');
+});
+
+test('clickUpgradeCost grows geometrically from the base cost', () => {
+  assert.equal(clickUpgradeCost(0), CLICK_UPGRADE.baseCost);
+  assert.ok(clickUpgradeCost(1) > clickUpgradeCost(0));
+  assert.ok(clickUpgradeCost(3) > clickUpgradeCost(2));
+  assert.equal(
+    clickUpgradeCost(2),
+    Math.ceil(CLICK_UPGRADE.baseCost * Math.pow(CLICK_UPGRADE.costGrowth, 2)),
+  );
+});
+
+test('clickYield never drops below BASE_CLICK, even on a pristine Station', () => {
+  const s = createIdleState();
+  assert.ok(clickYield(s, {}) >= BASE_CLICK);
+  // With no generators and no upgrades the yield is exactly the floor.
+  assert.equal(clickYield(s, {}), BASE_CLICK);
+});
+
+test('clickYield scales with the Mining Laser level', () => {
+  const s = createIdleState();
+  s.clickLevel = 4;
+  // No production yet, so the whole yield comes from click power.
+  assert.equal(clickYield(s, {}), clickPower(4));
+  assert.ok(clickYield(s, {}) > BASE_CLICK);
+});
+
+test('clickYield folds in a slice of live production', () => {
+  const s = createIdleState();
+  const g0 = GENERATORS[0];
+  s.generators[g0.id] = 50; // meaningful passive rate
+  const rate = totalRate(s, {});
+  assert.ok(rate > 0);
+  const expected = clickPower(0) + rate * CLICK_RATE_FRACTION;
+  assert.ok(Math.abs(clickYield(s, {}) - expected) < 1e-9);
+  assert.ok(clickYield(s, {}) > BASE_CLICK, 'a producing Station out-taps the floor');
+});
+
+test('clickYield rides the same Prestige multiplier as production', () => {
+  const base = createIdleState();
+  base.clickLevel = 3;
+  const prestiged = createIdleState();
+  prestiged.clickLevel = 3;
+  prestiged.lifetimeCores = 25; // boosts prestigeMultiplier above 1
+  assert.ok(prestigeMultiplier(prestiged.lifetimeCores) > 1);
+  assert.ok(clickYield(prestiged, {}) > clickYield(base, {}));
 });

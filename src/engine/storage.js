@@ -3,6 +3,7 @@
 import {
   createIdleState, GENERATOR_BY_ID, generatorBulkCost, prestigeGain,
   SPECIAL_BY_ID, specialCost, canBuySpecial,
+  clickYield, clickUpgradeCost,
 } from '../game/idle.js';
 
 const KEY = 'cosmic-survivor:v1';
@@ -56,6 +57,7 @@ function mergeIdle(saved) {
   base.lifetimeNebula = Math.max(0, +saved.lifetimeNebula || 0);
   base.cores = Math.max(0, +saved.cores || 0);
   base.lifetimeCores = Math.max(0, +saved.lifetimeCores || 0);
+  base.clickLevel = Math.max(0, Math.floor(+saved.clickLevel || 0));
   base.lastTick = Math.max(0, +saved.lastTick || 0);
   if (saved.generators && typeof saved.generators === 'object') {
     for (const id in GENERATOR_BY_ID) {
@@ -219,6 +221,19 @@ export const Store = {
     return idle.nebula;
   },
 
+  // Manual tap on the Station's mining beam (the Cookie-Clicker "big cookie").
+  // Mints a whole-Nebula amount from the live clickYield and returns how much was
+  // granted, so the UI can show a floating "+N". Always mints at least 1 so a
+  // pristine Station can always be bootstrapped by hand.
+  tapNebula() {
+    const idle = this.getIdle();
+    const got = Math.max(1, Math.round(clickYield(idle, this.getRunProfile())));
+    idle.nebula += got;
+    idle.lifetimeNebula += got;
+    this.save();
+    return got;
+  },
+
   // Stamp the last production tick (epoch ms); used for offline catch-up.
   setIdleTick(ms) {
     this.getIdle().lastTick = Math.max(0, Math.floor(ms || 0));
@@ -241,6 +256,19 @@ export const Store = {
     return n;
   },
 
+  // Spend Nebula to raise the Mining Laser (manual-tap power) by one level.
+  // Returns true on success.
+  buyClickUpgrade() {
+    const idle = this.getIdle();
+    const level = Math.max(0, Math.floor(idle.clickLevel || 0));
+    const cost = clickUpgradeCost(level);
+    if (idle.nebula < cost) return false;
+    idle.nebula -= cost;
+    idle.clickLevel = level + 1;
+    this.save();
+    return true;
+  },
+
   // Collapse the station: mint Cores from this epoch's lifetime Nebula and reset
   // generators + Nebula. Returns the number of Cores gained (0 if below threshold).
   prestigeIdle() {
@@ -252,6 +280,7 @@ export const Store = {
     idle.nebula = 0;
     idle.lifetimeNebula = 0;
     idle.generators = Object.create(null);
+    idle.clickLevel = 0; // the Mining Laser is a Nebula-era investment — reset with it
     this.save();
     return gain;
   },
