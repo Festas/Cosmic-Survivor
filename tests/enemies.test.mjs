@@ -106,6 +106,21 @@ test('seeder, sentinel and the Singularis update without throwing and emit bulle
   assert.ok(world.enemyBullets.length > 0, 'expansion enemies should fire enemy bullets');
 });
 
+test('the Bulwark is registered, well-formed and lays down an aimed volley', () => {
+  const def = ENEMY_TYPES.bulwark;
+  assert.ok(def, 'bulwark should be registered');
+  assert.equal(def.key, 'bulwark');
+  assert.ok(def.hp > 0 && def.radius > 0 && def.color, 'bulwark needs core fields');
+  assert.ok((def.xp || 0) >= 2, 'bulwark is an elite-eligible mid-tier enemy');
+  assert.equal(typeof def.update, 'function');
+  const world = { player: { x: 300, y: 300 }, enemyBullets: [], audio: { play() {} } };
+  const e = { x: 0, y: 0, vx: 0, vy: 0, spin: 0, speed: def.speed, damage: def.damage };
+  assert.doesNotThrow(() => {
+    for (let i = 0; i < 400; i++) def.update(e, 0.05, world);
+  }, 'bulwark update threw');
+  assert.ok(world.enemyBullets.length >= 5, 'bulwark should fire an aimed spread');
+});
+
 // ---- Elite affix ----------------------------------------------------------
 
 test('rollElite never promotes bosses or the xp:1 trash tier', () => {

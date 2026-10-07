@@ -79,3 +79,14 @@ test('phoenix meta grants revives', () => {
   const b = computeMetaBonus({ phoenix: 1 });
   assert.equal(b.revives, 1);
 });
+
+test('evasion and siphon meta fold into dodge and lifesteal bonuses', () => {
+  assert.ok(META_BY_ID.evasion && META_BY_ID.siphon, 'new nodes should exist');
+  const b = computeMetaBonus({ evasion: 2, siphon: 3 });
+  assert.ok(Math.abs(b.dodgeAdd - 0.06) < 1e-9, '+3% dodge * 2 levels');
+  assert.ok(Math.abs(b.lifestealAdd - 0.03) < 1e-9, '+1% lifesteal * 3 levels');
+  // Neutral by default so unused nodes change nothing.
+  const neutral = createMetaBonus();
+  assert.equal(neutral.dodgeAdd, 0);
+  assert.equal(neutral.lifestealAdd, 0);
+});

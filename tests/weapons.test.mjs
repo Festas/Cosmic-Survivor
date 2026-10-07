@@ -175,3 +175,36 @@ test('lash evolves into reaver once lifesteal is owned', () => {
   assert.equal(lash.id, 'reaver');
   assert.ok(weaponDef(lash).evolved);
 });
+
+test('Hailstorm sprays a wide fan of frozen shards', () => {
+  let shots = 0;
+  const world = { spawnBullet: () => { shots++; }, muzzle() {}, audio: { play() {} } };
+  const player = { x: 0, y: 0, faceAngle: 0, stats: mockStats({ bulletSpeed: 600, knockback: 100, projectilesBonus: 0 }), acquireTarget: () => ({ x: 60, y: 0 }) };
+  const inst = createWeaponInst('hail');
+  WEAPON_BY_ID.hail.fire(world, player, inst);
+  assert.ok(shots >= 6, `expected a shard fan, got ${shots}`);
+});
+
+test('Absolute Zero pairs a freeze nova with a radial shard storm', () => {
+  let novas = 0; let shots = 0;
+  const world = {
+    damageEnemiesInRadius: () => { novas++; }, spawnBullet: () => { shots++; },
+    ring() {}, audio: { play() {} },
+  };
+  const player = { x: 0, y: 0, stats: mockStats({ bulletSpeed: 600, areaMul: 1, knockback: 100 }) };
+  WEAPON_BY_ID.blizzard.fire(world, player, createWeaponInst('blizzard'));
+  assert.equal(novas, 1, 'one centred freeze nova');
+  assert.ok(shots >= 10, `expected a radial shard storm, got ${shots}`);
+});
+
+test('hail evolves into blizzard once cryo imbue is owned', () => {
+  const p = mockPlayer(['hail'], { imbue: { fire: 0, cryo: 0, shock: 0, void: 0 } });
+  const hail = p.weapons[0];
+  hail.level = weaponDef(hail).maxLevel;
+  assert.ok(!evolutionReady(p, hail), 'not ready without Cryo Rounds');
+  p.stats.imbue.cryo = 0.6;
+  assert.ok(evolutionReady(p, hail), 'ready once Cryo Rounds is owned');
+  evolveWeapon(p, hail);
+  assert.equal(hail.id, 'blizzard');
+  assert.ok(weaponDef(hail).evolved);
+});

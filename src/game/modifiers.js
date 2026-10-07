@@ -47,6 +47,10 @@ export const DIRECTIVES = [
     (e) => { e.xpMul *= 0.8; }),
   D('nightmare', 'Nightmare', '☠️', 'Enemies gain +30% HP and +15% speed.', 'All-round harder', 1.4,
     (e) => { e.hpMul *= 1.3; e.speedMul *= 1.15; }),
+  D('overwhelm', 'Overwhelm', '🌪️', 'Far more enemies crowd the arena at once.', 'Denser screens', 1.3,
+    (e) => { e.capMul *= 1.4; e.spawnMul *= 0.8; }),
+  D('juggernauts', 'Juggernauts', '🗿', 'Enemies gain +60% HP but move 15% slower.', 'Tanky enemies', 1.2,
+    (e) => { e.hpMul *= 1.6; e.speedMul *= 0.85; }),
 ];
 
 export const DIRECTIVE_BY_ID = Object.create(null);

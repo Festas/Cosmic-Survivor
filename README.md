@@ -70,13 +70,14 @@ and bosses downed (the *Salvage Rig* upgrade multiplies the haul). Spend it in t
 **Hangar**, reachable from the start and game-over screens.
 
 ### 🌟 Ascension
-A tree of **12 permanent upgrades** bought with Stardust — more max HP, damage, move speed,
+A tree of **14 permanent upgrades** bought with Stardust — more max HP, damage, move speed,
 armor, regen, crit, attack speed, XP & pickup range, luck, Singularity charge, Stardust
-gain, and the capstone **Phoenix Protocol**, which revives you once per run at half HP with
-a clearing nova. Levels persist forever and layer on top of your ship and in-run drafts.
+gain, **dodge** and **lifesteal**, and the capstone **Phoenix Protocol**, which revives you
+once per run at half HP with a clearing nova. Levels persist forever and layer on top of your
+ship and in-run drafts.
 
 ### 🚀 Starfighters
-Pick from **6 ships**, each a distinct build identity with its own starter weapon, stat
+Pick from **7 ships**, each a distinct build identity with its own starter weapon, stat
 profile and accent colour:
 
 | Ship | Style | Starter | Identity |
@@ -87,6 +88,7 @@ profile and accent colour:
 | ⚡ **Tempest** | Blitz | Arc Coil | +speed & haste, fragile |
 | 🔥 **Pyre** | Pyromancer | Missile Pod | Fire imbue + explosions |
 | 🌀 **Oracle** | Voidcaller | Graviton Mortar | Void imbue + supercharged Singularity |
+| ❄️ **Frostbite** | Cryo bruiser | Hailstorm | Cryo imbue + bigger blasts, tanky but slow |
 
 Ships beyond the Vanguard are unlocked permanently with Stardust.
 
@@ -167,6 +169,7 @@ own the passive it craves, it **evolves** into a legendary form:
 | Graviton Mortar    | **Cluster Swarm**   | Volatile Payload (explosive)     |
 | Halo Launcher      | **Corona Burst**    | Split Barrel ×2 (+projectiles)   |
 | Arc Whip           | **Rift Reaver**     | Vampiric Circuit (lifesteal)     |
+| Hailstorm          | **Absolute Zero**   | Cryo Rounds (cryo imbue)         |
 
 **Passive items** are shared stat augments — damage, crit, haste, pierce, elemental imbues,
 drones, lifesteal, armor and more — that buff *every* weapon and ability at once, so builds

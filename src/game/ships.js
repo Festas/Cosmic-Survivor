@@ -90,6 +90,20 @@ export const SHIPS = [
       s.maxHp -= 10;
     },
   }),
+  S({
+    id: 'frostbite', name: 'Frostbite', icon: '❄️',
+    tag: 'Cryomancer · chill & control',
+    desc: 'A frost bruiser that freezes the swarm solid. Opens with the Hailstorm.',
+    weapon: 'hail', color: COLORS.cryo, unlockCost: 520,
+    apply(s) {
+      s.imbue.cryo = Math.min(1, s.imbue.cryo + 0.6);
+      s.elementMul *= 1.25;
+      s.areaMul *= 1.12;
+      s.maxHp += 35;
+      s.knockback *= 1.2;
+      s.moveSpeed *= 0.94;
+    },
+  }),
 ];
 
 export const SHIP_BY_ID = Object.create(null);

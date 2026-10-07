@@ -68,3 +68,21 @@ test('totalAchievementReward sums rewards', () => {
   const expected = some.reduce((s, d) => s + d.reward, 0);
   assert.equal(totalAchievementReward(some), expected);
 });
+
+test('content-pack commendations unlock at their milestone thresholds', () => {
+  const cases = [
+    ['survive_20', { time: 1200 }, { time: 1199 }],
+    ['ascendant_30', { level: 30 }, { level: 29 }],
+    ['scorer_250k', { score: 250000 }, { score: 249999 }],
+    ['chain_reactor', { reactions: 120 }, { reactions: 119 }],
+    ['boss_rush', { bossKills: 5 }, { bossKills: 4 }],
+    ['slayer_50k', { totalKills: 50000 }, { totalKills: 49999 }],
+  ];
+  for (const [id, hit, miss] of cases) {
+    const def = ACHIEVEMENT_BY_ID[id];
+    assert.ok(def, `commendation ${id} should exist`);
+    assert.equal(isAchievementEarned(def, hit), true, `${id} should unlock at threshold`);
+    assert.equal(isAchievementEarned(def, miss), false, `${id} should stay locked below threshold`);
+    assert.equal(isAchievementEarned(def, {}), false, `${id} needs data`);
+  }
+});

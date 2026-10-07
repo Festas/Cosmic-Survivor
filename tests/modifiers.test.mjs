@@ -70,3 +70,17 @@ test('effect fields are clamped to sane ranges', () => {
   assert.ok(all.xpMul >= 0.25);
   assert.ok(all.stardustMul >= 1 && all.stardustMul <= 20);
 });
+
+test('overwhelm floods the arena (more cap, faster spawns)', () => {
+  const e = computeDirectiveEffect(['overwhelm']);
+  assert.ok(e.capMul > 1, 'more concurrent enemies');
+  assert.ok(e.spawnMul < 1, 'shorter spawn interval');
+  assert.ok(e.stardustMul > 1);
+});
+
+test('juggernauts trade enemy speed for bulk', () => {
+  const e = computeDirectiveEffect(['juggernauts']);
+  assert.ok(e.hpMul > 1, 'tankier enemies');
+  assert.ok(e.speedMul < 1, 'slower enemies');
+  assert.ok(e.stardustMul > 1);
+});
