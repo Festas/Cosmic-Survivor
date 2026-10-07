@@ -13,6 +13,7 @@ import {
   GENERATORS, generatorCost, generatorBulkCost, maxAffordable, baseRate, totalRate,
   prestigeGain, prestigeMultiplier, mainBoostMultiplier, PRESTIGE_BASE,
   SPECIAL_UPGRADES, specialCost, canBuySpecial, offlineGain, OFFLINE_CAP_SECONDS,
+  generatorMilestoneMultiplier, generatorMilestoneProgress, MILESTONE_STEP, MILESTONE_BONUS,
 } from './game/idle.js';
 import { DIRECTIVES, DIRECTIVE_BY_ID, directiveStardustMultiplier } from './game/modifiers.js';
 import { ACHIEVEMENTS, evaluateAchievements } from './game/achievements.js';
@@ -156,7 +157,10 @@ function refreshStart() {
 let hangarTab = 'ships';
 const HANGAR_TABS = ['ships', 'meta', 'station', 'directives', 'codex'];
 
-function openHangar() {
+function openHangar(tab) {
+  // Optionally jump straight to a specific tab (e.g. the start-screen STATION
+  // shortcut opens the Hangar on the Orbital Station).
+  if (tab && HANGAR_TABS.includes(tab)) hangarTab = tab;
   renderHangar();
   // The Hangar can be opened from the start screen *or* the game-over screen.
   // Game-over sits later in the DOM than the Hangar, so if it stayed visible it
@@ -315,7 +319,7 @@ function renderStation() {
       </div>
       <button class="btn prestige-btn"${gain > 0 ? '' : ' disabled'}>COLLAPSE</button>
     </div>
-    <div class="station-sec">GENERATORS <span class="st-qtyrow">${qtyBtns}</span></div>
+    <div class="station-sec"><span class="st-sec-head">GENERATORS <span class="st-sec-sub">every ${MILESTONE_STEP} → +${Math.round(MILESTONE_BONUS * 100)}%</span></span><span class="st-qtyrow">${qtyBtns}</span></div>
     <div class="gen-list">`;
 
   for (const def of GENERATORS) {
@@ -323,7 +327,13 @@ function renderStation() {
     const qty = stationBuyQty === 'max' ? Math.max(1, maxAffordable(def, owned, idle.nebula)) : stationBuyQty;
     const cost = generatorBulkCost(def, owned, qty);
     const afford = idle.nebula >= cost && (stationBuyQty !== 'max' || maxAffordable(def, owned, idle.nebula) > 0);
-    const contrib = def.rate * owned * mult;
+    const gmul = generatorMilestoneMultiplier(owned);
+    const contrib = def.rate * owned * gmul * mult;
+    // Milestone progress: current ×bonus (if any) + how many more to the next.
+    const ms = generatorMilestoneProgress(owned);
+    const mile = owned > 0
+      ? `<div class="gen-mile">${ms.reached > 0 ? `<b>×${gmul % 1 ? gmul.toFixed(1) : gmul}</b> milestone · ` : ''}${formatNumber(ms.remaining)} to ×${ms.nextMultiplier % 1 ? ms.nextMultiplier.toFixed(1) : ms.nextMultiplier}</div>`
+      : '';
     html += `
       <div class="gen-row${owned > 0 ? ' owned' : ''}">
         <div class="gen-ico">${def.icon}</div>
@@ -331,6 +341,7 @@ function renderStation() {
           <div class="gen-name">${def.name} <span class="gen-owned">×${formatNumber(owned)}</span></div>
           <div class="gen-desc">${def.desc}</div>
           <div class="gen-rate">${owned > 0 ? `${contrib >= 100 ? formatNumber(contrib) : contrib.toFixed(1)} ⬡/s` : `${def.rate} ⬡/s each`}</div>
+          ${mile}
         </div>
         <button class="btn btn-sm gen-buy" data-id="${def.id}"${afford ? '' : ' disabled'}>
           <span class="gb-q">${stationBuyQty === 'max' ? 'MAX ' + formatNumber(qty) : '×' + qty}</span>
@@ -927,9 +938,20 @@ $('reroll-btn').addEventListener('click', () => { world.rerollChoices(); });
 $('banish-btn').addEventListener('click', toggleBanishMode);
 
 // Hangar + ship picker
-$('hangar-btn').addEventListener('click', openHangar);
-$('go-hangar-btn').addEventListener('click', openHangar);
+$('hangar-btn').addEventListener('click', () => openHangar());
+$('go-hangar-btn').addEventListener('click', () => openHangar());
+$('station-btn').addEventListener('click', () => { audio.play('ui'); openHangar('station'); });
 $('hangar-close').addEventListener('click', closeHangar);
+
+// The start-screen Nebula pill doubles as a shortcut into the Orbital Station.
+const startNebulaPill = $('start-nebula-pill');
+if (startNebulaPill) {
+  const openStation = () => { audio.play('ui'); openHangar('station'); };
+  startNebulaPill.addEventListener('click', openStation);
+  startNebulaPill.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openStation(); }
+  });
+}
 $('tab-ships').addEventListener('click', () => setHangarTab('ships'));
 $('tab-meta').addEventListener('click', () => setHangarTab('meta'));
 $('tab-station').addEventListener('click', () => setHangarTab('station'));

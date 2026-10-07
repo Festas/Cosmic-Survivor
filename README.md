@@ -103,6 +103,29 @@ Permanent **milestone awards** earned by hitting thresholds in a single run (sur
 (1,000 kills, 10 bosses, unlock every ship, finish with 4 Directives…). Each pays a one-time
 **Stardust bounty** and pops a toast when unlocked. Track them all in the Hangar's **Codex** tab.
 
+### 🛰 Orbital Station — the idle layer
+A fully **AFK economy** that mines **Nebula** in real time — during a run, sitting in the menus,
+or with the tab closed entirely. Come back later and the Station greets you with the **Nebula it
+banked while you were away** (capped so it can't run away overnight). Open it straight from the
+start screen — tap the **🛰 STATION** button or the **Nebula pill** — or from the Hangar's
+**Station** tab.
+
+- **Generators.** Spend Nebula on **8 ascending generators** (Survey Probe → Dust Collector →
+  Ion Refinery → Graviton Harvester → Dyson Node → Singularity Tap → Warp Forge → Quasar Engine).
+  Each costs more and mines more than the last, and buying in **×1 / ×10 / MAX** batches keeps the
+  clicking down.
+- **Milestones.** Every **25 copies** of a single generator permanently boosts *that* generator by
+  **+50%** of its base output — and the goal never stops moving, so there's always a next tier to
+  chase. The Station shows your current multiplier and how many more to the next one.
+- **Collapse for Cores.** When your lifetime Nebula is deep enough, **Collapse** the Station to
+  reset your generators and Nebula in exchange for **Singularity Cores** — a prestige currency that
+  compounds your long-game.
+- **Core upgrades.** Spend Cores on permanent **run buffs** that fold into *every* sortie — more
+  weapon damage, max HP, move speed, XP, crit, attack speed and pickup range (plus extra Stardust
+  per run). They layer on top of your ship, Ascension tree and in-run drafts.
+
+Your best run also **boosts Station output**, so pushing for a high score pays the idle layer back.
+
 ---
 
 ## 🔫 Arsenal, evolutions & items
