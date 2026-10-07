@@ -56,7 +56,7 @@ export const GENERATORS = [
   G('probe', 'Survey Probe', '🛰️', 'A lonely drone sipping stray particles.', { baseCost: 15, rate: 0.1 }),
   G('collector', 'Dust Collector', '📡', 'Sweeps the debris field for Nebula.', { baseCost: 120, rate: 0.8 }),
   G('refinery', 'Ion Refinery', '🏭', 'Refines raw dust into dense Nebula.', { baseCost: 1300, rate: 5 }),
-  G('harvester', 'Graviton Harvester', '🌀', 'Bends gravity to funnel Nebula inward.', { baseCost: 14000, rate: 30 }),
+  G('harvester', 'Graviton Harvester', '⚛️', 'Bends gravity to funnel Nebula inward.', { baseCost: 14000, rate: 30 }),
   G('dyson', 'Dyson Node', '🛸', 'Taps a dying star for raw output.', { baseCost: 160000, rate: 180 }),
   G('singtap', 'Singularity Tap', '🕳️', 'Siphons a micro black hole. Obscene yield.', { baseCost: 2000000, rate: 1000 }),
 ];
