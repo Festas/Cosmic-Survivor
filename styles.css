@@ -323,7 +323,9 @@ kbd { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2)
 }
 .hangar-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .hangar-title { font-size: clamp(22px, 4vw, 34px); font-weight: 900; letter-spacing: 3px; color: var(--cyan); text-shadow: 0 0 20px rgba(81,233,255,0.4); }
-.hangar-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+/* Tabs wrap instead of overflowing: on a narrow phone the row reflows to two
+   lines (each stretched to fill) rather than being clipped off-screen. */
+.hangar-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
 .pilot-record {
   display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
 }
@@ -337,13 +339,16 @@ kbd { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2)
 }
 .pilot-record .rec b { font-size: 17px; font-weight: 900; color: #fff; }
 .tab {
-  flex: 1; cursor: pointer; pointer-events: auto; font-family: var(--font);
+  flex: 1 1 auto; min-width: 116px; cursor: pointer; pointer-events: auto; font-family: var(--font);
   font-weight: 800; letter-spacing: 2px; font-size: 13px; color: var(--muted);
   background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
   border-radius: 10px; padding: 10px; transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .tab.active { color: var(--bg0); background: linear-gradient(90deg, #51e9ff, #7cffb2); border-color: transparent; }
-.hangar-body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px; margin-bottom: 14px; }
+/* flex:1 + min-height:0 lets this scroll region actually shrink inside the capped
+   column panel; without min-height:0 the default min-height:auto keeps it at full
+   content height, pushing the DONE button off-screen on phones (the mobile bug). */
+.hangar-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px; margin-bottom: 14px; }
 
 .ship-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .ship-card {
@@ -463,9 +468,71 @@ kbd { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2)
 .nebula-pill b { color: #fff; }
 .nebula-pill .nb-rate { color: var(--xp); font-weight: 700; font-size: 11px; letter-spacing: 0; }
 
-/* Orbital Station — the idle/AFK layer */
-.station-grid { display: flex; flex-direction: column; gap: 10px; }
-.station-head { display: flex; gap: 10px; }
+/* Orbital Station — its own standalone overlay (not a Hangar tab). A capped-height
+   flex column: a fixed top bar + tap zone, a scrolling store, then a DONE button. */
+.station-panel {
+  width: min(560px, 96vw);
+  max-height: 92vh;   /* fallback for browsers without dvh */
+  max-height: 92dvh;  /* fit the *visible* area on mobile so nothing is clipped */
+  display: flex; flex-direction: column;
+}
+.station-topbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 10px 12px; margin-bottom: 10px; flex: none;
+}
+.station-title {
+  font-size: clamp(18px, 4.2vw, 26px); font-weight: 900; letter-spacing: 2px;
+  color: var(--cyan); text-shadow: 0 0 18px rgba(81,233,255,0.4);
+}
+.station-cash { display: flex; gap: 8px; }
+.station-cash .st-cur { flex: 0 1 auto; min-width: 88px; padding: 6px 12px; }
+.station-cash .st-cur b { font-size: 17px; }
+
+/* Tap zone — the Cookie-Clicker "big cookie": a juicy MINE button plus an overlay
+   layer for the floating "+N" numbers that drift up from each tap. */
+.station-tapzone {
+  position: relative; display: flex; flex-direction: column; align-items: center;
+  margin: 2px 0 12px; flex: none;
+}
+.station-tap {
+  position: relative; cursor: pointer; pointer-events: auto; font-family: var(--font);
+  width: min(190px, 46vw); height: min(190px, 46vw); max-height: 26dvh; border-radius: 50%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  color: #eafcff; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  background: radial-gradient(circle at 50% 36%, rgba(176,107,255,0.55), rgba(81,233,255,0.16) 58%, rgba(12,16,38,0.65));
+  border: 2px solid rgba(176,107,255,0.6);
+  box-shadow: 0 0 40px -6px rgba(176,107,255,0.7), inset 0 0 42px rgba(81,233,255,0.2);
+  transition: box-shadow 0.2s ease, transform 0.08s ease;
+}
+.station-tap::before {
+  content: ''; position: absolute; inset: -6px; border-radius: 50%; pointer-events: none;
+  border: 2px solid rgba(81,233,255,0.4); animation: tapRing 2.6s ease-out infinite;
+}
+.station-tap:hover { box-shadow: 0 0 54px -4px rgba(176,107,255,0.95), inset 0 0 48px rgba(81,233,255,0.28); }
+.station-tap.punch { animation: tapPunch 0.2s ease; }
+.station-tap .tap-core { font-size: clamp(32px, 10vw, 50px); line-height: 1; filter: drop-shadow(0 0 10px rgba(12,16,38,0.9)); }
+.station-tap .tap-label { font-weight: 900; letter-spacing: 3px; font-size: 12px; opacity: 0.9; }
+.station-tap .tap-gain { font-weight: 800; font-size: 14px; color: var(--xp); }
+.station-tapfx { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.tap-pop {
+  position: absolute; font-weight: 900; font-size: 18px; color: var(--xp); white-space: nowrap;
+  text-shadow: 0 0 10px rgba(124,255,178,0.7); pointer-events: none;
+  animation: tapPop 0.76s ease-out forwards;
+}
+@keyframes tapRing { 0% { transform: scale(0.96); opacity: 0.7; } 70% { transform: scale(1.14); opacity: 0; } 100% { opacity: 0; } }
+@keyframes tapPunch { 0% { transform: scale(0.9); } 45% { transform: scale(1.05); } 100% { transform: scale(1); } }
+@keyframes tapPop { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -160%) scale(1.1); } }
+
+/* The scrolling store. flex:1 + min-height:0 lets it shrink and scroll inside the
+   capped panel instead of pushing the DONE button off-screen (the mobile bug). */
+.station-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 2px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+#station-close { flex: none; }
+.click-buy { flex: none; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 96px; line-height: 1.15; }
+.click-buy .gb-q { font-size: 10px; letter-spacing: 0.5px; opacity: 0.85; }
+.click-buy .gb-c { font-weight: 800; }
 .st-cur {
   flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
   background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
@@ -551,7 +618,11 @@ kbd { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2)
   .ship-desc { min-height: 0; }
   .directive-grid, .codex-grid { grid-template-columns: 1fr; }
   .dir-desc { min-height: 0; }
-  .station-head { flex-direction: column; }
+  /* On phones the currency pills take the full width under the title and split
+     the row evenly, and the tap button shrinks a touch to leave room to scroll. */
+  .station-cash { width: 100%; }
+  .station-cash .st-cur { flex: 1 1 auto; }
+  .station-tap { width: min(168px, 52vw); height: min(168px, 52vw); }
 }
 
 /* Mobile controls */

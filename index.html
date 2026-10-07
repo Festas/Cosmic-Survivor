@@ -126,16 +126,37 @@
         <div class="hangar-tabs">
           <button id="tab-ships" class="tab active">STARFIGHTERS</button>
           <button id="tab-meta" class="tab">ASCENSION</button>
-          <button id="tab-station" class="tab">STATION</button>
           <button id="tab-directives" class="tab">DIRECTIVES</button>
           <button id="tab-codex" class="tab">CODEX</button>
         </div>
         <div id="hangar-ships" class="hangar-body ship-grid"></div>
         <div id="hangar-meta" class="hangar-body meta-grid hidden"></div>
-        <div id="hangar-station" class="hangar-body station-grid hidden"></div>
         <div id="hangar-directives" class="hangar-body directive-grid hidden"></div>
         <div id="hangar-codex" class="hangar-body codex-grid hidden"></div>
         <button id="hangar-close" class="btn">✔ DONE</button>
+      </div>
+    </div>
+
+    <!-- Orbital Station — the standalone idle/clicker layer (Nebula → Cores) -->
+    <div id="station" class="overlay hidden">
+      <div class="panel station-panel">
+        <div class="station-topbar">
+          <h2 class="station-title">🛰 ORBITAL STATION</h2>
+          <div class="station-cash">
+            <div class="st-cur st-neb"><span class="st-k">⬡ Nebula</span><b id="station-nebula">0</b><span class="st-sub" id="station-rate">0.0/s</span></div>
+            <div class="st-cur st-core"><span class="st-k">🌀 Cores</span><b id="station-cores">0</b><span class="st-sub" id="station-core-mult">×1.00</span></div>
+          </div>
+        </div>
+        <div class="station-tapzone">
+          <button id="station-tap" class="station-tap" aria-label="Mine Nebula">
+            <span class="tap-core">⬡</span>
+            <span class="tap-label">MINE</span>
+            <span class="tap-gain" id="station-tap-gain">+1 ⬡</span>
+          </button>
+          <div id="station-tapfx" class="station-tapfx" aria-hidden="true"></div>
+        </div>
+        <div id="station-store" class="station-body"></div>
+        <button id="station-close" class="btn">✔ DONE</button>
       </div>
     </div>
 

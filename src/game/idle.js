@@ -33,6 +33,7 @@ export function createIdleState() {
     lifetimeCores: 0,   // total Cores ever earned (drives the permanent multiplier)
     generators: Object.create(null), // { [generatorId]: ownedCount }
     special: Object.create(null),    // { [specialId]: level }
+    clickLevel: 0,      // Mining Laser level: boosts the manual-tap yield (see clickYield)
     lastTick: 0,        // epoch ms of the last production tick (for offline catch-up)
   };
 }
@@ -181,6 +182,47 @@ export function mainBoostMultiplier({ lifetimeStardust = 0, bestLevel = 0, bossK
 // multiplier. `profile` is the main→idle link (see mainBoostMultiplier).
 export function totalRate(state = createIdleState(), profile = {}) {
   return baseRate(state.generators) * prestigeMultiplier(state.lifetimeCores) * mainBoostMultiplier(profile);
+}
+
+// ------------------------------------------------------- manual mining (tap)
+
+// The Cookie-Clicker "big cookie": a manual tap that mines Nebula by hand. This
+// is the bootstrap that lets a brand-new Station (0 Nebula, 0 generators) earn
+// its very first Nebula and afford its first generator — you can always tap your
+// way out of an empty economy. Two ingredients keep taps relevant forever:
+//   • a flat per-tap power raised by the Nebula-bought Mining Laser upgrade, and
+//   • a slice of your live production, so a humming Station rewards taps too.
+export const BASE_CLICK = 1;              // Nebula minted by one tap at zero upgrades
+export const CLICK_RATE_FRACTION = 0.10;  // + this fraction of Nebula/sec per tap
+
+// The Mining Laser: a single click-power upgrade line (distinct from the auto
+// GENERATORS) bought with Nebula. Each level adds `power` to the flat per-tap
+// yield. Reset by Collapse along with generators (it is a Nebula-era investment).
+export const CLICK_UPGRADE = {
+  id: 'mininglaser', name: 'Mining Laser', icon: '🔆',
+  desc: 'Overcharge the mining beam — more Nebula from every manual tap.',
+  baseCost: 50, costGrowth: 1.35, power: 1,
+};
+export const CLICK_POWER_STEP = CLICK_UPGRADE.power;
+
+// Flat per-tap power (before global multipliers) from the Mining Laser level.
+export function clickPower(level = 0) {
+  return BASE_CLICK + CLICK_POWER_STEP * Math.max(0, Math.floor(level));
+}
+
+// Cost in Nebula of the NEXT Mining Laser level (geometric, like generators).
+export function clickUpgradeCost(level = 0) {
+  return Math.ceil(CLICK_UPGRADE.baseCost * Math.pow(CLICK_UPGRADE.costGrowth, Math.max(0, Math.floor(level))));
+}
+
+// Nebula minted by a single manual tap: click power (scaled by the same Prestige
+// × run-profile multipliers as production) plus a slice of live output. Floored
+// at BASE_CLICK so the first tap on a pristine Station always yields something.
+export function clickYield(state = createIdleState(), profile = {}) {
+  const globalMult = prestigeMultiplier(state.lifetimeCores) * mainBoostMultiplier(profile);
+  const fromPower = clickPower(state.clickLevel || 0) * globalMult;
+  const fromRate = totalRate(state, profile) * CLICK_RATE_FRACTION;
+  return Math.max(BASE_CLICK, fromPower + fromRate);
 }
 
 // Offline/elapsed catch-up window. AFK is rewarding but bounded so leaving the

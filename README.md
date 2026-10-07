@@ -106,10 +106,16 @@ Permanent **milestone awards** earned by hitting thresholds in a single run (sur
 ### 🛰 Orbital Station — the idle layer
 A fully **AFK economy** that mines **Nebula** in real time — during a run, sitting in the menus,
 or with the tab closed entirely. Come back later and the Station greets you with the **Nebula it
-banked while you were away** (capped so it can't run away overnight). Open it straight from the
-start screen — tap the **🛰 STATION** button or the **Nebula pill** — or from the Hangar's
-**Station** tab.
+banked while you were away** (capped so it can't run away overnight). It's its **own full-screen
+screen** (no longer a Hangar tab): open it straight from the start screen by tapping the
+**🛰 STATION** button or the **Nebula pill**.
 
+- **Tap to mine.** The Station's centrepiece is a big **MINE beam** — a Cookie-Clicker "big
+  cookie". Every tap mints Nebula by hand, so a brand-new Station (zero Nebula, zero generators)
+  can always **tap its way to its first generator** — no more dead-end start. Each tap floats a
+  "+N" and its yield scales with your production, so it stays worthwhile even late game.
+- **Mining Laser.** A Nebula-bought **click upgrade** that permanently raises how much each manual
+  tap mines. Like generators, it resets on Collapse.
 - **Generators.** Spend Nebula on **8 ascending generators** (Survey Probe → Dust Collector →
   Ion Refinery → Graviton Harvester → Dyson Node → Singularity Tap → Warp Forge → Quasar Engine).
   Each costs more and mines more than the last, and buying in **×1 / ×10 / MAX** batches keeps the
