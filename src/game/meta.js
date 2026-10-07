@@ -140,12 +140,14 @@ export function canBuyMeta(def, levels, stardust) {
 //
 // Tuned deliberately lean: a run should pay out enough to chip away at the
 // Hangar, not bankroll it in one sitting — so Ascension upgrades stay a
-// meaningful, challenging grind rather than an instant unlock.
+// meaningful, challenging grind rather than an instant unlock. The divisors and
+// per-source weights below are intentionally stingy (roughly half the early
+// payout) to keep the long-haul grind feeling earned rather than handed out.
 export function stardustForRun({ score = 0, time = 0, kills = 0, level = 1, bossKills = 0 } = {}) {
-  const fromScore = score / 220;
-  const fromTime = time / 16;
-  const fromKills = kills / 14;
-  const fromLevel = Math.max(0, level - 1) * 1;
-  const fromBoss = bossKills * 18;
+  const fromScore = score / 380;
+  const fromTime = time / 30;
+  const fromKills = kills / 26;
+  const fromLevel = Math.max(0, level - 1) * 0.5;
+  const fromBoss = bossKills * 10;
   return Math.max(0, Math.floor(fromScore + fromTime + fromKills + fromLevel + fromBoss));
 }
