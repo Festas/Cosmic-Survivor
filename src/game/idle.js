@@ -50,8 +50,9 @@ function G(id, name, icon, desc, opts) {
   };
 }
 
-// Six ascending generators. Early ones are cheap trickle; later ones are the
-// long-haul engine that makes Prestige worthwhile.
+// Eight ascending generators. Early ones are cheap trickle; later ones are the
+// long-haul engine that makes Prestige worthwhile and give post-Collapse runs
+// something to keep chasing.
 export const GENERATORS = [
   G('probe', 'Survey Probe', '🛰️', 'A lonely drone sipping stray particles.', { baseCost: 15, rate: 0.1 }),
   G('collector', 'Dust Collector', '📡', 'Sweeps the debris field for Nebula.', { baseCost: 120, rate: 0.8 }),
@@ -59,6 +60,8 @@ export const GENERATORS = [
   G('harvester', 'Graviton Harvester', '⚛️', 'Bends gravity to funnel Nebula inward.', { baseCost: 14000, rate: 30 }),
   G('dyson', 'Dyson Node', '🛸', 'Taps a dying star for raw output.', { baseCost: 160000, rate: 180 }),
   G('singtap', 'Singularity Tap', '🕳️', 'Siphons a micro black hole. Obscene yield.', { baseCost: 2000000, rate: 1000 }),
+  G('warpforge', 'Warp Forge', '🌌', 'Folds spacetime to mint Nebula wholesale.', { baseCost: 24000000, rate: 5500 }),
+  G('quasar', 'Quasar Engine', '💫', 'Harnesses a galactic core. Reality strains.', { baseCost: 300000000, rate: 32000 }),
 ];
 
 export const GENERATOR_BY_ID = Object.create(null);
@@ -94,12 +97,52 @@ export function maxAffordable(def, owned = 0, nebula = 0) {
   return n;
 }
 
-// Raw Nebula/second from owned generators, before any multipliers.
+// --------------------------------------------------------------- milestones
+
+// Owning many of one generator pays off beyond the next tier: every
+// MILESTONE_STEP units crossed grants that generator a permanent production
+// multiplier (classic idle "milestone" bonus). This deepens the AFK loop — the
+// longer the Station runs, the more each generator over-produces — and rewards
+// going wide on a single generator, not just tall across all of them.
+export const MILESTONE_STEP = 25;        // units of one generator per milestone
+export const MILESTONE_BONUS = 0.5;      // +50% of base output per milestone
+
+// How many milestones a given owned count has crossed.
+export function milestonesReached(owned = 0) {
+  return Math.floor(Math.max(0, Math.floor(owned)) / MILESTONE_STEP);
+}
+
+// Per-generator production multiplier from owning `owned` units. Starts at ×1
+// and climbs +MILESTONE_BONUS per milestone. The curve is unbounded, mirroring
+// the geometric cost curve, so there is always a next goal to chase.
+export function generatorMilestoneMultiplier(owned = 0) {
+  return 1 + MILESTONE_BONUS * milestonesReached(owned);
+}
+
+// Progress toward the next milestone for a generator, for the Station UI.
+// `remaining` is always 1..MILESTONE_STEP (there is always a next milestone).
+export function generatorMilestoneProgress(owned = 0) {
+  const n = Math.max(0, Math.floor(owned));
+  const reached = milestonesReached(n);
+  const next = (reached + 1) * MILESTONE_STEP;
+  return {
+    reached,
+    multiplier: generatorMilestoneMultiplier(n),
+    nextAt: next,
+    nextMultiplier: 1 + MILESTONE_BONUS * (reached + 1),
+    remaining: next - n,
+  };
+}
+
+// --------------------------------------------------------------- production
+
+// Raw Nebula/second from owned generators (including per-generator milestone
+// multipliers), before the global Prestige/run-profile multipliers.
 export function baseRate(generators = {}) {
   let r = 0;
   for (const def of GENERATORS) {
     const owned = Math.max(0, Math.floor(generators[def.id] || 0));
-    if (owned > 0) r += def.rate * owned;
+    if (owned > 0) r += def.rate * owned * generatorMilestoneMultiplier(owned);
   }
   return r;
 }
@@ -209,6 +252,16 @@ export const SPECIAL_UPGRADES = [
     max: 6, baseCost: 3, costGrowth: 1.75,
     apply: (b, l) => { b.critAdd += 0.04 * l; },
     effect: (l) => `+${Math.round(0.04 * l * 100)}% crit`,
+  }),
+  X('chrono_capacitor', 'Chrono Capacitor', '⏱️', '+4% attack speed per level', {
+    max: 6, baseCost: 2, costGrowth: 1.7,
+    apply: (b, l) => { b.hasteMul *= 1 - 0.04 * l; },
+    effect: (l) => `+${Math.round(0.04 * l * 100)}% attack speed`,
+  }),
+  X('magnetic_lattice', 'Magnetic Lattice', '🧲', '+14% pickup range per level', {
+    max: 6, baseCost: 2, costGrowth: 1.6,
+    apply: (b, l) => { b.pickupMul *= 1 + 0.14 * l; },
+    effect: (l) => `+${Math.round(0.14 * l * 100)}% pickup range`,
   }),
 ];
 
