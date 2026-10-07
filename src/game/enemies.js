@@ -709,7 +709,7 @@ export const BOSS_TYPES = {
   // boss: big obvious tells, simple patterns, rewards learning to dodge the lunge.
   devourer: {
     key: 'devourer', name: 'The Devourer', hp: 2200, speed: 50, radius: 50, damage: 24, xp: 60,
-    color: '#ff3b6b', shape: 'boss', boss: true, massive: true,
+    color: '#ff3b6b', shape: 'boss_maw', boss: true, massive: true,
     update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.devourer); },
   },
 
@@ -718,7 +718,7 @@ export const BOSS_TYPES = {
   // and a blink strike. Teaches threading a wall through its dodge lane.
   warden: {
     key: 'warden', name: 'The Warden', hp: 2700, speed: 60, radius: 46, damage: 24, xp: 75,
-    color: '#51e9ff', shape: 'boss', boss: true, massive: true,
+    color: '#51e9ff', shape: 'boss_crystal', boss: true, massive: true,
     update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.warden); },
   },
 
@@ -727,7 +727,7 @@ export const BOSS_TYPES = {
   // sprays acid. Pressure comes from the board filling up, not raw bullet speed.
   hivequeen: {
     key: 'hivequeen', name: 'The Hive Queen', hp: 3200, speed: 48, radius: 50, damage: 23, xp: 85,
-    color: COLORS.invGreen, shape: 'boss', boss: true, massive: true,
+    color: COLORS.invGreen, shape: 'boss_hive', boss: true, massive: true,
     update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.hivequeen); },
   },
 
@@ -736,7 +736,7 @@ export const BOSS_TYPES = {
   // walls, arc barrages and deployed mortars demand constant repositioning.
   siegemarshal: {
     key: 'siegemarshal', name: 'The Siege Marshal', hp: 3700, speed: 52, radius: 52, damage: 25, xp: 95,
-    color: COLORS.invAmber, shape: 'boss', boss: true, massive: true,
+    color: COLORS.invAmber, shape: 'boss_siege', boss: true, massive: true,
     update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.siegemarshal); },
   },
 
@@ -745,7 +745,7 @@ export const BOSS_TYPES = {
   // proper duel): a rotating plasma spiral, collapse bursts and an event horizon.
   singularis: {
     key: 'singularis', name: 'The Singularis', hp: 4300, speed: 50, radius: 50, damage: 25, xp: 100,
-    color: COLORS.void, shape: 'boss', boss: true, massive: true,
+    color: COLORS.void, shape: 'boss_singularis', boss: true, massive: true,
     update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.singularis); },
   },
 
@@ -763,7 +763,7 @@ export const BOSS_TYPES = {
   // and gapped walls, and summons blinking weavers. Punishes losing track of it.
   phantom: {
     key: 'phantom', name: 'The Phantom', hp: 5400, speed: 72, radius: 48, damage: 26, xp: 120,
-    color: COLORS.invMagenta, shape: 'boss', boss: true, massive: true,
+    color: COLORS.invMagenta, shape: 'boss_phantom', boss: true, massive: true,
     update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.phantom); },
   },
 
@@ -772,7 +772,7 @@ export const BOSS_TYPES = {
   // overlapping glacier novas. A tank-and-spank endurance wall with big nova tells.
   cryoleviathan: {
     key: 'cryoleviathan', name: 'The Cryo Leviathan', hp: 6400, speed: 42, radius: 58, damage: 27, xp: 135,
-    color: COLORS.cryo, shape: 'boss', boss: true, massive: true,
+    color: COLORS.cryo, shape: 'boss_cryo', boss: true, massive: true,
     update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.cryoleviathan); },
   },
 
@@ -781,7 +781,7 @@ export const BOSS_TYPES = {
   // walls and chain-storm novas. The highest bullet velocity before the finale.
   stormherald: {
     key: 'stormherald', name: 'The Storm Herald', hp: 6900, speed: 64, radius: 52, damage: 27, xp: 145,
-    color: COLORS.shock, shape: 'boss', boss: true, massive: true,
+    color: COLORS.shock, shape: 'boss_storm', boss: true, massive: true,
     update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.stormherald); },
   },
 
@@ -791,7 +791,7 @@ export const BOSS_TYPES = {
   // enrage — a Final Judgment that fills the arena. The climax of the run.
   nemesis: {
     key: 'nemesis', name: 'The Nemesis', hp: 9000, speed: 60, radius: 58, damage: 28, xp: 200,
-    color: COLORS.invRed, shape: 'boss', boss: true, massive: true,
+    color: COLORS.invRed, shape: 'boss_nemesis', boss: true, massive: true,
     update(e, dt, world) { bossThink(e, dt, world, BOSS_CFG.nemesis); },
   },
 };

@@ -66,7 +66,10 @@
     <!-- Start screen -->
     <div id="start" class="overlay fit">
       <div class="panel">
-        <div class="stardust-pill" title="Stardust — earn it in runs, spend it in the Hangar">✦ <b id="start-stardust">0</b> Stardust</div>
+        <div class="start-pills">
+          <div class="stardust-pill" title="Stardust — earn it in runs, spend it in the Hangar">✦ <b id="start-stardust">0</b> Stardust</div>
+          <div class="nebula-pill" title="Nebula — produced by your Orbital Station, even while away" id="start-nebula-pill">⬡ <b id="start-nebula">0</b> <span class="nb-rate" id="start-nebula-rate"></span></div>
+        </div>
         <h1 class="title">COSMIC SURVIVOR</h1>
         <p class="tagline">Hold the line against the alien swarm. Stack weapons. Evolve. Overdrive.</p>
         <div class="features">
@@ -122,11 +125,13 @@
         <div class="hangar-tabs">
           <button id="tab-ships" class="tab active">STARFIGHTERS</button>
           <button id="tab-meta" class="tab">ASCENSION</button>
+          <button id="tab-station" class="tab">STATION</button>
           <button id="tab-directives" class="tab">DIRECTIVES</button>
           <button id="tab-codex" class="tab">CODEX</button>
         </div>
         <div id="hangar-ships" class="hangar-body ship-grid"></div>
         <div id="hangar-meta" class="hangar-body meta-grid hidden"></div>
+        <div id="hangar-station" class="hangar-body station-grid hidden"></div>
         <div id="hangar-directives" class="hangar-body directive-grid hidden"></div>
         <div id="hangar-codex" class="hangar-body codex-grid hidden"></div>
         <button id="hangar-close" class="btn">✔ DONE</button>
@@ -170,6 +175,7 @@
         <div id="go-newbest" class="newbest hidden">★ NEW BEST ★</div>
         <div id="go-score" class="go-score">0</div>
         <div id="go-stardust" class="go-stardust">✦ +0 Stardust</div>
+        <div id="go-nebula" class="go-nebula hidden">⬡ +0 Nebula</div>
         <div id="go-commends" class="go-commends hidden"></div>
         <div id="go-stats" class="run-stats"></div>
         <button id="retry-btn" class="btn">↻ RETRY</button>

@@ -1,7 +1,15 @@
 // camera.js — smooth follow camera with trauma-based screen shake.
+//
+// The shake is deliberately subtle: a full-trauma hit nudges the view only a few
+// pixels so impacts still register as a faint "kick" without the jarring,
+// distracting lurch of a heavy screen shake. Tune SHAKE_AMPLITUDE to taste.
 
 import { clamp, damp } from './utils.js';
 import { ARENA } from '../game/config.js';
+
+// Peak shake offset in world px at full trauma. Kept small on purpose so the
+// shake reads as a gentle, minimal kick rather than a distracting lurch.
+const SHAKE_AMPLITUDE = 7;
 
 export class Camera {
   constructor(viewW, viewH) {
@@ -33,8 +41,8 @@ export class Camera {
 
     const shake = this.trauma * this.trauma;
     const t = performance.now() / 1000;
-    this.shakeX = (Math.sin(t * 47 + this._seed) + Math.sin(t * 31)) * 0.5 * shake * 26;
-    this.shakeY = (Math.cos(t * 41 + this._seed) + Math.sin(t * 29)) * 0.5 * shake * 26;
+    this.shakeX = (Math.sin(t * 47 + this._seed) + Math.sin(t * 31)) * 0.5 * shake * SHAKE_AMPLITUDE;
+    this.shakeY = (Math.cos(t * 41 + this._seed) + Math.sin(t * 29)) * 0.5 * shake * SHAKE_AMPLITUDE;
     this.trauma = Math.max(0, this.trauma - dt * 1.6);
   }
 

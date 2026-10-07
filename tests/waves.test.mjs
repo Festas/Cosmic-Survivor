@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  THEMES, themeIndexForWave, themeForWave, bossIndexForWave, bossKeyForWave, pickFromRoster,
+  THEMES, themeIndexForWave, themeForWave, bossIndexForWave, bossKeyForWave, bossTierForWave, pickFromRoster,
 } from '../src/game/waves.js';
 import { ENEMY_TYPES, BOSS_TYPES } from '../src/game/enemies.js';
 import { WAVE } from '../src/game/config.js';
@@ -66,6 +66,20 @@ test('boss roster cycles past wave 100 (wave 110 repeats the first boss)', () =>
   assert.equal(bossKeyForWave(210), bossKeyForWave(10));
   // Always a real boss key, however far out we go.
   for (const w of [10, 120, 340, 1000]) assert.ok(BOSS_TYPES[bossKeyForWave(w)], `wave ${w}`);
+});
+
+test('bossTierForWave labels each cleared roster cycle, starting at 1', () => {
+  // First cycle (waves 10–100) is tier 1.
+  for (let i = 0; i < WAVE.bossCount; i++) {
+    assert.equal(bossTierForWave((i + 1) * WAVE.bossEvery), 1, `wave ${(i + 1) * WAVE.bossEvery}`);
+  }
+  // Second cycle (110–200) is tier 2, third (210–300) is tier 3.
+  assert.equal(bossTierForWave(110), 2);
+  assert.equal(bossTierForWave(200), 2);
+  assert.equal(bossTierForWave(210), 3);
+  assert.equal(bossTierForWave(1000), 10);
+  // Never below 1, even for defensive/low inputs.
+  for (const w of [0, 1, 5, 9, -3]) assert.ok(bossTierForWave(w) >= 1, `wave ${w}`);
 });
 
 test('pickFromRoster is deterministic for a given sample and always valid', () => {

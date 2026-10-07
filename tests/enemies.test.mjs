@@ -68,7 +68,7 @@ test('new enemy and boss types are registered and well-formed', () => {
   const boss = BOSS_TYPES.singularis;
   assert.ok(boss, 'singularis boss should be registered');
   assert.equal(boss.boss, true);
-  assert.equal(boss.shape, 'boss');
+  assert.equal(boss.shape, 'boss_singularis');
   assert.ok(boss.hp > 0 && boss.radius > 0);
 });
 
