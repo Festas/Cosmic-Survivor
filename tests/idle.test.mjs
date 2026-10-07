@@ -485,3 +485,74 @@ test('a Lucky windfall floors to a worthwhile pop even on a pristine Station', (
   assert.equal(reward.kind, 'nebula');
   assert.ok(reward.nebula >= 25, 'empty Station still gets a floor windfall');
 });
+
+// --------------------------------------------------- expanded Station content
+// The Station catalogue was expanded to at least double its original size. These
+// guard the lower bounds and the new effect fields they introduced.
+
+test('Station catalogue is at least doubled in every line', () => {
+  assert.ok(GENERATORS.length >= 16, `generators ${GENERATORS.length} >= 16`);
+  assert.ok(PRESTIGE_UPGRADES.length >= 16, `perks ${PRESTIGE_UPGRADES.length} >= 16`);
+  assert.ok(SPECIAL_UPGRADES.length >= 16, `specials ${SPECIAL_UPGRADES.length} >= 16`);
+  assert.ok(SURGE_TYPES.length >= 10, `surges ${SURGE_TYPES.length} >= 10`);
+});
+
+test('new high-tier generators stay strictly ascending and formattable', () => {
+  for (const id of ['pulsar', 'antimatter', 'wormhole', 'infinityspire']) {
+    assert.ok(GENERATOR_BY_ID[id], `generator ${id} is registered`);
+  }
+  // The whole ladder must still ascend in both cost and rate (re-checked here so
+  // the new tail can never silently break monotonicity).
+  for (let i = 1; i < GENERATORS.length; i++) {
+    assert.ok(GENERATORS[i].baseCost > GENERATORS[i - 1].baseCost, 'cost ascends');
+    assert.ok(GENERATORS[i].rate > GENERATORS[i - 1].rate, 'rate ascends');
+    assert.ok(Number.isFinite(GENERATORS[i].baseCost) && Number.isFinite(GENERATORS[i].rate));
+  }
+});
+
+test('createPerkEffects exposes the new neutral perk fields', () => {
+  const n = createPerkEffects();
+  assert.equal(n.surgeDurationMul, 1);
+  assert.equal(n.offlineRateMul, 1);
+  assert.equal(n.nebulaRunMul, 1);
+});
+
+test('Temporal Lens perk widens Surge frenzy duration', () => {
+  const base = { rate: 50, nebula: 1e4, perks: createPerkEffects() };
+  const plain = rollSurge(0.3, base); // a prod/click frenzy bucket
+  const boosted = rollSurge(0.3, { ...base, perks: computePerks({ temporal_lens: 6 }) });
+  if (plain.duration) assert.ok(boosted.duration > plain.duration, 'frenzy lasts longer');
+});
+
+test('Dormant Reactor and Flux Siphon perks fold their multipliers', () => {
+  const reactor = computePerks({ dormant_reactor: 6 });
+  assert.ok(reactor.offlineRateMul > 1, 'offline rate scales up');
+  const siphon = computePerks({ flux_siphon: 8 });
+  assert.ok(siphon.nebulaRunMul > 1, 'run Nebula burst scales up');
+});
+
+test('new Core specials fold their extra run-stat fields into the bonus', () => {
+  const b = applyIdleBonus(createMetaBonus(), {
+    kinetic_amplifier: 8, phase_shift: 8, vampiric_core: 6,
+    blast_capacitor: 6, piercing_rounds: 4,
+  });
+  assert.ok(b.critMultAdd > 0, 'crit damage added');
+  assert.ok(b.dodgeAdd > 0, 'dodge added');
+  assert.ok(b.lifestealAdd > 0, 'lifesteal added');
+  assert.ok(b.areaMul > 1, 'area scaled');
+  assert.ok(b.pierceAdd >= 1, 'pierce added');
+});
+
+test('richer Nebula surges pay out more and Core Vault banks several Cores', () => {
+  const ctx = { rate: 100, nebula: 1e6, perks: createPerkEffects() };
+  const lucky = rollSurge(0, ctx).nebula;
+  // Walk the table to find the payoutMul'd nebula surges and the big Core jackpot.
+  let richest = lucky; let maxCores = 1;
+  for (let r = 0; r < 1; r += 0.001) {
+    const reward = rollSurge(r, ctx);
+    if (reward.kind === 'nebula') richest = Math.max(richest, reward.nebula);
+    if (reward.kind === 'core') maxCores = Math.max(maxCores, reward.cores);
+  }
+  assert.ok(richest > lucky, 'a richer surge beats the baseline Lucky Nebula');
+  assert.ok(maxCores >= 3, 'Core Vault grants several Cores');
+});

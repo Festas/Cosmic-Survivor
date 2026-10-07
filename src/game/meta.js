@@ -27,6 +27,14 @@ export function createMetaBonus() {
     singChargeMul: 1,
     revives: 0,
     stardustMul: 1,
+    // Extra run-stat fields, neutral by default. Currently only the Orbital
+    // Station's premium "Core" specials (game/idle.js) feed these, but they live
+    // here so World.applyLoadout has a single bonus shape to read.
+    critMultAdd: 0,   // + crit damage multiplier
+    dodgeAdd: 0,      // + dodge chance (capped in applyLoadout)
+    lifestealAdd: 0,  // + lifesteal fraction
+    areaMul: 1,       // × AoE / explosion radius
+    pierceAdd: 0,     // + projectile pierce count
   };
 }
 

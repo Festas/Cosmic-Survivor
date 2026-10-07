@@ -98,6 +98,9 @@ export class World {
     // Premium idle "special" upgrades (bought with Singularity Cores) fold their
     // buffs on top of Ascension, so the Orbital Station visibly empowers each run.
     if (config.idleSpecial) applyIdleBonus(this.metaBonus, config.idleSpecial);
+    // The Flux Siphon Singularity perk boosts the end-of-run Nebula burst. The
+    // controller passes the precomputed multiplier (≥1); default is neutral.
+    this.idleNebulaMul = Math.max(1, config.idleNebulaMul || 1);
     // Active challenge directives fold into one difficulty/economy effect object
     // that spawn, damage, XP and reward code read. Neutral (all 1s) when none set.
     this.directives = Array.isArray(config.directives) ? config.directives.slice() : [];
@@ -178,6 +181,13 @@ export class World {
     s.xpMul *= bonus.xpMul;
     s.pickupRadius *= bonus.pickupMul;
     s.singularityChargeMul *= bonus.singChargeMul;
+    // Extra run-stat buffs (currently fed by the Station's premium Core specials).
+    // Neutral defaults from createMetaBonus mean these change nothing when unused.
+    if (bonus.critMultAdd) s.critMult += bonus.critMultAdd;
+    if (bonus.dodgeAdd) s.dodge = Math.min(0.5, (s.dodge || 0) + bonus.dodgeAdd);
+    if (bonus.lifestealAdd) s.lifesteal = (s.lifesteal || 0) + bonus.lifestealAdd;
+    if (bonus.areaMul && bonus.areaMul !== 1) s.areaMul *= bonus.areaMul;
+    if (bonus.pierceAdd) s.pierce += bonus.pierceAdd;
     // Clamp and derive starting HP from the final maxHp.
     s.maxHp = Math.max(1, Math.round(s.maxHp));
     player.hp = s.maxHp;
@@ -1112,7 +1122,8 @@ export class World {
 
     // main → idle: actively finishing a run also mints a Nebula burst for the
     // Orbital Station, so the two economies feed each other (see game/idle.js).
-    const nebula = nebulaForRun(summary);
+    // The Flux Siphon perk (idleNebulaMul) scales this burst.
+    const nebula = Math.floor(nebulaForRun(summary) * (this.idleNebulaMul || 1));
     summary.nebula = nebula;
     if (this.store?.addNebula) {
       this.store.addNebula(nebula);
