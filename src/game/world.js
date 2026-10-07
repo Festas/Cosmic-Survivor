@@ -13,6 +13,7 @@ import { Camera } from '../engine/camera.js';
 import { Particles } from '../engine/particles.js';
 import { glowSprite } from '../engine/sprites.js';
 import { paletteFor, drawEnemyBody, drawBossCore, isUpright, enemyPath, withAlpha } from './enemyArt.js';
+import { drawShipBody, drawDroneBody } from './shipArt.js';
 import { Player } from './player.js';
 import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize, rollElite } from './enemies.js';
 import { THEMES, themeIndexForWave, bossKeyForWave, pickFromRoster } from './waves.js';
@@ -1152,8 +1153,7 @@ export class World {
     const p = this.player;
     ctx.save();
     ctx.translate(p.x, p.y);
-    // pickup radius hint (subtle)
-    // thrust flame
+    // thrust flame (live, additive) — reads p.thrust / p.faceAngle, same feel.
     if (p.thrust > 0.1 && !p.dashing) {
       ctx.save();
       ctx.rotate(p.faceAngle);
@@ -1165,34 +1165,64 @@ export class World {
       ctx.fill();
       ctx.restore();
     }
+    // invuln blink (skipped while dashing, which has its own look).
     ctx.globalAlpha = p.invuln > 0 && !p.dashing ? (Math.sin(performance.now() / 40) * 0.3 + 0.6) : 1;
-    // glow body (tinted by the chosen ship's accent colour)
+
+    // Cached 3D hull sprite: the detailed, lit starfighter is baked once per ship
+    // colour / radius / hit-flash state (its glow + volumetric shading cost nothing
+    // per frame) and blitted rotated to the aim angle.
     const hull = p.shipColor || COLORS.player;
-    ctx.shadowColor = p.shipColor || COLORS.playerGlow;
-    ctx.shadowBlur = p.dashing ? 30 : 16;
+    const flash = p.hitFlash > 0;
+    const r = p.radius;
+    const pal = paletteFor(hull);
+    const spr = glowSprite(
+      'ship|' + hull + '|' + (flash ? 1 : 0) + '|' + r,
+      r * 1.75, Math.ceil(r * 0.9),
+      (g) => drawShipBody(g, r, { hull, accent: pal.accent, highlight: pal.highlight, flash }),
+    );
+
     ctx.rotate(p.aimAngle);
-    ctx.fillStyle = p.hitFlash > 0 ? '#fff' : hull;
-    ctx.beginPath();
-    ctx.moveTo(p.radius + 4, 0);
-    ctx.lineTo(-p.radius, -p.radius * 0.8);
-    ctx.lineTo(-p.radius * 0.5, 0);
-    ctx.lineTo(-p.radius, p.radius * 0.8);
-    ctx.closePath();
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    // cockpit
+    // Dash: an extra additive bloom for the "bigger glow" dash feel (live).
+    if (p.dashing) {
+      const glow = p.shipColor || COLORS.playerGlow;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      if (typeof ctx.createRadialGradient === 'function') {
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2.4);
+        g.addColorStop(0, withAlpha(glow, 0.5));
+        g.addColorStop(1, withAlpha(glow, 0));
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = withAlpha(glow, 0.25);
+      }
+      ctx.beginPath(); ctx.arc(0, 0, r * 2.4, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+    if (spr) ctx.drawImage(spr.canvas, -spr.off, -spr.off);
+    else drawShipBody(ctx, r, { hull, accent: pal.accent, highlight: pal.highlight, flash });
+
+    // Crisp live cockpit glow over the baked canopy for extra sparkle.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.shadowColor = '#eafcff'; ctx.shadowBlur = 6;
     ctx.fillStyle = '#eafcff';
-    ctx.beginPath(); ctx.arc(2, 0, 3.5, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.42, 0, Math.max(2, r * 0.18), 0, TAU); ctx.fill();
+    ctx.restore();
     ctx.restore();
 
-    // drones
+    // drones — small cached 3D orb sprites (domed, lit from the upper-left).
     for (const d of p.drones) {
       if (d.x === undefined) continue;
+      const dr = 5;
+      const dspr = glowSprite(
+        'drone|' + COLORS.cryo + '|' + dr,
+        dr * 1.6, Math.ceil(dr * 0.9),
+        (g) => drawDroneBody(g, dr, { hull: COLORS.cryo }),
+      );
       ctx.save();
       ctx.translate(d.x, d.y);
-      ctx.fillStyle = COLORS.cryo;
-      ctx.shadowColor = COLORS.cryo; ctx.shadowBlur = 8;
-      ctx.beginPath(); ctx.arc(0, 0, 5, 0, TAU); ctx.fill();
+      if (dspr) ctx.drawImage(dspr.canvas, -dspr.off, -dspr.off);
+      else drawDroneBody(ctx, dr, { hull: COLORS.cryo });
       ctx.restore();
     }
   }

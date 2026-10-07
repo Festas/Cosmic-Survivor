@@ -28,6 +28,7 @@ const ASSETS = [
   './src/game/weapons.js',
   './src/game/enemies.js',
   './src/game/enemyArt.js',
+  './src/game/shipArt.js',
   './src/game/waves.js',
   './src/game/player.js',
   './src/game/world.js',
