@@ -9,6 +9,11 @@ import {
   generatorMilestoneMultiplier, generatorMilestoneProgress,
   BASE_CLICK, CLICK_RATE_FRACTION, CLICK_UPGRADE, CLICK_POWER_STEP,
   clickPower, clickUpgradeCost, clickYield,
+  PRESTIGE_UPGRADES, PRESTIGE_BY_ID, prestigeUpgradeCost, canBuyPrestige,
+  createPerkEffects, computePerks, prestigeCoreGain, collapseSeedNebula,
+  offlineCapSeconds,
+  SURGE_TYPES, SURGE_BY_ID, pickSurgeType, rollSurge,
+  SURGE_MIN_INTERVAL, SURGE_MAX_INTERVAL, SURGE_LIFETIME,
 } from '../src/game/idle.js';
 import { createMetaBonus } from '../src/game/meta.js';
 
@@ -22,6 +27,7 @@ test('createIdleState is a neutral, empty save', () => {
   assert.equal(baseRate(s.generators), 0);
   assert.equal(Object.keys(s.generators).length, 0);
   assert.equal(Object.keys(s.special).length, 0);
+  assert.equal(Object.keys(s.prestige).length, 0);
 });
 
 test('generators have required fields and are indexed', () => {
@@ -289,4 +295,193 @@ test('clickYield rides the same Prestige multiplier as production', () => {
   prestiged.lifetimeCores = 25; // boosts prestigeMultiplier above 1
   assert.ok(prestigeMultiplier(prestiged.lifetimeCores) > 1);
   assert.ok(clickYield(prestiged, {}) > clickYield(base, {}));
+});
+
+// ---- Ascension perk tree (the "sophisticated prestige" layer) -------------
+
+test('prestige upgrades have required fields, a working apply(), and are indexed', () => {
+  assert.ok(PRESTIGE_UPGRADES.length >= 4);
+  const ids = PRESTIGE_UPGRADES.map((p) => p.id);
+  assert.equal(new Set(ids).size, ids.length, 'perk ids are unique');
+  for (const p of PRESTIGE_UPGRADES) {
+    assert.ok(p.id && p.name && p.icon && p.desc, `bad perk ${p.id}`);
+    assert.ok(p.max >= 1 && p.baseCost > 0 && p.costGrowth > 1, `bad economy ${p.id}`);
+    assert.equal(typeof p.apply, 'function');
+    assert.equal(PRESTIGE_BY_ID[p.id], p);
+    // apply() must leave a real mark on a neutral effects accumulator.
+    const fx = createPerkEffects();
+    assert.doesNotThrow(() => p.apply(fx, p.max));
+    assert.notDeepEqual(fx, createPerkEffects(), `${p.id} changes the effects`);
+    if (p.effect) assert.equal(typeof p.effect(1), 'string');
+  }
+});
+
+test('createPerkEffects is neutral and computePerks is empty-safe', () => {
+  const n = createPerkEffects();
+  assert.equal(n.prodMul, 1);
+  assert.equal(n.clickMul, 1);
+  assert.equal(n.costMul, 1);
+  assert.equal(n.coreGainMul, 1);
+  assert.equal(n.startNebulaFrac, 0);
+  assert.equal(n.surgeChanceMul, 1);
+  assert.equal(n.surgeRewardMul, 1);
+  assert.equal(n.milestoneBonus, MILESTONE_BONUS);
+  assert.equal(n.offlineCapSeconds, OFFLINE_CAP_SECONDS);
+  assert.deepEqual(computePerks({}), createPerkEffects());
+  assert.deepEqual(computePerks({ bogus: 9 }), createPerkEffects(), 'unknown ids ignored');
+});
+
+test('computePerks folds owned levels and clamps to each perk max', () => {
+  const fx = computePerks({ resonant_core: 3 });
+  assert.ok(Math.abs(fx.prodMul - 1.36) < 1e-9, '1 + 0.12*3');
+  // Over-max levels clamp to the perk cap (no runaway from a stale save).
+  const def = PRESTIGE_BY_ID.resonant_core;
+  const capped = computePerks({ resonant_core: 999 });
+  const atMax = computePerks({ resonant_core: def.max });
+  assert.deepEqual(capped, atMax);
+});
+
+test('prestigeUpgradeCost grows geometrically and canBuyPrestige respects cost + cap', () => {
+  const def = PRESTIGE_BY_ID.resonant_core;
+  assert.equal(prestigeUpgradeCost(def, 0), def.baseCost);
+  assert.ok(prestigeUpgradeCost(def, 2) > prestigeUpgradeCost(def, 1));
+  assert.ok(!canBuyPrestige(def, {}, 0), 'cannot buy with no cores');
+  assert.ok(canBuyPrestige(def, {}, prestigeUpgradeCost(def, 0)), 'can buy when affordable');
+  assert.ok(!canBuyPrestige(def, { [def.id]: def.max }, 1e9), 'cannot exceed max level');
+});
+
+test('Resonant Core perk multiplies total production', () => {
+  const s = createIdleState();
+  s.generators[GENERATORS[0].id] = 10;
+  const before = totalRate(s, {});
+  s.prestige.resonant_core = 5; // ×(1 + 0.12*5) = ×1.6
+  const after = totalRate(s, {});
+  assert.ok(Math.abs(after - before * 1.6) < 1e-6, 'production scales with the perk');
+});
+
+test('Hardened Beam perk multiplies manual-tap yield', () => {
+  const s = createIdleState();
+  s.clickLevel = 4;
+  const before = clickYield(s, {});
+  s.prestige.hardened_beam = 2; // ×(1 + 0.35*2) = ×1.7
+  const after = clickYield(s, {});
+  assert.ok(Math.abs(after - before * 1.7) < 1e-6);
+});
+
+test('Mass Production perk discounts generator costs via costMul', () => {
+  const def = GENERATORS[1];
+  const fx = computePerks({ mass_production: 5 });
+  assert.ok(fx.costMul < 1 && fx.costMul > 0);
+  assert.ok(generatorCost(def, 10, fx.costMul) < generatorCost(def, 10));
+  // Bulk cost and maxAffordable honour the same discount.
+  assert.ok(generatorBulkCost(def, 0, 8, fx.costMul) < generatorBulkCost(def, 0, 8));
+  assert.ok(maxAffordable(def, 0, 10000, fx.costMul) >= maxAffordable(def, 0, 10000));
+  // A neutral (default) costMul leaves the classic numbers untouched.
+  assert.equal(generatorCost(def, 0), def.baseCost);
+  assert.equal(generatorCost(def, 0, 1), def.baseCost);
+});
+
+test('Milestone Mastery perk raises the per-milestone bonus in baseRate', () => {
+  const def = GENERATORS[0];
+  const gens = { [def.id]: MILESTONE_STEP }; // exactly one milestone
+  const fx = computePerks({ milestone_mastery: 4 });
+  assert.ok(fx.milestoneBonus > MILESTONE_BONUS);
+  const expected = def.rate * MILESTONE_STEP * (1 + fx.milestoneBonus);
+  assert.ok(Math.abs(baseRate(gens, fx.milestoneBonus) - expected) < 1e-9);
+  assert.ok(baseRate(gens, fx.milestoneBonus) > baseRate(gens));
+  // The progress helper reports the boosted next multiplier too.
+  const p = generatorMilestoneProgress(MILESTONE_STEP, fx.milestoneBonus);
+  assert.ok(Math.abs(p.multiplier - (1 + fx.milestoneBonus)) < 1e-9);
+});
+
+test('Temporal Buffer perk widens the offline cap', () => {
+  assert.equal(offlineCapSeconds({}), OFFLINE_CAP_SECONDS);
+  const longer = offlineCapSeconds({ temporal_buffer: 3 }); // +6h
+  assert.equal(longer, OFFLINE_CAP_SECONDS + 3 * 2 * 3600);
+  assert.ok(longer > OFFLINE_CAP_SECONDS);
+});
+
+test('Dense Singularity perk lifts Core gain without changing the base curve', () => {
+  // Neutral: prestigeCoreGain matches prestigeGain exactly.
+  for (const n of [0, PRESTIGE_BASE - 1, PRESTIGE_BASE, PRESTIGE_BASE * 27]) {
+    assert.equal(prestigeCoreGain(n, {}), prestigeGain(n));
+  }
+  // Perked: strictly >= base, and never mints from a sub-threshold balance.
+  assert.equal(prestigeCoreGain(PRESTIGE_BASE - 1, { dense_singularity: 6 }), 0);
+  assert.ok(prestigeCoreGain(PRESTIGE_BASE * 27, { dense_singularity: 6 }) > prestigeGain(PRESTIGE_BASE * 27));
+});
+
+test('Collapse Memory perk seeds a capped fraction of lifetime Nebula', () => {
+  assert.equal(collapseSeedNebula(1e8, {}), 0, 'no perk → cold restart');
+  assert.equal(collapseSeedNebula(1e8, { collapse_memory: 5 }), Math.floor(1e8 * 0.30));
+  // Levels clamp to the perk max (8 → 48%); the internal 0.8 guard just keeps a
+  // stale save from ever exceeding a sane ceiling.
+  const def = PRESTIGE_BY_ID.collapse_memory;
+  const maxFrac = Math.min(0.8, 0.06 * def.max);
+  assert.equal(collapseSeedNebula(1e8, { collapse_memory: 999 }), Math.floor(1e8 * maxFrac));
+  assert.equal(collapseSeedNebula(1e8, { collapse_memory: def.max }), Math.floor(1e8 * maxFrac));
+  assert.equal(collapseSeedNebula(0, { collapse_memory: 5 }), 0);
+});
+
+// ---- Nebula Surges (the RNG / golden-cookie layer) ------------------------
+
+test('surge types are well-formed, indexed and have positive weights', () => {
+  assert.ok(SURGE_TYPES.length >= 3);
+  const ids = SURGE_TYPES.map((s) => s.id);
+  assert.equal(new Set(ids).size, ids.length);
+  for (const s of SURGE_TYPES) {
+    assert.ok(s.id && s.name && s.icon && s.kind, `bad surge ${s.id}`);
+    assert.ok(s.weight > 0, `positive weight ${s.id}`);
+    assert.equal(SURGE_BY_ID[s.id], s);
+    if (s.kind === 'prod' || s.kind === 'click') {
+      assert.ok(s.mult > 1 && s.duration > 0, `timed buff fields ${s.id}`);
+    }
+  }
+  assert.ok(SURGE_MIN_INTERVAL > 0 && SURGE_MAX_INTERVAL > SURGE_MIN_INTERVAL);
+  assert.ok(SURGE_LIFETIME > 0);
+});
+
+test('pickSurgeType covers the whole table and clamps out-of-range rolls', () => {
+  // Every type is reachable by some roll in [0,1).
+  const seen = new Set();
+  for (let r = 0; r < 1; r += 0.001) seen.add(pickSurgeType(r).id);
+  for (const s of SURGE_TYPES) assert.ok(seen.has(s.id), `${s.id} reachable`);
+  // Clamping: negative → first bucket, ≥1 → last bucket.
+  assert.equal(pickSurgeType(-5).id, SURGE_TYPES[0].id);
+  assert.equal(pickSurgeType(1).id, SURGE_TYPES[SURGE_TYPES.length - 1].id);
+  assert.equal(pickSurgeType(2).id, SURGE_TYPES[SURGE_TYPES.length - 1].id);
+});
+
+test('rollSurge returns a concrete, applicable reward for every kind', () => {
+  const ctx = { rate: 100, nebula: 1e6, perks: createPerkEffects() };
+  // Walk a spread of rolls; collect one reward per kind.
+  const byKind = {};
+  for (let r = 0; r < 1; r += 0.005) {
+    const reward = rollSurge(r, ctx);
+    byKind[reward.kind] = reward;
+    assert.ok(reward.id && reward.name && reward.icon, 'reward carries display fields');
+  }
+  // Instant Nebula windfall is a positive integer.
+  assert.ok(byKind.nebula && Number.isInteger(byKind.nebula.nebula) && byKind.nebula.nebula > 0);
+  // Timed buffs carry a mult (>1) and a duration (>0).
+  for (const k of ['prod', 'click']) {
+    if (byKind[k]) { assert.ok(byKind[k].mult > 1); assert.ok(byKind[k].duration > 0); }
+  }
+  // Core jackpot grants at least one whole Core.
+  if (byKind.core) assert.ok(byKind.core.cores >= 1 && Number.isInteger(byKind.core.cores));
+});
+
+test('rollSurge is deterministic and the reward perk scales instant payouts', () => {
+  const base = { rate: 50, nebula: 2e5, perks: createPerkEffects() };
+  const lucky = rollSurge(0, base); // roll 0 → first (highest-weight) bucket = lucky
+  assert.equal(lucky.kind, 'nebula');
+  assert.equal(rollSurge(0, base).nebula, lucky.nebula, 'deterministic for a fixed roll');
+  const boosted = rollSurge(0, { ...base, perks: computePerks({ lucky_resonance: 6 }) });
+  assert.ok(boosted.nebula > lucky.nebula, 'Lucky Resonance grows the windfall');
+});
+
+test('a Lucky windfall floors to a worthwhile pop even on a pristine Station', () => {
+  const reward = rollSurge(0, { rate: 0, nebula: 0, perks: createPerkEffects() });
+  assert.equal(reward.kind, 'nebula');
+  assert.ok(reward.nebula >= 25, 'empty Station still gets a floor windfall');
 });
