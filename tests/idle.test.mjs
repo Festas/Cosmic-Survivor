@@ -5,7 +5,8 @@ import {
   createIdleState, generatorCost, generatorBulkCost, maxAffordable, baseRate,
   prestigeGain, prestigeMultiplier, mainBoostMultiplier, totalRate, offlineGain,
   OFFLINE_CAP_SECONDS, PRESTIGE_BASE, nebulaForRun, specialCost, canBuySpecial,
-  applyIdleBonus,
+  applyIdleBonus, MILESTONE_STEP, MILESTONE_BONUS, milestonesReached,
+  generatorMilestoneMultiplier, generatorMilestoneProgress,
 } from '../src/game/idle.js';
 import { createMetaBonus } from '../src/game/meta.js';
 
@@ -72,6 +73,49 @@ test('baseRate sums rate × owned across generators', () => {
   assert.equal(baseRate({ [GENERATORS[0].id]: -3 }), 0, 'negative ownership is ignored');
 });
 
+test('milestone multiplier steps up by MILESTONE_BONUS every MILESTONE_STEP units', () => {
+  assert.ok(MILESTONE_STEP >= 1 && MILESTONE_BONUS > 0);
+  assert.equal(milestonesReached(0), 0);
+  assert.equal(milestonesReached(MILESTONE_STEP - 1), 0);
+  assert.equal(milestonesReached(MILESTONE_STEP), 1);
+  assert.equal(milestonesReached(MILESTONE_STEP * 3), 3);
+  assert.equal(generatorMilestoneMultiplier(0), 1);
+  assert.equal(generatorMilestoneMultiplier(MILESTONE_STEP - 1), 1, 'no bonus below the first milestone');
+  assert.ok(Math.abs(generatorMilestoneMultiplier(MILESTONE_STEP) - (1 + MILESTONE_BONUS)) < 1e-9);
+  assert.ok(Math.abs(generatorMilestoneMultiplier(MILESTONE_STEP * 4) - (1 + 4 * MILESTONE_BONUS)) < 1e-9);
+  // Monotonic non-decreasing in ownership.
+  let prev = 0;
+  for (let owned = 0; owned <= MILESTONE_STEP * 5; owned += 7) {
+    const m = generatorMilestoneMultiplier(owned);
+    assert.ok(m >= prev, `multiplier monotonic at ${owned}`);
+    prev = m;
+  }
+});
+
+test('generatorMilestoneProgress reports a reachable next milestone', () => {
+  const p0 = generatorMilestoneProgress(0);
+  assert.equal(p0.reached, 0);
+  assert.equal(p0.nextAt, MILESTONE_STEP);
+  assert.equal(p0.remaining, MILESTONE_STEP);
+  assert.ok(p0.nextMultiplier > p0.multiplier);
+  // remaining is always within 1..MILESTONE_STEP, and nextAt is strictly ahead.
+  for (let owned = 0; owned <= MILESTONE_STEP * 3 + 4; owned++) {
+    const p = generatorMilestoneProgress(owned);
+    assert.ok(p.remaining >= 1 && p.remaining <= MILESTONE_STEP, `remaining in range at ${owned}`);
+    assert.ok(p.nextAt > owned, `nextAt ahead at ${owned}`);
+  }
+});
+
+test('baseRate folds in the per-generator milestone multiplier', () => {
+  const def = GENERATORS[0];
+  // At exactly one milestone, output is rate × owned × (1 + MILESTONE_BONUS).
+  const owned = MILESTONE_STEP;
+  const expected = def.rate * owned * (1 + MILESTONE_BONUS);
+  assert.ok(Math.abs(baseRate({ [def.id]: owned }) - expected) < 1e-9);
+  // More of the same generator earns strictly more than a milestone-free sum.
+  assert.ok(baseRate({ [def.id]: owned }) > def.rate * owned);
+});
+
 test('prestigeGain follows a cube-root curve and is zero below threshold', () => {
   assert.equal(prestigeGain(0), 0);
   assert.equal(prestigeGain(PRESTIGE_BASE - 1), 0);
@@ -131,6 +175,19 @@ test('nebulaForRun is non-negative, integer, deterministic and rewards bigger ru
   assert.ok(big > small);
   assert.equal(nebulaForRun({ score: 1000, time: 60, kills: 50, level: 5 }), small);
   assert.equal(nebulaForRun(), 0);
+});
+
+test('catalog includes the new high-tier generators and Core upgrades', () => {
+  for (const id of ['warpforge', 'quasar']) {
+    assert.ok(GENERATOR_BY_ID[id], `generator ${id} is registered`);
+  }
+  for (const id of ['chrono_capacitor', 'magnetic_lattice']) {
+    const def = SPECIAL_BY_ID[id];
+    assert.ok(def, `core upgrade ${id} is registered`);
+    // apply() must touch a real meta-bonus field (leave the object changed).
+    const bonus = applyIdleBonus(createMetaBonus(), { [id]: def.max });
+    assert.notDeepEqual(bonus, createMetaBonus(), `${id} applies a bonus`);
+  }
 });
 
 test('special upgrades have required fields, a working apply(), and are indexed', () => {
