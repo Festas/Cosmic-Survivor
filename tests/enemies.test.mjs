@@ -154,3 +154,61 @@ test('rollElite accepts a pre-rolled sample instead of an RNG function', () => {
   assert.equal(rollElite(eligible, late, 0), true, 'pre-rolled 0 => promote');
   assert.equal(rollElite(eligible, late, 0.999), false, 'pre-rolled 0.999 => no promote');
 });
+
+// ---- Wave bosses: ten phased, telegraphed fights --------------------------
+
+test('there are ten bosses, each a well-formed massive boss with an update()', () => {
+  const keys = Object.keys(BOSS_TYPES);
+  assert.equal(keys.length, 10, 'expected exactly ten bosses by wave 100');
+  for (const [key, def] of Object.entries(BOSS_TYPES)) {
+    assert.equal(def.key, key, `${key} key mismatch`);
+    assert.equal(def.boss, true, `${key} must be flagged boss`);
+    assert.equal(def.massive, true, `${key} should be massive`);
+    assert.ok(def.hp > 0 && def.radius > 0 && def.damage > 0, `${key} needs core stats`);
+    assert.ok(def.name && def.color, `${key} needs name/color`);
+    assert.ok(typeof def.update === 'function', `${key} needs an update()`);
+  }
+  // HP broadly ramps toward the wave-100 finale (nemesis tankier than the opener).
+  assert.ok(BOSS_TYPES.nemesis.hp > BOSS_TYPES.devourer.hp, 'the finale boss should be the tankiest');
+});
+
+// A fuller world stub than the minimal spiral test above: it records telegraphs,
+// announcements and summons so we can assert the shared bossThink brain actually
+// escalates through phases and fires its abilities.
+function makeBossWorld() {
+  return {
+    player: { x: 520, y: 360 },
+    enemyBullets: [],
+    texts: [],
+    summons: [],
+    shakes: 0,
+    sounds: [],
+    spawnEnemy(key, x, y) { const m = { key, x, y }; this.summons.push(m); return m; },
+    addText(x, y, label) { this.texts.push(label); },
+    audio: { play(name) {} },
+    shake() { this.shakes++; },
+  };
+}
+
+test('every boss drives phases, telegraphs and fire through bossThink without throwing', () => {
+  for (const [key, def] of Object.entries(BOSS_TYPES)) {
+    const world = makeBossWorld();
+    const e = {
+      key, x: 480, y: 360, vx: 0, vy: 0, spin: 0,
+      speed: def.speed, damage: def.damage, radius: def.radius,
+      hp: def.hp, maxHp: def.hp, color: def.color,
+    };
+    let sawTelegraph = false;
+    assert.doesNotThrow(() => {
+      // ~24s at 20fps, bleeding HP so the boss crosses both phase thresholds and
+      // reaches enrage — exercising phase-gated abilities and the clearing novas.
+      for (let i = 0; i < 480; i++) {
+        def.update(e, 0.05, world);
+        if (e.tele) sawTelegraph = true;
+        e.hp = Math.max(1, e.hp - def.hp / 480);
+      }
+    }, `${key} update threw`);
+    assert.ok(sawTelegraph, `${key} should telegraph at least one special`);
+    assert.ok(world.enemyBullets.length > 0, `${key} should fire enemy bullets`);
+  }
+});

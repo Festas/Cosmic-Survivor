@@ -556,6 +556,14 @@ function maybeShowTouch() {
     touchEls.knob = $('joy-knob');
     touchEls.hint = $('joy-hint');
     input.bindButton($('btn-dash'), $('btn-sing'));
+    // Mobile pause: toggles the pause overlay. preventDefault suppresses the
+    // ghost click so a single tap doesn't toggle twice.
+    const pauseBtn = $('btn-pause');
+    if (pauseBtn) {
+      const onPause = (e) => { e.preventDefault(); togglePause(); };
+      pauseBtn.addEventListener('touchstart', onPause, { passive: false });
+      pauseBtn.addEventListener('mousedown', onPause);
+    }
   }
 }
 
@@ -588,7 +596,7 @@ function updateTouch() {
 
 // ------------------------------------------------------------- HUD update
 const el = {
-  threat: $('threat'), enemies: $('enemies'), timer: $('timer'),
+  wave: $('wave'), enemies: $('enemies'), timer: $('timer'),
   score: $('score'), mult: $('multiplier'), hiscore: $('hiscore'),
   healthFill: $('health-fill'), healthText: $('health-text'),
   xpFill: $('xp-fill'), levelText: $('level-text'),
@@ -605,7 +613,7 @@ const ARC_LEN = 119.4;
 
 function updateHud() {
   const h = world.getHud();
-  el.threat.textContent = h.threat;
+  el.wave.textContent = h.wave;
   el.enemies.textContent = h.enemies;
   const revives = h.revives || 0;
   el.reviveChip.classList.toggle('hidden', revives <= 0);

@@ -21,6 +21,7 @@ function mockCtx({ gradients = true } = {}) {
   };
   if (gradients) {
     ctx.createRadialGradient = (...a) => { rec('createRadialGradient')(...a); return { addColorStop() {} }; };
+    ctx.createLinearGradient = (...a) => { rec('createLinearGradient')(...a); return { addColorStop() {} }; };
   }
   return ctx;
 }

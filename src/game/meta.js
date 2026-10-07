@@ -137,11 +137,15 @@ export function canBuyMeta(def, levels, stardust) {
 // Stardust awarded for a finished run. Deterministic function of the summary so
 // the reward is predictable and testable. The `salvage` meta multiplier is
 // applied by the caller (World) via bonus.stardustMul.
+//
+// Tuned deliberately lean: a run should pay out enough to chip away at the
+// Hangar, not bankroll it in one sitting — so Ascension upgrades stay a
+// meaningful, challenging grind rather than an instant unlock.
 export function stardustForRun({ score = 0, time = 0, kills = 0, level = 1, bossKills = 0 } = {}) {
-  const fromScore = score / 100;
-  const fromTime = time / 8;
-  const fromKills = kills / 6;
-  const fromLevel = Math.max(0, level - 1) * 2;
-  const fromBoss = bossKills * 30;
+  const fromScore = score / 220;
+  const fromTime = time / 16;
+  const fromKills = kills / 14;
+  const fromLevel = Math.max(0, level - 1) * 1;
+  const fromBoss = bossKills * 18;
   return Math.max(0, Math.floor(fromScore + fromTime + fromKills + fromLevel + fromBoss));
 }

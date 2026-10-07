@@ -22,16 +22,37 @@ export class Background {
     for (let i = 0; i < 3; i++) {
       this.nebulae.push({ x: rand() * 1600, y: rand() * 1200, r: randRange(320, 560), color: cols[i], depth: 0.08 + i * 0.03 });
     }
+    // Theme palette (set per enemy theme by World.applyTheme). Defaults to the
+    // base gradient so the attract screen and tests look unchanged until a theme
+    // is applied. A tiny eased blend lets the backdrop drift between themes
+    // rather than snapping, so the "slightly shifting" background reads smoothly.
+    this.bg0 = COLORS.bg0;
+    this.bg1 = COLORS.bg1;
     this.t = 0;
   }
 
   update(dt) { this.t += dt; }
 
+  // Swap the arena palette for the current theme: { bg0, bg1, nebula:[c0,c1,c2] }.
+  // Nebula colours are reassigned in place so the cached gradient sprites simply
+  // re-key by colour; positions/sizes are preserved for continuity.
+  setTheme(theme) {
+    if (!theme) return;
+    if (theme.bg0) this.bg0 = theme.bg0;
+    if (theme.bg1) this.bg1 = theme.bg1;
+    const neb = theme.nebula;
+    if (Array.isArray(neb)) {
+      for (let i = 0; i < this.nebulae.length; i++) {
+        if (neb[i]) this.nebulae[i].color = neb[i];
+      }
+    }
+  }
+
   render(ctx, cam, w, h) {
     // base vertical gradient
     const g = ctx.createLinearGradient(0, 0, 0, h);
-    g.addColorStop(0, COLORS.bg1);
-    g.addColorStop(1, COLORS.bg0);
+    g.addColorStop(0, this.bg1);
+    g.addColorStop(1, this.bg0);
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
 

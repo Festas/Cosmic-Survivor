@@ -2,8 +2,9 @@
 // reactions, leveling, scoring and rendering. Coordinates the whole run.
 
 import {
-  ARENA, COLORS, PLAYER, SINGULARITY, DASH, COMBO, DIRECTOR, ELITE,
+  ARENA, COLORS, PLAYER, SINGULARITY, DASH, COMBO, ELITE, WAVE,
   spawnInterval, enemyCap, hpScale, speedScale, dmgScale, xpForLevel, comboMultiplier,
+  waveDuration, waveHyperScale, waveSpeedHyper, bossWaveScale, isBossWave, isEliteWave,
 } from './config.js';
 import {
   TAU, clamp, lerp, dist, dist2, angleTo, rand, randRange, randOnCircle, chance, pick,
@@ -12,8 +13,10 @@ import { Camera } from '../engine/camera.js';
 import { Particles } from '../engine/particles.js';
 import { glowSprite } from '../engine/sprites.js';
 import { paletteFor, drawEnemyBody, drawBossCore, isUpright, enemyPath, withAlpha } from './enemyArt.js';
+import { drawShipBody, drawDroneBody } from './shipArt.js';
 import { Player } from './player.js';
 import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize, rollElite } from './enemies.js';
+import { THEMES, themeIndexForWave, bossKeyForWave, pickFromRoster } from './waves.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
 import { draftUpgrades } from './upgrades.js';
 import { weaponDef, addOrLevelWeapon, evolveWeapon, createWeaponInst } from './weapons.js';
@@ -114,9 +117,18 @@ export class World {
     this.elapsed = 0;
     this.spawnTimer = 0.6;
     this.formationTimer = 22;
-    this.nextBossAt = DIRECTOR.bossEvery;
+    // Wave director state. The run is paced in discrete waves (see updateDirector):
+    // wave 1 upward, a wave clock that pauses while a boss is alive, and the
+    // current enemy theme (every 10 waves). Boss cadence is derived from the wave
+    // number, so bosses can never stack up the way the old time-threshold did.
+    this.wave = 1;
+    this.waveTime = 0;
+    this.themeIndex = -1;
+    this.theme = null;
+    this.pendingBossKey = null;
     this.bossActive = null;
     this.bossWarn = 0;
+    this.applyTheme(0); // seed the wave-1 theme + background palette
 
     this.score = 0;
     this.kills = 0;
@@ -186,11 +198,23 @@ export class World {
     const def = isBoss ? BOSS_TYPES[typeKey] : ENEMY_TYPES[typeKey];
     if (!def) return null;
     const d = this.diff || createDirectiveEffect();
-    // Bosses use bossHpMul; rank-and-file use the time-based hp curve × hpMul.
-    const hp = isBoss ? def.hp * d.bossHpMul : def.hp * hpScale(this.elapsed) * d.hpMul;
-    const speed = (isBoss ? def.speed : def.speed * speedScale(this.elapsed)) * d.speedMul;
-    // Rank-and-file damage ramps with time (bosses keep their tuned damage).
-    const damage = isBoss ? def.damage : def.damage * dmgScale(this.elapsed);
+    // Wave-based exponential tier (1 until wave 100, then geometric) layers on top
+    // of the existing time-based director curves.
+    const hv = waveHyperScale(this.wave);
+    // Bosses: per-slot hand-tuned hp × directive × the boss wave scale (which adds
+    // the post-100 exponential for cycled repeats). Rank-and-file: the time-based
+    // hp curve × directive × the hyper tier.
+    const hp = isBoss
+      ? def.hp * d.bossHpMul * bossWaveScale(this.wave)
+      : def.hp * hpScale(this.elapsed) * d.hpMul * hv;
+    const speed = isBoss
+      ? def.speed * d.speedMul
+      : def.speed * speedScale(this.elapsed) * d.speedMul * waveSpeedHyper(this.wave);
+    // Rank-and-file damage ramps with time (+ a softened hyper tier); bosses keep
+    // their tuned per-pattern damage, nudged by the square-root of the boss scale.
+    const damage = isBoss
+      ? def.damage * Math.sqrt(bossWaveScale(this.wave))
+      : def.damage * dmgScale(this.elapsed) * (hv > 1 ? Math.sqrt(hv) : 1);
     const e = {
       type: def, key: typeKey, boss: !!def.boss,
       x, y, vx: 0, vy: 0, kx: 0, ky: 0,
@@ -208,18 +232,23 @@ export class World {
     // Elite promotion: a time-gated chance to turn a mid-tier+ spawn into a
     // heavier, XP-rich variant (gold ring drawn in renderEnemies). Scaling is
     // applied on top of the director curves so elites stay relative to the wave.
-    if (!isBoss && rollElite(def, this.elapsed, this.rng)) {
-      e.elite = true;
-      e.hp *= ELITE.hpMul;
-      e.maxHp *= ELITE.hpMul;
-      e.damage *= ELITE.damageMul;
-      e.radius *= ELITE.radiusMul;
-      e.speed *= ELITE.speedMul;
-      e.xp = Math.max(1, Math.round(e.xp * ELITE.xpMul));
-    }
+    if (!isBoss && rollElite(def, this.elapsed, this.rng)) this.makeElite(e);
     this.enemies.push(e);
     if (e.boss) { this.bossActive = e; }
     return e;
+  }
+
+  // Promote an enemy to an Elite (heavier, faster, XP-rich). Extracted so both the
+  // random director promotion and guaranteed Elite waves share one definition.
+  makeElite(e) {
+    if (e.elite) return;
+    e.elite = true;
+    e.hp *= ELITE.hpMul;
+    e.maxHp *= ELITE.hpMul;
+    e.damage *= ELITE.damageMul;
+    e.radius *= ELITE.radiusMul;
+    e.speed *= ELITE.speedMul;
+    e.xp = Math.max(1, Math.round(e.xp * ELITE.xpMul));
   }
 
   spawnRing(typeKey) {
@@ -243,20 +272,14 @@ export class World {
   spawnFormation() {
     const room = this.capNow() - this.enemies.length;
     if (room < 4) return; // not enough headroom for a meaningful row
-    // Pick an unlocked invader type for the fleet.
-    const roster = [];
-    if (this.elapsed >= 15) roster.push('squid');
-    if (this.elapsed >= 30) roster.push('crab');
-    if (this.elapsed >= 70) roster.push('octopus');
-    if (roster.length === 0) roster.push('swarm');
-    // Wave size and arm count both grow with elapsed time.
-    const arms = this.elapsed >= 130 ? 3 : this.elapsed >= 60 ? 2 : 1;
+    // Wave size and arm count both grow with the run.
+    const arms = this.wave >= 40 ? 3 : this.wave >= 12 ? 2 : 1;
     const perArm = 5 + Math.floor(this.elapsed / 24); // grows over the run
     let budget = Math.min(room, arms * perArm, 30); // hard cap protects frame budget
     const baseDir = this.rng() * TAU;
     const gap = 58;
     for (let arm = 0; arm < arms && budget > 0; arm++) {
-      const key = pick(roster, this.rng);
+      const key = this.pickThemeEnemy(); // themed fleet, so formations match the theme
       const count = Math.min(budget, perArm);
       budget -= count;
       // Spread arms around the player (pincer); jitter so it is not perfectly even.
@@ -272,51 +295,117 @@ export class World {
       }
     }
     const label = arms >= 2 ? 'PINCER INCOMING' : 'INVADERS INCOMING';
-    this.addText(this.player.x, this.player.y - 110, label, COLORS.invGreen, 20);
+    this.addText(this.player.x, this.player.y - 110, label, (this.theme && this.theme.bg.accent) || COLORS.invGreen, 20);
   }
 
   updateDirector(dt) {
-    // Boss handling
+    // Boss telegraph -> spawn exactly one boss for this boss-wave, then hold.
     if (this.bossWarn > 0) {
       this.bossWarn -= dt;
       if (this.bossWarn <= 0) {
-        const key = pick(Object.keys(BOSS_TYPES), this.rng);
+        const key = this.pendingBossKey || bossKeyForWave(this.wave);
+        this.pendingBossKey = null;
         const boss = this.spawnRing(key);
-        this.addText(this.player.x, this.player.y - 120, boss.type.name.toUpperCase() + ' INCOMING', COLORS.danger, 26);
+        if (boss) {
+          this.addText(this.player.x, this.player.y - 120,
+            boss.type.name.toUpperCase() + ' — WAVE ' + this.wave, COLORS.danger, 26);
+        }
       }
-      return; // pause normal spawns briefly during warning
-    }
-    if (!this.bossActive && this.elapsed >= this.nextBossAt) {
-      this.nextBossAt += DIRECTOR.bossEvery;
-      this.bossWarn = 2.2;
-      this.audio?.play('bosswarn');
-      this.shake(10);
-      return;
+      return; // pause spawns during the warning
     }
 
-    if (this.bossActive) return; // no trickle spawns during a boss fight
+    // A live boss gates progression: no trickle/formation spawns, and the wave
+    // clock is frozen. The player must clear the boss to advance — which makes it
+    // structurally impossible for multiple bosses to stack up.
+    if (this.bossActive) return;
 
+    // Advance the wave clock; roll to the next wave when it elapses.
+    this.waveTime += dt;
+    if (this.waveTime >= waveDuration(this.wave)) {
+      this.waveTime = 0;
+      this.startWave(this.wave + 1);
+      // If that rolled into a boss wave, a warning just began — hold all spawns
+      // this tick too (startWave set bossWarn), so nothing trickles out under the
+      // incoming-boss telegraph.
+      if (this.bossWarn > 0) return;
+    }
+
+    // Trickle spawns, drawn from the current theme's roster.
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
       this.spawnTimer += spawnInterval(this.elapsed) * (this.diff?.spawnMul || 1);
       if (this.enemies.length < this.capNow()) {
-        const key = pickEnemyType(this.elapsed, this.rng);
+        const key = this.pickThemeEnemy();
         const n = packSize(key);
         for (let i = 0; i < n; i++) this.spawnRing(key);
       }
     }
 
-    // Invader-formation wave, layered on top of the trickle (never replacing it).
-    // These are the main anti-camp pressure: as the run goes on they arrive more
-    // often and as multi-sided pincers, so a stationary player gets surrounded and
-    // must reposition, while a mover can carve a lane through one arm. Telegraphed
-    // via spawnFormation's "INVADERS INCOMING" text so the pressure stays fair.
+    // Themed invader-formation waves, layered on top of the trickle (never
+    // replacing it). The main anti-camp pressure: as the run goes on they arrive
+    // more often and as multi-sided pincers. Telegraphed via spawnFormation.
     this.formationTimer -= dt;
     if (this.formationTimer <= 0) {
       // Cadence tightens over the run: ~16-22s early, down to ~6-10s late game.
       const base = Math.max(6, 16 - this.elapsed / 22);
       this.formationTimer = base + this.rng() * 5;
-      if (this.elapsed >= 14) this.spawnFormation();
+      if (this.wave >= 2) this.spawnFormation();
+    }
+  }
+
+  // Begin a new wave: advance the counter, apply the theme for this wave, and —
+  // on the cadence waves — queue a boss (every 10th) or guarantee an Elite (every
+  // 5th). Normal waves just announce, with a theme banner at each 10-wave block.
+  startWave(w) {
+    this.wave = w;
+    this.applyTheme(themeIndexForWave(w));
+    if (isBossWave(w)) {
+      this.pendingBossKey = bossKeyForWave(w);
+      this.bossWarn = 2.4;
+      this.audio?.play('bosswarn');
+      this.shake(12);
+      this.addText(this.player.x, this.player.y - 150, 'WARNING — WAVE ' + w, COLORS.danger, 28);
+      return;
+    }
+    const themeStart = (w - 1) % WAVE.themeSize === 0; // first wave of a theme block
+    const name = this.theme ? this.theme.name : '';
+    const label = 'WAVE ' + w + (themeStart && name ? ' · ' + name.toUpperCase() : '');
+    const color = themeStart && this.theme ? (this.theme.bg.accent || COLORS.gold) : COLORS.gold;
+    this.addText(this.player.x, this.player.y - 120, label, color, themeStart ? 24 : 20);
+    this.audio?.play('levelup');
+    if (isEliteWave(w)) this.spawnThemeElite();
+  }
+
+  // Apply a theme by index (idempotent): swap the active roster and shift the
+  // background palette so the arena visibly changes every 10 waves.
+  applyTheme(idx) {
+    const clamped = Math.min(THEMES.length - 1, Math.max(0, idx));
+    if (clamped === this.themeIndex) return;
+    this.themeIndex = clamped;
+    this.theme = THEMES[clamped];
+    this.background.setTheme(this.theme.bg);
+  }
+
+  // Pick a trickle/formation enemy from the current theme (falls back to the
+  // time-gated table if no theme is active, which never happens in a real run).
+  pickThemeEnemy() {
+    return this.theme ? pickFromRoster(this.theme, this.rng) : pickEnemyType(this.elapsed, this.rng);
+  }
+
+  // Guarantee an Elite on Elite waves: pick an elite-eligible type from the theme
+  // (xp>=2) and force-promote it, so 5/15/25/… always deliver a heavier threat.
+  spawnThemeElite() {
+    let key = this.pickThemeEnemy();
+    for (let i = 0; i < 8; i++) {
+      const k = this.pickThemeEnemy();
+      const def = ENEMY_TYPES[k];
+      if (def && (def.xp || 0) >= 2 && !def.boss) { key = k; break; }
+    }
+    const e = this.spawnRing(key);
+    if (e) {
+      this.makeElite(e);
+      this.addText(this.player.x, this.player.y - 110, 'ELITE INBOUND', ELITE.ring, 22);
+      this.audio?.play('bosswarn');
     }
   }
 
@@ -1064,8 +1153,7 @@ export class World {
     const p = this.player;
     ctx.save();
     ctx.translate(p.x, p.y);
-    // pickup radius hint (subtle)
-    // thrust flame
+    // thrust flame (live, additive) — reads p.thrust / p.faceAngle, same feel.
     if (p.thrust > 0.1 && !p.dashing) {
       ctx.save();
       ctx.rotate(p.faceAngle);
@@ -1077,34 +1165,64 @@ export class World {
       ctx.fill();
       ctx.restore();
     }
+    // invuln blink (skipped while dashing, which has its own look).
     ctx.globalAlpha = p.invuln > 0 && !p.dashing ? (Math.sin(performance.now() / 40) * 0.3 + 0.6) : 1;
-    // glow body (tinted by the chosen ship's accent colour)
+
+    // Cached 3D hull sprite: the detailed, lit starfighter is baked once per ship
+    // colour / radius / hit-flash state (its glow + volumetric shading cost nothing
+    // per frame) and blitted rotated to the aim angle.
     const hull = p.shipColor || COLORS.player;
-    ctx.shadowColor = p.shipColor || COLORS.playerGlow;
-    ctx.shadowBlur = p.dashing ? 30 : 16;
+    const flash = p.hitFlash > 0;
+    const r = p.radius;
+    const pal = paletteFor(hull);
+    const spr = glowSprite(
+      'ship|' + hull + '|' + (flash ? 1 : 0) + '|' + r,
+      r * 1.75, Math.ceil(r * 0.9),
+      (g) => drawShipBody(g, r, { hull, accent: pal.accent, highlight: pal.highlight, flash }),
+    );
+
     ctx.rotate(p.aimAngle);
-    ctx.fillStyle = p.hitFlash > 0 ? '#fff' : hull;
-    ctx.beginPath();
-    ctx.moveTo(p.radius + 4, 0);
-    ctx.lineTo(-p.radius, -p.radius * 0.8);
-    ctx.lineTo(-p.radius * 0.5, 0);
-    ctx.lineTo(-p.radius, p.radius * 0.8);
-    ctx.closePath();
-    ctx.fill();
-    ctx.shadowBlur = 0;
-    // cockpit
+    // Dash: an extra additive bloom for the "bigger glow" dash feel (live).
+    if (p.dashing) {
+      const glow = p.shipColor || COLORS.playerGlow;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      if (typeof ctx.createRadialGradient === 'function') {
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 2.4);
+        g.addColorStop(0, withAlpha(glow, 0.5));
+        g.addColorStop(1, withAlpha(glow, 0));
+        ctx.fillStyle = g;
+      } else {
+        ctx.fillStyle = withAlpha(glow, 0.25);
+      }
+      ctx.beginPath(); ctx.arc(0, 0, r * 2.4, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+    if (spr) ctx.drawImage(spr.canvas, -spr.off, -spr.off);
+    else drawShipBody(ctx, r, { hull, accent: pal.accent, highlight: pal.highlight, flash });
+
+    // Crisp live cockpit glow over the baked canopy for extra sparkle.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.shadowColor = '#eafcff'; ctx.shadowBlur = 6;
     ctx.fillStyle = '#eafcff';
-    ctx.beginPath(); ctx.arc(2, 0, 3.5, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(r * 0.42, 0, Math.max(2, r * 0.18), 0, TAU); ctx.fill();
+    ctx.restore();
     ctx.restore();
 
-    // drones
+    // drones — small cached 3D orb sprites (domed, lit from the upper-left).
     for (const d of p.drones) {
       if (d.x === undefined) continue;
+      const dr = 5;
+      const dspr = glowSprite(
+        'drone|' + COLORS.cryo + '|' + dr,
+        dr * 1.6, Math.ceil(dr * 0.9),
+        (g) => drawDroneBody(g, dr, { hull: COLORS.cryo }),
+      );
       ctx.save();
       ctx.translate(d.x, d.y);
-      ctx.fillStyle = COLORS.cryo;
-      ctx.shadowColor = COLORS.cryo; ctx.shadowBlur = 8;
-      ctx.beginPath(); ctx.arc(0, 0, 5, 0, TAU); ctx.fill();
+      if (dspr) ctx.drawImage(dspr.canvas, -dspr.off, -dspr.off);
+      else drawDroneBody(ctx, dr, { hull: COLORS.cryo });
       ctx.restore();
     }
   }
@@ -1162,7 +1280,44 @@ export class World {
 
       if (e.boss) this.drawBossBar(ctx, e);
       else if (e.maxHp > 60 && e.hp < e.maxHp) this.drawHpBar(ctx, e);
+      // Telegraph cue for a charging boss special, drawn over the body so the
+      // player can read the incoming attack and pre-position a dodge.
+      if (e.tele && e.tele.t > 0) this.drawTelegraph(ctx, e);
     }
+  }
+
+  // Draw the warning for a boss's charging special: a pulsing ring that tightens
+  // onto the boss as the attack charges, a radial "charge meter" arc, and — for
+  // aimed specials — a lance pointing at the player so the threat direction is
+  // unmistakable. Purely cosmetic; the fire itself happens in enemies.bossThink.
+  drawTelegraph(ctx, e) {
+    const tl = e.tele;
+    const k = clamp(1 - Math.max(0, tl.t) / (tl.dur || 1), 0, 1); // 0 -> 1 as it charges
+    const col = tl.color || COLORS.danger;
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    // Pulsing warning ring that closes in on the boss.
+    const rr = e.radius * (1.15 + (1 - k) * 1.7);
+    ctx.strokeStyle = withAlpha(col, 0.45 + 0.4 * (0.5 + 0.5 * Math.sin(now / 60)));
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(e.x, e.y, rr, 0, TAU); ctx.stroke();
+    // Charge meter: an arc that fills clockwise as the windup completes.
+    ctx.strokeStyle = withAlpha(col, 0.95);
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(e.x, e.y, e.radius + 10, -Math.PI / 2, -Math.PI / 2 + k * TAU); ctx.stroke();
+    // Directional lance toward the player for aimed specials.
+    if (tl.aim) {
+      const a = angleTo(e.x, e.y, this.player.x, this.player.y);
+      const len = 170 + k * 170;
+      ctx.strokeStyle = withAlpha(col, 0.3 + 0.45 * k);
+      ctx.lineWidth = 3 + k * 4;
+      ctx.beginPath();
+      ctx.moveTo(e.x, e.y);
+      ctx.lineTo(e.x + Math.cos(a) * len, e.y + Math.sin(a) * len);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // Elite markers: a crisp, non-rotating gold glow ring just outside each elite's
@@ -1452,6 +1607,8 @@ export class World {
       multiplier: this.multiplier,
       time: this.elapsed,
       threat: this.threat,
+      wave: this.wave,
+      bossActive: !!this.bossActive,
       kills: this.kills,
       singCharge: this.player.singCharge,
       singMax: SINGULARITY.chargeMax,
