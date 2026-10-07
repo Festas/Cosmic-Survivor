@@ -532,7 +532,7 @@ function detailBossHull(ctx, shape, r, accent, highlight, eye) {
 }
 
 // Inner armoured plate (a scaled copy of the silhouette) with a bevel highlight.
-function bossInnerPlate(ctx, shape, r, accent, highlight, scale = 0.6) {
+function bossInnerPlate(ctx, shape, r, accent, highlight, scale = 0.62) {
   ctx.save(); ctx.scale(scale, scale); enemyPath(ctx, shape, r); ctx.restore();
   ctx.fillStyle = withAlpha(accent, 0.92);
   ctx.fill();
@@ -561,6 +561,8 @@ function flourishMaw(ctx, r, accent, highlight, eye) {
       const t0 = 0.12 + k * 0.22, t1 = t0 + 0.14;
       const x0 = A.x + (B.x - A.x) * t0, y0 = A.y + (B.y - A.y) * t0;
       const x1 = A.x + (B.x - A.x) * t1, y1 = A.y + (B.y - A.y) * t1;
+      // Nudge every tip a hair toward the throat (+x) so both jaws' fangs lean
+      // inward into the bite rather than standing straight off the lip.
       const tipX = (x0 + x1) / 2 + r * 0.02;
       const tipY = (y0 + y1) / 2 + dir * r * 0.16;
       ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.lineTo(tipX, tipY); ctx.closePath();
