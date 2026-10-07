@@ -26,7 +26,8 @@ function mockCtx({ gradients = true } = {}) {
   return ctx;
 }
 
-const ALL_SHAPES = ['tri', 'diamond', 'arrow', 'pentagon', 'hex', 'blob', 'boss', 'crab', 'squid', 'octopus', 'ufo', 'mothership', 'mystery'];
+const ALL_SHAPES = ['tri', 'diamond', 'arrow', 'pentagon', 'hex', 'blob', 'boss', 'crab', 'squid', 'octopus', 'ufo', 'mothership', 'mystery',
+  'boss_maw', 'boss_crystal', 'boss_hive', 'boss_siege', 'boss_singularis', 'boss_phantom', 'boss_cryo', 'boss_storm', 'boss_nemesis'];
 
 test('shade lightens and darkens hex colours and passes through non-hex', () => {
   assert.equal(shade('#000000', 1), '#ffffff');
