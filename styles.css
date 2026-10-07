@@ -471,11 +471,18 @@ kbd { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2)
 /* Orbital Station — its own standalone overlay (not a Hangar tab). A capped-height
    flex column: a fixed top bar + tap zone, a scrolling store, then a DONE button. */
 .station-panel {
+  position: relative; /* anchor for the absolute Surge-orb overlay layer */
   width: min(560px, 96vw);
   max-height: 92vh;   /* fallback for browsers without dvh */
   max-height: 92dvh;  /* fit the *visible* area on mobile so nothing is clipped */
   display: flex; flex-direction: column;
 }
+/* Station tab bar — mirrors the Hangar tabs; wraps on narrow phones. */
+.station-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; flex: none; }
+.station-tabs .tab { min-width: 84px; padding: 9px 8px; font-size: 12px; letter-spacing: 1px; }
+/* The MINE tab keeps the tap button + laser centred; it never needs to scroll as
+   hard as the lists, but still shrinks gracefully on short screens. */
+.station-mine { align-items: stretch; }
 .station-topbar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 10px 12px; margin-bottom: 10px; flex: none;
@@ -592,6 +599,47 @@ kbd { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2)
 }
 .special-row.maxed { border-color: rgba(81,233,255,0.4); background: rgba(81,233,255,0.06); }
 .special-row .meta-desc b { color: var(--xp); }
+.perk-list { display: flex; flex-direction: column; gap: 8px; }
+.perk-buy { flex: none; }
+
+/* Active-Surge buff banner (shown above the tabs while a frenzy is running). */
+.station-buffs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; flex: none; }
+.station-buffs.hidden { display: none; }
+.buff-chip {
+  display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 800; color: #fff;
+  border: 1px solid rgba(255,212,71,0.5); background: rgba(255,212,71,0.12);
+  animation: buffPulse 1.6s ease-in-out infinite;
+}
+.buff-chip.buff-click { border-color: rgba(124,255,178,0.55); background: rgba(124,255,178,0.12); }
+.buff-ico { font-size: 15px; }
+.buff-txt { letter-spacing: 0.3px; }
+.buff-time { color: var(--gold); font-variant-numeric: tabular-nums; }
+.buff-chip.buff-click .buff-time { color: var(--xp); }
+@keyframes buffPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,212,71,0); } 50% { box-shadow: 0 0 14px -2px rgba(255,212,71,0.6); } }
+
+/* Nebula Surge orbs — golden-cookie-style RNG. They float over the whole panel;
+   the host layer ignores pointers so only the orb itself is clickable. */
+.station-surge { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 6; border-radius: inherit; }
+.surge-orb {
+  position: absolute; pointer-events: auto; cursor: pointer;
+  width: 56px; height: 56px; border-radius: 50%; font-size: 26px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; font-family: var(--font);
+  color: #1a1030; background: radial-gradient(circle at 50% 38%, #fff3b0, #ffcf3f 55%, #ff9b2f);
+  border: 2px solid rgba(255,243,176,0.9);
+  box-shadow: 0 0 26px -2px rgba(255,207,63,0.9), inset 0 0 14px rgba(255,255,255,0.5);
+  animation: surgeFade linear forwards, surgeBob ease-in-out infinite;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+}
+.surge-orb.surge-prod { background: radial-gradient(circle at 50% 38%, #fff0c2, #ffb347 55%, #ff7b2f); }
+.surge-orb.surge-click { background: radial-gradient(circle at 50% 38%, #d6ffe8, #7cffb2 55%, #32d58a); border-color: rgba(214,255,232,0.9); box-shadow: 0 0 26px -2px rgba(124,255,178,0.9), inset 0 0 14px rgba(255,255,255,0.5); }
+.surge-orb.surge-core { background: radial-gradient(circle at 50% 38%, #e8f6ff, #51e9ff 55%, #7c9bff); border-color: rgba(232,246,255,0.9); box-shadow: 0 0 30px -2px rgba(81,233,255,0.95), inset 0 0 14px rgba(255,255,255,0.5); }
+.surge-orb:hover { filter: brightness(1.08); }
+/* The two animations share the orb: surgeFade (duration = SURGE_LIFETIME) telegraphs
+   the orb expiring; surgeBob gives it a gentle idle drift. */
+@keyframes surgeFade { 0% { opacity: 0; transform: scale(0.4); } 8% { opacity: 1; transform: scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: scale(0.75); } }
+@keyframes surgeBob { 0%, 100% { margin-top: 0; } 50% { margin-top: -10px; } }
+@media (prefers-reduced-motion: reduce) { .surge-orb { animation: surgeFade linear forwards; } }
 
 /* Transient commendation toasts */
 .toast-wrap {

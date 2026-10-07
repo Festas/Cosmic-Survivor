@@ -33,6 +33,7 @@ export function createIdleState() {
     lifetimeCores: 0,   // total Cores ever earned (drives the permanent multiplier)
     generators: Object.create(null), // { [generatorId]: ownedCount }
     special: Object.create(null),    // { [specialId]: level }
+    prestige: Object.create(null),   // { [perkId]: level } — permanent Singularity perks (survive Collapse)
     clickLevel: 0,      // Mining Laser level: boosts the manual-tap yield (see clickYield)
     lastTick: 0,        // epoch ms of the last production tick (for offline catch-up)
   };
@@ -69,31 +70,33 @@ export const GENERATOR_BY_ID = Object.create(null);
 for (const g of GENERATORS) GENERATOR_BY_ID[g.id] = g;
 
 // Cost of the NEXT single unit of `def`, given how many are already owned.
-export function generatorCost(def, owned = 0) {
-  return Math.ceil(def.baseCost * Math.pow(def.costGrowth, Math.max(0, Math.floor(owned))));
+// `costMul` (≤ 1 from the Mass Production prestige perk) discounts the price.
+export function generatorCost(def, owned = 0, costMul = 1) {
+  const raw = def.baseCost * Math.pow(def.costGrowth, Math.max(0, Math.floor(owned)));
+  return Math.max(1, Math.ceil(raw * Math.max(0, costMul)));
 }
 
 // Cost of buying `qty` units in one go (geometric series), for a "buy xN" UI.
-export function generatorBulkCost(def, owned = 0, qty = 1) {
+export function generatorBulkCost(def, owned = 0, qty = 1, costMul = 1) {
   const n = Math.max(0, Math.floor(qty));
   if (n === 0) return 0;
   const o = Math.max(0, Math.floor(owned));
   const g = def.costGrowth;
   // Σ baseCost·g^(o+i) for i in [0,n) = baseCost·g^o·(g^n − 1)/(g − 1).
   const first = def.baseCost * Math.pow(g, o);
-  return Math.ceil(first * (Math.pow(g, n) - 1) / (g - 1));
+  return Math.max(1, Math.ceil(first * (Math.pow(g, n) - 1) / (g - 1) * Math.max(0, costMul)));
 }
 
 // How many units of `def` you can afford with `nebula`, given current ownership.
-export function maxAffordable(def, owned = 0, nebula = 0) {
+export function maxAffordable(def, owned = 0, nebula = 0, costMul = 1) {
   let n = 0;
   let budget = nebula;
-  let cost = generatorCost(def, owned);
+  let cost = generatorCost(def, owned, costMul);
   // Bounded loop: idle balances are finite and costs grow ~15%/step.
   while (budget >= cost && n < 100000) {
     budget -= cost;
     n += 1;
-    cost = generatorCost(def, owned + n);
+    cost = generatorCost(def, owned + n, costMul);
   }
   return n;
 }
@@ -114,23 +117,24 @@ export function milestonesReached(owned = 0) {
 }
 
 // Per-generator production multiplier from owning `owned` units. Starts at ×1
-// and climbs +MILESTONE_BONUS per milestone. The curve is unbounded, mirroring
-// the geometric cost curve, so there is always a next goal to chase.
-export function generatorMilestoneMultiplier(owned = 0) {
-  return 1 + MILESTONE_BONUS * milestonesReached(owned);
+// and climbs +`bonus` per milestone (default MILESTONE_BONUS; the Milestone
+// Mastery prestige perk raises it). The curve is unbounded, mirroring the
+// geometric cost curve, so there is always a next goal to chase.
+export function generatorMilestoneMultiplier(owned = 0, bonus = MILESTONE_BONUS) {
+  return 1 + Math.max(0, bonus) * milestonesReached(owned);
 }
 
 // Progress toward the next milestone for a generator, for the Station UI.
 // `remaining` is always 1..MILESTONE_STEP (there is always a next milestone).
-export function generatorMilestoneProgress(owned = 0) {
+export function generatorMilestoneProgress(owned = 0, bonus = MILESTONE_BONUS) {
   const n = Math.max(0, Math.floor(owned));
   const reached = milestonesReached(n);
   const next = (reached + 1) * MILESTONE_STEP;
   return {
     reached,
-    multiplier: generatorMilestoneMultiplier(n),
+    multiplier: generatorMilestoneMultiplier(n, bonus),
     nextAt: next,
-    nextMultiplier: 1 + MILESTONE_BONUS * (reached + 1),
+    nextMultiplier: 1 + Math.max(0, bonus) * (reached + 1),
     remaining: next - n,
   };
 }
@@ -138,12 +142,13 @@ export function generatorMilestoneProgress(owned = 0) {
 // --------------------------------------------------------------- production
 
 // Raw Nebula/second from owned generators (including per-generator milestone
-// multipliers), before the global Prestige/run-profile multipliers.
-export function baseRate(generators = {}) {
+// multipliers), before the global Prestige/run-profile multipliers. `milestoneBonus`
+// defaults to MILESTONE_BONUS (raised by the Milestone Mastery prestige perk).
+export function baseRate(generators = {}, milestoneBonus = MILESTONE_BONUS) {
   let r = 0;
   for (const def of GENERATORS) {
     const owned = Math.max(0, Math.floor(generators[def.id] || 0));
-    if (owned > 0) r += def.rate * owned * generatorMilestoneMultiplier(owned);
+    if (owned > 0) r += def.rate * owned * generatorMilestoneMultiplier(owned, milestoneBonus);
   }
   return r;
 }
@@ -166,6 +171,121 @@ export function prestigeMultiplier(lifetimeCores = 0) {
   return 1 + Math.max(0, lifetimeCores) * 0.03;
 }
 
+// ---------------------------------------------------- Singularity perk tree
+//
+// The "sophisticated prestige" layer. Unlike SPECIAL_UPGRADES (which buff the
+// main-game run), Singularity perks permanently upgrade the STATION ECONOMY
+// itself — production, taps, costs, milestones, offline reach, Core yield and
+// the odds/size of random Surges. They are bought with Singularity Cores and —
+// crucially — SURVIVE a Collapse (they are the thing a Collapse builds toward),
+// so prestiging compounds instead of merely resetting.
+//
+// Each perk folds its owned level into a neutral "effects" accumulator via
+// apply(fx, level); computePerks() reduces a level map into a single effects
+// object the pure economy reads. Keeping it data-driven means adding a perk is
+// one array entry, and the whole layer stays deterministic + unit-testable.
+
+// Neutral perk effects: multipliers are 1, additive terms 0, costMul 1 (no
+// discount). The economy multiplies/adds these on top of everything else.
+export function createPerkEffects() {
+  return {
+    prodMul: 1,            // × global Nebula production (Resonant Core)
+    clickMul: 1,           // × manual-tap yield (Hardened Beam)
+    costMul: 1,            // × generator price, ≤ 1 is a discount (Mass Production)
+    milestoneBonus: MILESTONE_BONUS, // per-milestone generator bonus (Milestone Mastery)
+    offlineCapSeconds: OFFLINE_CAP_SECONDS, // offline catch-up window (Temporal Buffer)
+    coreGainMul: 1,        // × Cores minted per Collapse (Dense Singularity)
+    startNebulaFrac: 0,    // fraction of pre-Collapse lifetime Nebula seeded back (Collapse Memory)
+    surgeChanceMul: 1,     // × Surge spawn frequency (Lucky Resonance)
+    surgeRewardMul: 1,     // × Surge payout (Lucky Resonance)
+  };
+}
+
+// Perk factory. `apply(fx, level)` mutates a createPerkEffects() accumulator;
+// `effect(level)` is a human-readable summary for the Station UI. Costs are in
+// Cores and grow geometrically per owned level, like every other upgrade line.
+function P(id, name, icon, desc, opts) {
+  return {
+    id, name, icon, desc,
+    max: opts.max,
+    baseCost: opts.baseCost,       // in Cores
+    costGrowth: opts.costGrowth ?? 1.9,
+    apply: opts.apply,
+    effect: opts.effect,
+  };
+}
+
+export const PRESTIGE_UPGRADES = [
+  P('resonant_core', 'Resonant Core', '🌀', '+12% Nebula production per level', {
+    max: 12, baseCost: 1, costGrowth: 1.8,
+    apply: (fx, l) => { fx.prodMul *= 1 + 0.12 * l; },
+    effect: (l) => `+${Math.round(0.12 * l * 100)}% production`,
+  }),
+  P('hardened_beam', 'Hardened Beam', '🔆', '+35% manual-tap yield per level', {
+    max: 10, baseCost: 1, costGrowth: 1.7,
+    apply: (fx, l) => { fx.clickMul *= 1 + 0.35 * l; },
+    effect: (l) => `+${Math.round(0.35 * l * 100)}% tap yield`,
+  }),
+  P('mass_production', 'Mass Production', '🏗️', '−4% generator cost per level', {
+    max: 8, baseCost: 2, costGrowth: 1.95,
+    // Compounding discount, floored so costs never collapse to nothing.
+    apply: (fx, l) => { fx.costMul *= Math.pow(0.96, l); },
+    effect: (l) => `−${Math.round((1 - Math.pow(0.96, l)) * 100)}% generator cost`,
+  }),
+  P('milestone_mastery', 'Milestone Mastery', '📈', '+15% to each generator milestone per level', {
+    max: 8, baseCost: 2, costGrowth: 1.9,
+    apply: (fx, l) => { fx.milestoneBonus += 0.15 * l * MILESTONE_BONUS; },
+    effect: (l) => `+${Math.round(0.15 * l * 100)}% milestone power`,
+  }),
+  P('temporal_buffer', 'Temporal Buffer', '⏳', '+2h offline catch-up per level', {
+    max: 8, baseCost: 2, costGrowth: 1.8,
+    apply: (fx, l) => { fx.offlineCapSeconds += 2 * 3600 * l; },
+    effect: (l) => `+${2 * l}h offline (${Math.round((OFFLINE_CAP_SECONDS + 2 * 3600 * l) / 3600)}h total)`,
+  }),
+  P('dense_singularity', 'Dense Singularity', '💠', '+20% Cores per Collapse per level', {
+    max: 6, baseCost: 3, costGrowth: 2.1,
+    apply: (fx, l) => { fx.coreGainMul *= 1 + 0.2 * l; },
+    effect: (l) => `+${Math.round(0.2 * l * 100)}% Cores on Collapse`,
+  }),
+  P('collapse_memory', 'Collapse Memory', '🧠', 'Keep +6% of lifetime Nebula through Collapse per level', {
+    max: 8, baseCost: 3, costGrowth: 2.0,
+    // Additive fraction, capped at 80% so a Collapse always costs something.
+    apply: (fx, l) => { fx.startNebulaFrac = Math.min(0.8, fx.startNebulaFrac + 0.06 * l); },
+    effect: (l) => `keep ${Math.round(Math.min(0.8, 0.06 * l) * 100)}% of Nebula`,
+  }),
+  P('lucky_resonance', 'Lucky Resonance', '🍀', '+25% Surge frequency & +20% payout per level', {
+    max: 6, baseCost: 2, costGrowth: 1.85,
+    apply: (fx, l) => { fx.surgeChanceMul *= 1 + 0.25 * l; fx.surgeRewardMul *= 1 + 0.2 * l; },
+    effect: (l) => `+${Math.round(0.25 * l * 100)}% Surges · +${Math.round(0.2 * l * 100)}% payout`,
+  }),
+];
+
+export const PRESTIGE_BY_ID = Object.create(null);
+for (const p of PRESTIGE_UPGRADES) PRESTIGE_BY_ID[p.id] = p;
+
+// Cost in Cores to buy the NEXT level of `def`, given the currently owned level.
+export function prestigeUpgradeCost(def, currentLevel = 0) {
+  return Math.ceil(def.baseCost * Math.pow(def.costGrowth, Math.max(0, Math.floor(currentLevel))));
+}
+
+// Can the player afford and has room to buy one more level of `def`?
+export function canBuyPrestige(def, levels = {}, cores = 0) {
+  const cur = clamp(Math.floor(levels[def.id] || 0), 0, def.max);
+  if (cur >= def.max) return false;
+  return cores >= prestigeUpgradeCost(def, cur);
+}
+
+// Reduce an owned-perk-level map into a single effects object the economy reads.
+// Unknown ids and out-of-range levels are clamped/ignored, so a stale save is safe.
+export function computePerks(levels = {}) {
+  const fx = createPerkEffects();
+  for (const def of PRESTIGE_UPGRADES) {
+    const lvl = clamp(Math.floor(levels[def.id] || 0), 0, def.max);
+    if (lvl > 0) def.apply(fx, lvl);
+  }
+  return fx;
+}
+
 // --------------------------------------------------------- main ↔ idle link
 
 // main → idle: a production multiplier (≥ 1) derived from the player's run
@@ -179,9 +299,28 @@ export function mainBoostMultiplier({ lifetimeStardust = 0, bestLevel = 0, bossK
 }
 
 // Total effective Nebula/second: generators × Prestige multiplier × run-profile
-// multiplier. `profile` is the main→idle link (see mainBoostMultiplier).
+// multiplier × Singularity perks. `profile` is the main→idle link (mainBoostMultiplier).
 export function totalRate(state = createIdleState(), profile = {}) {
-  return baseRate(state.generators) * prestigeMultiplier(state.lifetimeCores) * mainBoostMultiplier(profile);
+  const fx = computePerks(state.prestige);
+  return baseRate(state.generators, fx.milestoneBonus)
+    * prestigeMultiplier(state.lifetimeCores)
+    * mainBoostMultiplier(profile)
+    * fx.prodMul;
+}
+
+// Cores minted by Collapsing right now, after the Dense Singularity perk. Floors
+// after the multiplier so the perk only ever rounds Core gain up or leaves it.
+export function prestigeCoreGain(lifetimeNebula = 0, levels = {}) {
+  const base = prestigeGain(lifetimeNebula);
+  if (base <= 0) return 0;
+  return Math.floor(base * computePerks(levels).coreGainMul);
+}
+
+// Nebula seeded back right after a Collapse, from the Collapse Memory perk: a
+// fraction of the lifetime Nebula you are about to reset, so prestiging is a
+// head start instead of a cold restart.
+export function collapseSeedNebula(lifetimeNebula = 0, levels = {}) {
+  return Math.floor(Math.max(0, lifetimeNebula) * computePerks(levels).startNebulaFrac);
 }
 
 // ------------------------------------------------------- manual mining (tap)
@@ -216,18 +355,25 @@ export function clickUpgradeCost(level = 0) {
 }
 
 // Nebula minted by a single manual tap: click power (scaled by the same Prestige
-// × run-profile multipliers as production) plus a slice of live output. Floored
-// at BASE_CLICK so the first tap on a pristine Station always yields something.
+// × run-profile multipliers as production) plus a slice of live output, all lifted
+// by the Hardened Beam Singularity perk (clickMul). Floored at BASE_CLICK so the
+// first tap on a pristine Station always yields something.
 export function clickYield(state = createIdleState(), profile = {}) {
   const globalMult = prestigeMultiplier(state.lifetimeCores) * mainBoostMultiplier(profile);
   const fromPower = clickPower(state.clickLevel || 0) * globalMult;
   const fromRate = totalRate(state, profile) * CLICK_RATE_FRACTION;
-  return Math.max(BASE_CLICK, fromPower + fromRate);
+  const clickMul = computePerks(state.prestige).clickMul;
+  return Math.max(BASE_CLICK, (fromPower + fromRate) * clickMul);
 }
 
 // Offline/elapsed catch-up window. AFK is rewarding but bounded so leaving the
-// tab for a month doesn't trivialise the economy.
+// tab for a month doesn't trivialise the economy. The Temporal Buffer perk widens it.
 export const OFFLINE_CAP_SECONDS = 8 * 3600; // 8 hours
+
+// The effective offline cap (seconds) after the Temporal Buffer perk.
+export function offlineCapSeconds(levels = {}) {
+  return computePerks(levels).offlineCapSeconds;
+}
 
 // Nebula produced over `seconds` at `rate`/sec, clamped to the offline cap.
 export function offlineGain(rate = 0, seconds = 0, cap = OFFLINE_CAP_SECONDS) {
@@ -331,4 +477,77 @@ export function applyIdleBonus(bonus, levels = {}) {
     if (lvl > 0) def.apply(bonus, lvl);
   }
   return bonus;
+}
+
+// ----------------------------------------------------- Nebula Surges (RNG)
+//
+// The Cookie-Clicker "golden cookie": a bit of luck layered over the steady
+// economy. While the Station is open, a glowing Surge occasionally drifts across
+// the mine — tap it before it fades for a random reward. Rewards are deliberately
+// swingy (an instant windfall, a timed production Frenzy, a short Click Frenzy, or
+// a rare Core jackpot) so the Station always has a reason to watch.
+//
+// Everything here is pure and deterministic: the controller supplies the random
+// rolls (so timing/DOM stay in main.js), and this module just maps a roll + the
+// live economy snapshot into a concrete reward. That keeps the whole RNG layer
+// unit-testable and keeps idle.js free of side effects.
+
+// Surge spawn cadence, in seconds, before the Lucky Resonance perk. The controller
+// picks a uniform interval in [min,max]; the perk's surgeChanceMul shortens it.
+export const SURGE_MIN_INTERVAL = 42;
+export const SURGE_MAX_INTERVAL = 96;
+// How long a spawned Surge stays tappable before it fades away (seconds).
+export const SURGE_LIFETIME = 13;
+
+// The reward table. `weight` drives the weighted pick; `kind` tells the controller
+// how to apply it. Timed buffs carry a `mult` and `duration` (seconds); instant
+// rewards are computed from the live snapshot in rollSurge().
+export const SURGE_TYPES = [
+  { id: 'lucky',        name: 'Lucky Nebula',  icon: '🍀', kind: 'nebula', weight: 46 },
+  { id: 'frenzy',       name: 'Production Frenzy', icon: '⚡', kind: 'prod', weight: 26, mult: 7, duration: 45 },
+  { id: 'click_frenzy', name: 'Click Frenzy',  icon: '👆', kind: 'click', weight: 18, mult: 11, duration: 15 },
+  { id: 'bloom',        name: 'Resonance Bloom', icon: '🌸', kind: 'prod', weight: 8, mult: 3, duration: 20 },
+  { id: 'core_cache',   name: 'Core Cache',    icon: '💠', kind: 'core', weight: 2 },
+];
+
+export const SURGE_BY_ID = Object.create(null);
+for (const s of SURGE_TYPES) SURGE_BY_ID[s.id] = s;
+
+// Pick a Surge type from a [0,1) roll via the weight table. Pure and total: any
+// in-range roll returns a type, and out-of-range rolls clamp to the ends.
+export function pickSurgeType(roll = 0) {
+  let total = 0;
+  for (const s of SURGE_TYPES) total += s.weight;
+  let r = clamp(roll, 0, 0.999999) * total;
+  for (const s of SURGE_TYPES) {
+    r -= s.weight;
+    if (r < 0) return s;
+  }
+  return SURGE_TYPES[SURGE_TYPES.length - 1];
+}
+
+// Turn a chosen Surge type + a live economy snapshot into a concrete reward the
+// controller can apply. `ctx` carries { rate, nebula, perks } where perks is a
+// computePerks() result (surgeRewardMul scales instant payouts). Timed buffs come
+// back with { kind:'prod'|'click', mult, duration }; instant ones with a `nebula`
+// or `cores` amount. Kept pure so the RNG economy is deterministic + testable.
+export function rollSurge(roll = 0, ctx = {}) {
+  const { rate = 0, nebula = 0, perks = createPerkEffects() } = ctx;
+  const rewardMul = Math.max(1, perks.surgeRewardMul || 1);
+  const type = pickSurgeType(roll);
+  const base = { id: type.id, name: type.name, icon: type.icon, kind: type.kind };
+  if (type.kind === 'prod' || type.kind === 'click') {
+    // A timed frenzy: multiply production (or taps) for a fixed window.
+    return { ...base, mult: type.mult, duration: type.duration };
+  }
+  if (type.kind === 'core') {
+    // Rare jackpot: a Core straight into the bank (never less than one).
+    return { ...base, cores: Math.max(1, Math.round(rewardMul)) };
+  }
+  // Lucky Nebula: the larger of "a chunk of the bank" and "a burst of production",
+  // with a sane floor so an empty/idle Station still gets a worthwhile pop.
+  const fromBank = nebula * 0.15;
+  const fromRate = rate * 900; // ~15 minutes of production
+  const windfall = Math.max(fromBank, fromRate, 25) * rewardMul;
+  return { ...base, nebula: Math.max(1, Math.floor(windfall)) };
 }

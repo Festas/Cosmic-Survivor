@@ -1,9 +1,11 @@
 // storage.js — safe localStorage wrapper for high scores and settings.
 
 import {
-  createIdleState, GENERATOR_BY_ID, generatorBulkCost, prestigeGain,
+  createIdleState, GENERATOR_BY_ID, generatorBulkCost,
   SPECIAL_BY_ID, specialCost, canBuySpecial,
   clickYield, clickUpgradeCost,
+  PRESTIGE_BY_ID, prestigeUpgradeCost, canBuyPrestige,
+  prestigeCoreGain, collapseSeedNebula,
 } from '../game/idle.js';
 
 const KEY = 'cosmic-survivor:v1';
@@ -69,6 +71,12 @@ function mergeIdle(saved) {
     for (const id in SPECIAL_BY_ID) {
       const n = Math.max(0, Math.floor(+saved.special[id] || 0));
       if (n > 0) base.special[id] = Math.min(n, SPECIAL_BY_ID[id].max);
+    }
+  }
+  if (saved.prestige && typeof saved.prestige === 'object') {
+    for (const id in PRESTIGE_BY_ID) {
+      const n = Math.max(0, Math.floor(+saved.prestige[id] || 0));
+      if (n > 0) base.prestige[id] = Math.min(n, PRESTIGE_BY_ID[id].max);
     }
   }
   return base;
@@ -198,6 +206,10 @@ export const Store = {
   // ---- Idle layer ("Orbital Station") ------------------------------------
   getIdle() {
     if (!this.data.idle || typeof this.data.idle !== 'object') this.data.idle = createIdleState();
+    // Lazily add fields introduced after this save was first written.
+    if (!this.data.idle.prestige || typeof this.data.idle.prestige !== 'object') {
+      this.data.idle.prestige = Object.create(null);
+    }
     return this.data.idle;
   },
 
@@ -224,10 +236,12 @@ export const Store = {
   // Manual tap on the Station's mining beam (the Cookie-Clicker "big cookie").
   // Mints a whole-Nebula amount from the live clickYield and returns how much was
   // granted, so the UI can show a floating "+N". Always mints at least 1 so a
-  // pristine Station can always be bootstrapped by hand.
-  tapNebula() {
+  // pristine Station can always be bootstrapped by hand. `mult` lets a transient
+  // Click-Frenzy Surge temporarily multiply the yield (kept in the controller).
+  tapNebula(mult = 1) {
     const idle = this.getIdle();
-    const got = Math.max(1, Math.round(clickYield(idle, this.getRunProfile())));
+    const m = Math.max(1, +mult || 1);
+    const got = Math.max(1, Math.round(clickYield(idle, this.getRunProfile()) * m));
     idle.nebula += got;
     idle.lifetimeNebula += got;
     this.save();
@@ -270,19 +284,39 @@ export const Store = {
   },
 
   // Collapse the station: mint Cores from this epoch's lifetime Nebula and reset
-  // generators + Nebula. Returns the number of Cores gained (0 if below threshold).
+  // generators + Nebula. Cores, lifetime Cores, purchased Specials and — crucially
+  // — the Singularity perk tree all SURVIVE (a Collapse is what they are built on).
+  // The Dense Singularity perk boosts the Core yield; the Collapse Memory perk
+  // seeds some Nebula back as a spending head start (not counted toward the next
+  // Collapse, so it can't be farmed). Returns the number of Cores gained (0 if
+  // below threshold).
   prestigeIdle() {
     const idle = this.getIdle();
-    const gain = prestigeGain(idle.lifetimeNebula);
+    const gain = prestigeCoreGain(idle.lifetimeNebula, idle.prestige);
     if (gain <= 0) return 0;
+    const seed = collapseSeedNebula(idle.lifetimeNebula, idle.prestige);
     idle.cores += gain;
     idle.lifetimeCores += gain;
-    idle.nebula = 0;
     idle.lifetimeNebula = 0;
     idle.generators = Object.create(null);
     idle.clickLevel = 0; // the Mining Laser is a Nebula-era investment — reset with it
+    idle.nebula = seed;  // head start: spendable Nebula only, not re-counted for Cores
     this.save();
     return gain;
+  },
+
+  // Spend Cores to raise a Singularity perk (the prestige tree) by one level.
+  // Perks persist through a Collapse. Returns true on success.
+  buyPrestige(id) {
+    const def = PRESTIGE_BY_ID[id];
+    if (!def) return false;
+    const idle = this.getIdle();
+    if (!canBuyPrestige(def, idle.prestige, idle.cores)) return false;
+    const cur = Math.max(0, Math.floor(idle.prestige[id] || 0));
+    idle.cores -= prestigeUpgradeCost(def, cur);
+    idle.prestige[id] = cur + 1;
+    this.save();
+    return true;
   },
 
   // Spend Cores to raise a special (premium) run upgrade by one level.
