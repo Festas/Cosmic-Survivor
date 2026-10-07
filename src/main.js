@@ -12,9 +12,12 @@ import { META_UPGRADES, metaCost } from './game/meta.js';
 import {
   GENERATORS, generatorCost, generatorBulkCost, maxAffordable, baseRate, totalRate,
   prestigeGain, prestigeMultiplier, mainBoostMultiplier, PRESTIGE_BASE,
-  SPECIAL_UPGRADES, specialCost, canBuySpecial, offlineGain, OFFLINE_CAP_SECONDS,
+  SPECIAL_UPGRADES, specialCost, canBuySpecial, offlineGain,
   generatorMilestoneMultiplier, generatorMilestoneProgress, MILESTONE_STEP, MILESTONE_BONUS,
   clickYield, clickUpgradeCost, CLICK_UPGRADE,
+  PRESTIGE_UPGRADES, prestigeUpgradeCost, canBuyPrestige, computePerks,
+  prestigeCoreGain, collapseSeedNebula, offlineCapSeconds,
+  pickSurgeType, rollSurge, SURGE_MIN_INTERVAL, SURGE_MAX_INTERVAL, SURGE_LIFETIME,
 } from './game/idle.js';
 import { DIRECTIVES, DIRECTIVE_BY_ID, directiveStardustMultiplier } from './game/modifiers.js';
 import { ACHIEVEMENTS, evaluateAchievements } from './game/achievements.js';
@@ -280,20 +283,34 @@ function renderMeta() {
 // ---- Orbital Station: a standalone Cookie-Clicker-style idle layer ----------
 // A dedicated overlay (NOT a Hangar tab). It mines Nebula in real time; a manual
 // "big cookie" tap bootstraps the economy from zero, generators automate it, the
-// Mining Laser upgrades the tap, and Collapse prestiges it for Cores that buy
-// permanent run buffs. The scrollable store is rebuilt on open / on purchase /
-// ~5×/s for affordability; the header + tap gain tick every frame via
-// updateStationLive() so the live balance is always smooth.
+// Mining Laser upgrades the tap, and Collapse prestiges it for Singularity Cores.
+// The layer is split into tabs so the big MINE button no longer crowds out the
+// upgrade lists: MINE (tap + laser), GENERATORS (automation), CORES (run buffs)
+// and ASCEND (the prestige perk tree). Random "Nebula Surges" (golden-cookie-style
+// RNG) drift across the overlay for a burst of Nebula or a timed frenzy.
 let stationBuyQty = 1; // 1 | 10 | 'max'
 let stationRefreshT = 0; // throttle for live store re-renders while open
 let tapSoundT = 0;       // last tap-sound timestamp (ms) for throttling
+
+let stationTab = 'mine'; // mine | gen | cores | ascend
+const STATION_TABS = ['mine', 'gen', 'cores', 'ascend'];
+
+// Transient Surge frenzies (not persisted — they only run for their short window).
+// Each: { id, name, icon, kind:'prod'|'click', mult, until } where until is in
+// seconds on the performance.now() clock.
+let activeBuffs = [];
+let surgeTimer = 0;        // seconds until the next Surge orb spawns
+let surgeExpireT = 0;      // seconds the live orb has left before it fades
+let activeSurgeEl = null;  // the live Surge orb element (null when none is out)
 
 function stationOpen() { return !$('station').classList.contains('hidden'); }
 
 function openStation() {
   audio.play('ui');
+  setStationTab(stationTab);
   renderStation();
   updateStationLive();
+  scheduleSurge(); // start the RNG Surge cycle fresh each visit
   // Make the Station the sole top, interactive overlay (same reasoning as the
   // Hangar): hide the other menus/HUD so nothing paints over it or steals clicks.
   $('gameover').classList.add('hidden');
@@ -303,15 +320,44 @@ function openStation() {
   $('station').classList.remove('hidden');
 }
 function closeStation() {
+  despawnSurge(); // don't leave an orb floating for next time
   $('station').classList.add('hidden');
   started = false;
   $('start').classList.remove('hidden');
   refreshStart();
 }
 
+// Switch the visible Station tab (mirrors the Hangar tab pattern) and render it.
+function setStationTab(tab) {
+  if (!STATION_TABS.includes(tab)) tab = 'mine';
+  stationTab = tab;
+  for (const t of STATION_TABS) {
+    $('st-tab-' + t)?.classList.toggle('active', t === tab);
+    $('st-body-' + t)?.classList.toggle('hidden', t !== tab);
+  }
+  renderStationTab();
+}
+
 function stationRateMult() {
   const idle = store.getIdle();
-  return prestigeMultiplier(idle.lifetimeCores) * mainBoostMultiplier(store.getRunProfile());
+  const fx = computePerks(idle.prestige);
+  return prestigeMultiplier(idle.lifetimeCores) * mainBoostMultiplier(store.getRunProfile())
+    * fx.prodMul * buffProdMult();
+}
+
+// Product of all active production-frenzy Surge multipliers (1 when none).
+function buffProdMult() {
+  const now = performance.now() / 1000;
+  let m = 1;
+  for (const b of activeBuffs) if (b.kind === 'prod' && b.until > now) m *= b.mult;
+  return m;
+}
+// Product of all active click-frenzy Surge multipliers (1 when none).
+function buffClickMult() {
+  const now = performance.now() / 1000;
+  let m = 1;
+  for (const b of activeBuffs) if (b.kind === 'click' && b.until > now) m *= b.mult;
+  return m;
 }
 
 // Cheap per-frame refresh of the always-visible header + tap gain. No innerHTML
@@ -320,31 +366,32 @@ function updateStationLive() {
   if (!stationOpen()) return;
   const idle = store.getIdle();
   const profile = store.getRunProfile();
-  const rate = totalRate(idle, profile);
+  const rate = totalRate(idle, profile) * buffProdMult();
   const neb = $('station-nebula'); if (neb) neb.textContent = formatNumber(idle.nebula);
   const rt = $('station-rate'); if (rt) rt.textContent = `${rate >= 100 ? formatNumber(rate) : rate.toFixed(1)}/s`;
   const cr = $('station-cores'); if (cr) cr.textContent = formatNumber(idle.cores);
   const cm = $('station-core-mult'); if (cm) cm.textContent = `×${prestigeMultiplier(idle.lifetimeCores).toFixed(2)}`;
   const tg = $('station-tap-gain');
   if (tg) {
-    const per = Math.max(1, Math.round(clickYield(idle, profile)));
+    const per = Math.max(1, Math.round(clickYield(idle, profile) * buffClickMult()));
     tg.textContent = `+${formatNumber(per)} ⬡`;
   }
 }
 
 // Manual mining tap — the Cookie-Clicker "big cookie". Mints Nebula, floats a
-// "+N", and gives light (throttled) audio/visual feedback.
+// "+N", and gives light (throttled) audio/visual feedback. A Click-Frenzy Surge
+// temporarily multiplies the yield.
 function stationTap(ev) {
   if (ev && ev.button != null && ev.button !== 0) return; // left / touch only
-  const got = store.tapNebula();
+  const got = store.tapNebula(buffClickMult());
   spawnTapFx(got, ev);
   updateStationLive();
   const btn = $('station-tap');
   if (btn) { btn.classList.remove('punch'); void btn.offsetWidth; btn.classList.add('punch'); }
   const now = performance.now();
   if (now - tapSoundT > 55) { tapSoundT = now; audio.play('pickup'); }
-  // Refresh the store promptly so newly-affordable buy buttons light up.
-  renderStation();
+  // Refresh the visible tab promptly so newly-affordable buy buttons light up.
+  renderStationTab();
 }
 
 // Floating "+N" that drifts up from the tap point (or the button centre).
@@ -367,27 +414,55 @@ function spawnTapFx(amount, ev) {
   setTimeout(() => pop.remove(), 760);
 }
 
+// Quantity selector (×1 / ×10 / MAX) shared by the generator tab.
+function stationQtyButtonsHtml() {
+  return [1, 10, 'max'].map((q) =>
+    `<button class="btn btn-sm st-qty${stationBuyQty === q ? ' active' : ''}" data-qty="${q}">${q === 'max' ? 'MAX' : '×' + q}</button>`).join('');
+}
+
+// Render just the currently-visible tab (cheap enough to call on every purchase
+// and a few times per second for live affordability).
+function renderStationTab() {
+  if (stationTab === 'mine') renderStationMine();
+  else if (stationTab === 'gen') renderStationGenerators();
+  else if (stationTab === 'cores') renderStationCores();
+  else if (stationTab === 'ascend') renderStationAscend();
+}
+
+// Full refresh on open / after a Collapse: the buff banner, the active tab, and
+// the live header all at once.
 function renderStation() {
-  const wrap = $('station-store');
+  renderStationBuffs();
+  renderStationTab();
+  updateStationLive();
+}
+
+// --- Active Surge frenzies banner (above the tabs) -------------------------
+function renderStationBuffs() {
+  const wrap = $('station-buffs');
   if (!wrap) return;
+  const now = performance.now() / 1000;
+  const live = activeBuffs.filter((b) => b.until > now);
+  if (!live.length) { wrap.innerHTML = ''; wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  wrap.innerHTML = live.map((b) => {
+    const left = Math.max(0, Math.ceil(b.until - now));
+    return `<div class="buff-chip buff-${b.kind}"><span class="buff-ico">${b.icon}</span><span class="buff-txt">${b.name} ×${b.mult}</span><span class="buff-time">${left}s</span></div>`;
+  }).join('');
+}
+
+// --- MINE tab: the tap "big cookie" (persistent) + the Mining Laser upgrade --
+function renderStationMine() {
+  const host = $('station-laser');
+  if (!host) return;
   const idle = store.getIdle();
   const profile = store.getRunProfile();
-  const mult = stationRateMult();
-  const gain = prestigeGain(idle.lifetimeNebula);
-  // Lifetime Nebula needed for the next Core = PRESTIGE_BASE·(cores+1)³.
-  const nextCoreAt = PRESTIGE_BASE * Math.pow(gain + 1, 3);
-  const prestigePct = Math.max(0, Math.min(100, (idle.lifetimeNebula / nextCoreAt) * 100));
   const boostPct = Math.round((mainBoostMultiplier(profile) - 1) * 100);
-
-  const qtyBtns = [1, 10, 'max'].map((q) =>
-    `<button class="btn btn-sm st-qty${stationBuyQty === q ? ' active' : ''}" data-qty="${q}">${q === 'max' ? 'MAX' : '×' + q}</button>`).join('');
-
-  // --- Manual-mining upgrade (Mining Laser): raises the per-tap yield ---------
   const clickLvl = idle.clickLevel || 0;
   const clickCost = clickUpgradeCost(clickLvl);
   const clickAfford = idle.nebula >= clickCost;
-  const perTap = Math.max(1, Math.round(clickYield(idle, profile)));
-  const clickRow = `
+  const perTap = Math.max(1, Math.round(clickYield(idle, profile) * buffClickMult()));
+  host.innerHTML = `
     <div class="station-sec"><span class="st-sec-head">MANUAL MINING <span class="st-sec-sub">tap the beam above</span></span></div>
     <div class="gen-list">
       <div class="gen-row${clickLvl > 0 ? ' owned' : ''}">
@@ -402,31 +477,29 @@ function renderStation() {
           <span class="gb-c">⬡ ${formatNumber(clickCost)}</span>
         </button>
       </div>
-    </div>`;
-
-  let html = `
-    <div class="station-note">Your Station mines <b>Nebula</b> in real time — even while the tab is closed. <b>Tap the beam</b> to mine by hand, buy <b>generators</b> to automate it, then <b>Collapse</b> for <b>Singularity Cores</b> that buy permanent run buffs. Run progress boosts production: <b>+${boostPct}%</b> from your record.</div>
-    <div class="prestige-row">
-      <div class="prestige-info">
-        <div class="prestige-title">🌀 Collapse Station</div>
-        <div class="prestige-sub">${gain > 0 ? `Mint <b>${formatNumber(gain)}</b> Core${gain === 1 ? '' : 's'} · resets generators &amp; Nebula` : `Reach ${formatNumber(nextCoreAt)} lifetime Nebula for your first Core`}</div>
-        <div class="prestige-bar"><span style="width:${prestigePct}%"></span></div>
-      </div>
-      <button class="btn prestige-btn"${gain > 0 ? '' : ' disabled'}>COLLAPSE</button>
     </div>
-    ${clickRow}
-    <div class="station-sec"><span class="st-sec-head">GENERATORS <span class="st-sec-sub">every ${MILESTONE_STEP} → +${Math.round(MILESTONE_BONUS * 100)}%</span></span><span class="st-qtyrow">${qtyBtns}</span></div>
-    <div class="gen-list">`;
+    <div class="station-note">Your Station mines <b>Nebula</b> in real time — even while the tab is closed. <b>Tap the beam</b> to mine by hand, then automate it under <b>Generators</b>. Watch for drifting <b>Nebula Surges</b> — tap one for a windfall or a frenzy. Run progress adds <b>+${boostPct}%</b> production.</div>`;
+  host.querySelector('.click-buy')?.addEventListener('click', () => {
+    if (store.buyClickUpgrade()) { audio.play('pickup'); renderStationMine(); updateStationLive(); }
+  });
+}
 
+// --- GENERATORS tab: automation lines with milestone bonuses ---------------
+function renderStationGenerators() {
+  const wrap = $('st-body-gen');
+  if (!wrap) return;
+  const idle = store.getIdle();
+  const fx = computePerks(idle.prestige);
+  const mult = stationRateMult();
+  let html = `<div class="station-sec"><span class="st-sec-head">GENERATORS <span class="st-sec-sub">every ${MILESTONE_STEP} → +${Math.round(fx.milestoneBonus * 100)}%</span></span><span class="st-qtyrow">${stationQtyButtonsHtml()}</span></div><div class="gen-list">`;
   for (const def of GENERATORS) {
     const owned = idle.generators[def.id] || 0;
-    const qty = stationBuyQty === 'max' ? Math.max(1, maxAffordable(def, owned, idle.nebula)) : stationBuyQty;
-    const cost = generatorBulkCost(def, owned, qty);
-    const afford = idle.nebula >= cost && (stationBuyQty !== 'max' || maxAffordable(def, owned, idle.nebula) > 0);
-    const gmul = generatorMilestoneMultiplier(owned);
+    const qty = stationBuyQty === 'max' ? Math.max(1, maxAffordable(def, owned, idle.nebula, fx.costMul)) : stationBuyQty;
+    const cost = generatorBulkCost(def, owned, qty, fx.costMul);
+    const afford = idle.nebula >= cost && (stationBuyQty !== 'max' || maxAffordable(def, owned, idle.nebula, fx.costMul) > 0);
+    const gmul = generatorMilestoneMultiplier(owned, fx.milestoneBonus);
     const contrib = def.rate * owned * gmul * mult;
-    // Milestone progress: current ×bonus (if any) + how many more to the next.
-    const ms = generatorMilestoneProgress(owned);
+    const ms = generatorMilestoneProgress(owned, fx.milestoneBonus);
     const mile = owned > 0
       ? `<div class="gen-mile">${ms.reached > 0 ? `<b>×${gmul % 1 ? gmul.toFixed(1) : gmul}</b> milestone · ` : ''}${formatNumber(ms.remaining)} to ×${ms.nextMultiplier % 1 ? ms.nextMultiplier.toFixed(1) : ms.nextMultiplier}</div>`
       : '';
@@ -445,8 +518,30 @@ function renderStation() {
         </button>
       </div>`;
   }
-  html += `</div><div class="station-sec"><span class="st-sec-head">CORE UPGRADES <span class="st-sec-sub">spent on every run</span></span></div><div class="special-list">`;
+  html += '</div>';
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.st-qty').forEach((b) => b.addEventListener('click', () => {
+    const q = b.dataset.qty;
+    stationBuyQty = q === 'max' ? 'max' : +q;
+    audio.play('ui');
+    renderStationGenerators();
+  }));
+  wrap.querySelectorAll('.gen-buy').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.id;
+    const def = GENERATORS.find((g) => g.id === id);
+    const owned = store.getIdle().generators[id] || 0;
+    const costMul = computePerks(store.getIdle().prestige).costMul;
+    const qty = stationBuyQty === 'max' ? maxAffordable(def, owned, store.getIdle().nebula, costMul) : stationBuyQty;
+    if (store.buyGenerator(id, qty) > 0) { audio.play('pickup'); renderStationGenerators(); updateStationLive(); }
+  }));
+}
 
+// --- CORES tab: Singularity-Core run buffs (spent on every run) -------------
+function renderStationCores() {
+  const wrap = $('st-body-cores');
+  if (!wrap) return;
+  const idle = store.getIdle();
+  let html = `<div class="station-note">Spend <b>🌀 Singularity Cores</b> (earned by Collapsing under ASCEND) on permanent buffs that apply to <b>every run</b>.</div><div class="station-sec"><span class="st-sec-head">CORE UPGRADES <span class="st-sec-sub">applied on every run</span></span></div><div class="special-list">`;
   for (const def of SPECIAL_UPGRADES) {
     const level = idle.special[def.id] || 0;
     const maxed = level >= def.max;
@@ -469,17 +564,58 @@ function renderStation() {
   }
   html += '</div>';
   wrap.innerHTML = html;
-  updateStationLive();
-
-  wrap.querySelectorAll('.st-qty').forEach((b) => b.addEventListener('click', () => {
-    const q = b.dataset.qty;
-    stationBuyQty = q === 'max' ? 'max' : +q;
-    audio.play('ui');
-    renderStation();
+  wrap.querySelectorAll('.special-buy').forEach((b) => b.addEventListener('click', () => {
+    if (store.buySpecial(b.dataset.id)) { audio.play('pickup'); renderStationCores(); updateStationLive(); }
   }));
-  wrap.querySelector('.click-buy')?.addEventListener('click', () => {
-    if (store.buyClickUpgrade()) { audio.play('pickup'); renderStation(); }
-  });
+}
+
+// --- ASCEND tab: the Collapse control + the permanent Ascension perk tree ----
+function renderStationAscend() {
+  const wrap = $('st-body-ascend');
+  if (!wrap) return;
+  const idle = store.getIdle();
+  const gain = prestigeCoreGain(idle.lifetimeNebula, idle.prestige);
+  const baseGain = prestigeGain(idle.lifetimeNebula);
+  // Lifetime Nebula needed for the next Core = PRESTIGE_BASE·(baseGain+1)³.
+  const nextCoreAt = PRESTIGE_BASE * Math.pow(baseGain + 1, 3);
+  const prestigePct = Math.max(0, Math.min(100, (idle.lifetimeNebula / nextCoreAt) * 100));
+  const seed = collapseSeedNebula(idle.lifetimeNebula, idle.prestige);
+  let html = `
+    <div class="prestige-row">
+      <div class="prestige-info">
+        <div class="prestige-title">🌀 Collapse Station</div>
+        <div class="prestige-sub">${gain > 0
+          ? `Mint <b>${formatNumber(gain)}</b> Core${gain === 1 ? '' : 's'} · resets generators &amp; Nebula${seed > 0 ? ` · keeps <b>${formatNumber(seed)}</b> Nebula` : ''}`
+          : `Reach ${formatNumber(nextCoreAt)} lifetime Nebula for your first Core`}</div>
+        <div class="prestige-bar"><span style="width:${prestigePct}%"></span></div>
+      </div>
+      <button class="btn prestige-btn"${gain > 0 ? '' : ' disabled'}>COLLAPSE</button>
+    </div>
+    <div class="station-note">Ascension perks are bought with <b>🌀 Cores</b> and <b>survive every Collapse</b> — they permanently upgrade the Station itself.</div>
+    <div class="station-sec"><span class="st-sec-head">ASCENSION PERKS <span class="st-sec-sub">permanent · survive Collapse</span></span></div>
+    <div class="perk-list">`;
+  for (const def of PRESTIGE_UPGRADES) {
+    const level = idle.prestige[def.id] || 0;
+    const maxed = level >= def.max;
+    const cost = prestigeUpgradeCost(def, level);
+    const afford = canBuyPrestige(def, idle.prestige, idle.cores);
+    const pips = Array.from({ length: def.max }, (_, i) => `<span class="pip${i < level ? ' on' : ''}"></span>`).join('');
+    const btn = maxed
+      ? '<div class="meta-max">MAX</div>'
+      : `<button class="btn btn-sm perk-buy" data-id="${def.id}"${afford ? '' : ' disabled'}>🌀 ${formatNumber(cost)}</button>`;
+    html += `
+      <div class="special-row${maxed ? ' maxed' : ''}">
+        <div class="meta-ico">${def.icon}</div>
+        <div class="meta-main">
+          <div class="meta-name">${def.name} <span class="meta-lvl">${level}/${def.max}</span></div>
+          <div class="meta-desc">${def.desc}${def.effect && level > 0 ? ` · now <b>${def.effect(level)}</b>` : ''}</div>
+          <div class="meta-pips">${pips}</div>
+        </div>
+        <div class="meta-action">${btn}</div>
+      </div>`;
+  }
+  html += '</div>';
+  wrap.innerHTML = html;
   wrap.querySelector('.prestige-btn')?.addEventListener('click', () => {
     const got = store.prestigeIdle();
     if (got > 0) {
@@ -488,16 +624,105 @@ function renderStation() {
       renderStation();
     }
   });
-  wrap.querySelectorAll('.gen-buy').forEach((b) => b.addEventListener('click', () => {
-    const id = b.dataset.id;
-    const def = GENERATORS.find((g) => g.id === id);
-    const owned = store.getIdle().generators[id] || 0;
-    const qty = stationBuyQty === 'max' ? maxAffordable(def, owned, store.getIdle().nebula) : stationBuyQty;
-    if (store.buyGenerator(id, qty) > 0) { audio.play('pickup'); renderStation(); }
+  wrap.querySelectorAll('.perk-buy').forEach((b) => b.addEventListener('click', () => {
+    if (store.buyPrestige(b.dataset.id)) { audio.play('pickup'); renderStationAscend(); updateStationLive(); }
   }));
-  wrap.querySelectorAll('.special-buy').forEach((b) => b.addEventListener('click', () => {
-    if (store.buySpecial(b.dataset.id)) { audio.play('pickup'); renderStation(); }
-  }));
+}
+
+// ---- Nebula Surges: golden-cookie-style RNG that drifts across the overlay --
+// The pure roll→reward mapping lives in idle.js (rollSurge); here we only handle
+// the DOM orb, its timing and applying the reward. Surges spawn only while the
+// Station is open (you click the orb), but the frenzies they grant keep ticking
+// afterwards until they expire.
+function scheduleSurge() {
+  const perks = computePerks(store.getIdle().prestige);
+  const span = SURGE_MAX_INTERVAL - SURGE_MIN_INTERVAL;
+  const base = SURGE_MIN_INTERVAL + rng() * span;
+  surgeTimer = base / Math.max(1, perks.surgeChanceMul); // Lucky Resonance shortens it
+}
+
+function spawnSurge() {
+  const host = $('station-surge');
+  if (!host || activeSurgeEl) return;
+  const roll = rng();
+  const type = pickSurgeType(roll);
+  const orb = document.createElement('button');
+  orb.type = 'button';
+  orb.className = `surge-orb surge-${type.kind}`;
+  orb.dataset.roll = String(roll);
+  orb.title = type.name;
+  orb.setAttribute('aria-label', `Collect ${type.name}`);
+  orb.textContent = type.icon;
+  orb.style.left = `${10 + rng() * 78}%`;
+  orb.style.top = `${16 + rng() * 60}%`;
+  orb.style.animationDuration = `${SURGE_LIFETIME}s, 2.4s`;
+  orb.addEventListener('pointerdown', (e) => { e.preventDefault(); collectSurge(e); });
+  host.appendChild(orb);
+  activeSurgeEl = orb;
+  surgeExpireT = SURGE_LIFETIME;
+  audio.play('levelup'); // a chime so a drifting Surge gets noticed
+}
+
+function despawnSurge() {
+  if (activeSurgeEl) { activeSurgeEl.remove(); activeSurgeEl = null; }
+  surgeExpireT = 0;
+}
+
+function collectSurge(ev) {
+  if (!activeSurgeEl) return;
+  const roll = +activeSurgeEl.dataset.roll || 0;
+  const idle = store.getIdle();
+  const reward = rollSurge(roll, {
+    rate: totalRate(idle, store.getRunProfile()),
+    nebula: idle.nebula,
+    perks: computePerks(idle.prestige),
+  });
+  despawnSurge();
+  applySurgeReward(reward, ev);
+  scheduleSurge();
+}
+
+function applySurgeReward(reward, ev) {
+  audio.play('pickup');
+  if (reward.kind === 'nebula') {
+    store.addNebula(reward.nebula);
+    if (ev && stationTab === 'mine') spawnTapFx(reward.nebula, ev);
+    showToast(`<span class="t-ico">${reward.icon}</span><div class="t-body"><b>${reward.name}</b><span>+${formatNumber(reward.nebula)} Nebula</span></div>`);
+  } else if (reward.kind === 'core') {
+    const idle = store.getIdle();
+    idle.cores += reward.cores;
+    idle.lifetimeCores += reward.cores;
+    store.save();
+    showToast(`<span class="t-ico">${reward.icon}</span><div class="t-body"><b>${reward.name}</b><span>+${formatNumber(reward.cores)} Singularity Core${reward.cores === 1 ? '' : 's'}</span></div>`);
+  } else { // 'prod' | 'click' timed frenzy
+    const until = performance.now() / 1000 + reward.duration;
+    activeBuffs = activeBuffs.filter((b) => b.id !== reward.id); // refresh, don't stack the same one
+    activeBuffs.push({ id: reward.id, name: reward.name, icon: reward.icon, kind: reward.kind, mult: reward.mult, until });
+    showToast(`<span class="t-ico">${reward.icon}</span><div class="t-body"><b>${reward.name}</b><span>×${reward.mult} for ${reward.duration}s</span></div>`);
+    renderStationBuffs();
+  }
+  updateStationLive();
+  renderStationTab();
+}
+
+// Per-frame Surge + buff bookkeeping. Surges only advance while the overlay is
+// open; buffs expire on the real clock regardless.
+function tickSurges(dt) {
+  if (stationOpen()) {
+    if (activeSurgeEl) {
+      surgeExpireT -= dt;
+      if (surgeExpireT <= 0) { despawnSurge(); scheduleSurge(); }
+    } else {
+      surgeTimer -= dt;
+      if (surgeTimer <= 0) spawnSurge();
+    }
+  }
+  if (activeBuffs.length) {
+    const now = performance.now() / 1000;
+    const before = activeBuffs.length;
+    activeBuffs = activeBuffs.filter((b) => b.until > now);
+    if (activeBuffs.length !== before && stationOpen()) { renderStationBuffs(); updateStationLive(); }
+  }
 }
 
 // ---- Directives: opt-in challenge modifiers (more risk → more Stardust) ----
@@ -932,7 +1157,7 @@ let idleSaveT = 0;   // seconds since the idle state was last persisted
 
 function tickIdle(dt) {
   const idle = store.getIdle();
-  const rate = totalRate(idle, store.getRunProfile());
+  const rate = totalRate(idle, store.getRunProfile()) * buffProdMult();
   idleAccum += rate * dt;
   if (idleAccum >= 1) {
     const whole = Math.floor(idleAccum);
@@ -947,12 +1172,15 @@ function tickIdle(dt) {
     idle.lastTick = Date.now();
     store.save();
   }
+  // Advance RNG Surges + expire transient frenzies (works whether open or not).
+  tickSurges(dt);
   // Keep the open Station overlay live: smooth header/tap gain every frame, and
-  // a throttled store rebuild so affordability (buy buttons) refreshes a few ×/s.
+  // a throttled rebuild of the visible tab so affordability (buy buttons) and the
+  // buff countdowns refresh a few ×/s.
   if (stationOpen()) {
     updateStationLive();
     stationRefreshT += dt;
-    if (stationRefreshT >= 0.2) { stationRefreshT = 0; renderStation(); }
+    if (stationRefreshT >= 0.2) { stationRefreshT = 0; renderStationTab(); renderStationBuffs(); }
   }
   // Keep the start-screen Nebula pill ticking too.
   if (!started && !$('start').classList.contains('hidden')) updateStartNebula();
@@ -960,19 +1188,21 @@ function tickIdle(dt) {
 
 // Grant offline/elapsed Nebula earned since the last recorded tick, then re-stamp.
 // `announce` shows a "welcome back" toast (page load); quick tab-switch returns
-// award silently so a glance away doesn't spam toasts.
+// award silently so a glance away doesn't spam toasts. The offline window widens
+// with the Temporal Buffer Ascension perk.
 function catchUpOffline(announce = true) {
   const idle = store.getIdle();
   const nowMs = Date.now();
   if (idle.lastTick > 0) {
     const seconds = (nowMs - idle.lastTick) / 1000;
     const rate = totalRate(idle, store.getRunProfile());
-    const gain = Math.floor(offlineGain(rate, seconds));
+    const cap = offlineCapSeconds(idle.prestige);
+    const gain = Math.floor(offlineGain(rate, seconds, cap));
     if (gain > 0) {
       store.addNebula(gain);
       // Only shout about it for a meaningful absence (≥60s) on page load.
       if (announce && seconds >= 60) {
-        const capped = seconds > OFFLINE_CAP_SECONDS;
+        const capped = seconds > cap;
         showToast(`<span class="t-ico">⬡</span><div class="t-body"><b>Welcome back</b><span>Station mined +${formatNumber(gain)} Nebula${capped ? ' (max)' : ''}</span></div>`);
       }
     }
@@ -1047,6 +1277,10 @@ $('hangar-close').addEventListener('click', closeHangar);
 // not a Hangar tab. The 🛰 STATION button and the Nebula pill both open it.
 $('station-btn').addEventListener('click', openStation);
 $('station-close').addEventListener('click', closeStation);
+// Station tab bar (MINE / GENERATORS / CORES / ASCEND).
+for (const t of STATION_TABS) {
+  $('st-tab-' + t)?.addEventListener('click', () => { audio.play('ui'); setStationTab(t); });
+}
 const stationTapBtn = $('station-tap');
 if (stationTapBtn) {
   // pointerdown gives an instant, mobile-friendly tap (no 300ms click delay);

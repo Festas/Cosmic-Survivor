@@ -147,16 +147,33 @@
             <div class="st-cur st-core"><span class="st-k">🌀 Cores</span><b id="station-cores">0</b><span class="st-sub" id="station-core-mult">×1.00</span></div>
           </div>
         </div>
-        <div class="station-tapzone">
-          <button id="station-tap" class="station-tap" aria-label="Mine Nebula">
-            <span class="tap-core">⬡</span>
-            <span class="tap-label">MINE</span>
-            <span class="tap-gain" id="station-tap-gain">+1 ⬡</span>
-          </button>
-          <div id="station-tapfx" class="station-tapfx" aria-hidden="true"></div>
+        <!-- Active Surge frenzies (transient RNG buffs) show here, above the tabs -->
+        <div id="station-buffs" class="station-buffs hidden" aria-live="polite"></div>
+        <div class="station-tabs" role="tablist">
+          <button id="st-tab-mine" class="tab active" role="tab">⬡ MINE</button>
+          <button id="st-tab-gen" class="tab" role="tab">⚙ GENERATORS</button>
+          <button id="st-tab-cores" class="tab" role="tab">🌀 CORES</button>
+          <button id="st-tab-ascend" class="tab" role="tab">✦ ASCEND</button>
         </div>
-        <div id="station-store" class="station-body"></div>
+        <!-- MINE tab: the Cookie-Clicker "big cookie" lives here, in its own space,
+             so the tap button no longer crowds out the upgrade lists. -->
+        <div id="st-body-mine" class="station-body station-mine">
+          <div class="station-tapzone">
+            <button id="station-tap" class="station-tap" aria-label="Mine Nebula">
+              <span class="tap-core">⬡</span>
+              <span class="tap-label">MINE</span>
+              <span class="tap-gain" id="station-tap-gain">+1 ⬡</span>
+            </button>
+            <div id="station-tapfx" class="station-tapfx" aria-hidden="true"></div>
+          </div>
+          <div id="station-laser"></div>
+        </div>
+        <div id="st-body-gen" class="station-body hidden"></div>
+        <div id="st-body-cores" class="station-body hidden"></div>
+        <div id="st-body-ascend" class="station-body hidden"></div>
         <button id="station-close" class="btn">✔ DONE</button>
+        <!-- Surge orbs (golden-cookie-style RNG) spawn into this overlay layer -->
+        <div id="station-surge" class="station-surge" aria-hidden="true"></div>
       </div>
     </div>
 
