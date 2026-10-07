@@ -33,7 +33,7 @@ export function createIdleState() {
     lifetimeCores: 0,   // total Cores ever earned (drives the permanent multiplier)
     generators: Object.create(null), // { [generatorId]: ownedCount }
     special: Object.create(null),    // { [specialId]: level }
-    prestige: Object.create(null),   // { [perkId]: level } — permanent Ascension perks (survive Collapse)
+    prestige: Object.create(null),   // { [perkId]: level } — permanent Singularity perks (survive Collapse)
     clickLevel: 0,      // Mining Laser level: boosts the manual-tap yield (see clickYield)
     lastTick: 0,        // epoch ms of the last production tick (for offline catch-up)
   };
@@ -171,10 +171,10 @@ export function prestigeMultiplier(lifetimeCores = 0) {
   return 1 + Math.max(0, lifetimeCores) * 0.03;
 }
 
-// ---------------------------------------------------- Ascension perk tree
+// ---------------------------------------------------- Singularity perk tree
 //
 // The "sophisticated prestige" layer. Unlike SPECIAL_UPGRADES (which buff the
-// main-game run), Ascension perks permanently upgrade the STATION ECONOMY
+// main-game run), Singularity perks permanently upgrade the STATION ECONOMY
 // itself — production, taps, costs, milestones, offline reach, Core yield and
 // the odds/size of random Surges. They are bought with Singularity Cores and —
 // crucially — SURVIVE a Collapse (they are the thing a Collapse builds toward),
@@ -299,7 +299,7 @@ export function mainBoostMultiplier({ lifetimeStardust = 0, bestLevel = 0, bossK
 }
 
 // Total effective Nebula/second: generators × Prestige multiplier × run-profile
-// multiplier × Ascension perks. `profile` is the main→idle link (mainBoostMultiplier).
+// multiplier × Singularity perks. `profile` is the main→idle link (mainBoostMultiplier).
 export function totalRate(state = createIdleState(), profile = {}) {
   const fx = computePerks(state.prestige);
   return baseRate(state.generators, fx.milestoneBonus)
@@ -356,7 +356,7 @@ export function clickUpgradeCost(level = 0) {
 
 // Nebula minted by a single manual tap: click power (scaled by the same Prestige
 // × run-profile multipliers as production) plus a slice of live output, all lifted
-// by the Hardened Beam Ascension perk (clickMul). Floored at BASE_CLICK so the
+// by the Hardened Beam Singularity perk (clickMul). Floored at BASE_CLICK so the
 // first tap on a pristine Station always yields something.
 export function clickYield(state = createIdleState(), profile = {}) {
   const globalMult = prestigeMultiplier(state.lifetimeCores) * mainBoostMultiplier(profile);

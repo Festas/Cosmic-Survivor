@@ -286,8 +286,8 @@ function renderMeta() {
 // Mining Laser upgrades the tap, and Collapse prestiges it for Singularity Cores.
 // The layer is split into tabs so the big MINE button no longer crowds out the
 // upgrade lists: MINE (tap + laser), GENERATORS (automation), CORES (run buffs)
-// and ASCEND (the prestige perk tree). Random "Nebula Surges" (golden-cookie-style
-// RNG) drift across the overlay for a burst of Nebula or a timed frenzy.
+// and COLLAPSE (the Singularity perk tree). Random "Nebula Surges" (golden-cookie-
+// style RNG) drift across the overlay for a burst of Nebula or a timed frenzy.
 let stationBuyQty = 1; // 1 | 10 | 'max'
 let stationRefreshT = 0; // throttle for live store re-renders while open
 let tapSoundT = 0;       // last tap-sound timestamp (ms) for throttling
@@ -541,7 +541,7 @@ function renderStationCores() {
   const wrap = $('st-body-cores');
   if (!wrap) return;
   const idle = store.getIdle();
-  let html = `<div class="station-note">Spend <b>🌀 Singularity Cores</b> (earned by Collapsing under ASCEND) on permanent buffs that apply to <b>every run</b>.</div><div class="station-sec"><span class="st-sec-head">CORE UPGRADES <span class="st-sec-sub">applied on every run</span></span></div><div class="special-list">`;
+  let html = `<div class="station-note">Spend <b>🌀 Singularity Cores</b> (earned by Collapsing under COLLAPSE) on permanent buffs that apply to <b>every run</b>.</div><div class="station-sec"><span class="st-sec-head">CORE UPGRADES <span class="st-sec-sub">applied on every run</span></span></div><div class="special-list">`;
   for (const def of SPECIAL_UPGRADES) {
     const level = idle.special[def.id] || 0;
     const maxed = level >= def.max;
@@ -569,7 +569,7 @@ function renderStationCores() {
   }));
 }
 
-// --- ASCEND tab: the Collapse control + the permanent Ascension perk tree ----
+// --- COLLAPSE tab: the Collapse control + the permanent Singularity perk tree -
 function renderStationAscend() {
   const wrap = $('st-body-ascend');
   if (!wrap) return;
@@ -591,8 +591,8 @@ function renderStationAscend() {
       </div>
       <button class="btn prestige-btn"${gain > 0 ? '' : ' disabled'}>COLLAPSE</button>
     </div>
-    <div class="station-note">Ascension perks are bought with <b>🌀 Cores</b> and <b>survive every Collapse</b> — they permanently upgrade the Station itself.</div>
-    <div class="station-sec"><span class="st-sec-head">ASCENSION PERKS <span class="st-sec-sub">permanent · survive Collapse</span></span></div>
+    <div class="station-note">Singularity perks are bought with <b>🌀 Cores</b> and <b>survive every Collapse</b> — they permanently upgrade the Station itself.</div>
+    <div class="station-sec"><span class="st-sec-head">SINGULARITY PERKS <span class="st-sec-sub">permanent · survive Collapse</span></span></div>
     <div class="perk-list">`;
   for (const def of PRESTIGE_UPGRADES) {
     const level = idle.prestige[def.id] || 0;
@@ -1189,7 +1189,7 @@ function tickIdle(dt) {
 // Grant offline/elapsed Nebula earned since the last recorded tick, then re-stamp.
 // `announce` shows a "welcome back" toast (page load); quick tab-switch returns
 // award silently so a glance away doesn't spam toasts. The offline window widens
-// with the Temporal Buffer Ascension perk.
+// with the Temporal Buffer Singularity perk.
 function catchUpOffline(announce = true) {
   const idle = store.getIdle();
   const nowMs = Date.now();

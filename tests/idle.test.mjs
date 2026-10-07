@@ -297,7 +297,7 @@ test('clickYield rides the same Prestige multiplier as production', () => {
   assert.ok(clickYield(prestiged, {}) > clickYield(base, {}));
 });
 
-// ---- Ascension perk tree (the "sophisticated prestige" layer) -------------
+// ---- Singularity perk tree (the "sophisticated prestige" layer) -----------
 
 test('prestige upgrades have required fields, a working apply(), and are indexed', () => {
   assert.ok(PRESTIGE_UPGRADES.length >= 4);

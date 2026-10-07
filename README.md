@@ -110,25 +110,41 @@ banked while you were away** (capped so it can't run away overnight). It's its *
 screen** (no longer a Hangar tab): open it straight from the start screen by tapping the
 **🛰 STATION** button or the **Nebula pill**.
 
-- **Tap to mine.** The Station's centrepiece is a big **MINE beam** — a Cookie-Clicker "big
-  cookie". Every tap mints Nebula by hand, so a brand-new Station (zero Nebula, zero generators)
-  can always **tap its way to its first generator** — no more dead-end start. Each tap floats a
-  "+N" and its yield scales with your production, so it stays worthwhile even late game.
-- **Mining Laser.** A Nebula-bought **click upgrade** that permanently raises how much each manual
-  tap mines. Like generators, it resets on Collapse.
-- **Generators.** Spend Nebula on **8 ascending generators** (Survey Probe → Dust Collector →
+The Station is split into **four tabs** so the big clicker no longer crowds out the upgrade lists —
+every system gets its own room:
+
+- **⬡ MINE** — the Cookie-Clicker "big cookie". A giant **MINE beam** you tap to mint Nebula by
+  hand, so a brand-new Station (zero Nebula, zero generators) can always **tap its way to its first
+  generator** — no dead-end start. Each tap floats a "+N" and its yield scales with your
+  production, so it stays worthwhile late game. The **Mining Laser** click upgrade (bought with
+  Nebula) permanently raises per-tap yield; like generators, it resets on Collapse.
+- **⚙ GENERATORS** — spend Nebula on **8 ascending generators** (Survey Probe → Dust Collector →
   Ion Refinery → Graviton Harvester → Dyson Node → Singularity Tap → Warp Forge → Quasar Engine).
-  Each costs more and mines more than the last, and buying in **×1 / ×10 / MAX** batches keeps the
-  clicking down.
-- **Milestones.** Every **25 copies** of a single generator permanently boosts *that* generator by
-  **+50%** of its base output — and the goal never stops moving, so there's always a next tier to
-  chase. The Station shows your current multiplier and how many more to the next one.
-- **Collapse for Cores.** When your lifetime Nebula is deep enough, **Collapse** the Station to
-  reset your generators and Nebula in exchange for **Singularity Cores** — a prestige currency that
-  compounds your long-game.
-- **Core upgrades.** Spend Cores on permanent **run buffs** that fold into *every* sortie — more
-  weapon damage, max HP, move speed, XP, crit, attack speed and pickup range (plus extra Stardust
-  per run). They layer on top of your ship, Ascension tree and in-run drafts.
+  Each costs more and mines more than the last, buyable in **×1 / ×10 / MAX** batches. Every **25
+  copies** of a generator permanently boosts *that* generator by **+50%** of its base output, and
+  the goal never stops moving — there's always a next milestone to chase.
+- **🌀 CORES** — spend **Singularity Cores** on permanent **run buffs** that fold into *every*
+  sortie: more weapon damage, max HP, move speed, XP, crit, attack speed, pickup range and extra
+  Stardust per run. They layer on top of your ship, the Hangar **Ascension** tree and in-run drafts.
+- **✦ COLLAPSE** — the prestige tab. When your lifetime Nebula is deep enough, **Collapse** the
+  Station to reset generators + Nebula in exchange for **Singularity Cores**, then reinvest those
+  Cores in the **Singularity perk tree** below.
+
+**✦ Singularity perks — the prestige tree.** Eight permanent perks, bought with Cores, that
+**survive every Collapse** and upgrade the *Station itself* (not your runs): **Resonant Core**
+(+production), **Hardened Beam** (+tap yield), **Mass Production** (cheaper generators), **Milestone
+Mastery** (bigger milestone bonuses), **Temporal Buffer** (longer offline reach), **Dense
+Singularity** (more Cores per Collapse), **Collapse Memory** (keep a slice of Nebula as a head start
+after Collapsing) and **Lucky Resonance** (more frequent, richer Surges). Each Collapse compounds
+your long game, and **Collapse Memory** softens the reset by seeding Nebula back — never re-counted
+toward the next Collapse, so it can't be farmed.
+
+**✨ Nebula Surges — Cookie-Clicker RNG.** While the Station is open, golden **Surge orbs** drift
+across the overlay on a random timer. Click one before it fades for a random boon: a **Nebula
+windfall**, a timed **production Frenzy** or **Bloom**, a **Click Frenzy** that supercharges manual
+taps, or a rare **Core Cache**. Active frenzies show as **buff chips** above the tabs and keep
+ticking even after you close the Station. **Lucky Resonance** makes orbs appear more often and pay
+out more.
 
 Your best run also **boosts Station output**, so pushing for a high score pays the idle layer back.
 

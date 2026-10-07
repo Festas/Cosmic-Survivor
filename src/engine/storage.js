@@ -285,7 +285,7 @@ export const Store = {
 
   // Collapse the station: mint Cores from this epoch's lifetime Nebula and reset
   // generators + Nebula. Cores, lifetime Cores, purchased Specials and — crucially
-  // — the Ascension perk tree all SURVIVE (a Collapse is what they are built on).
+  // — the Singularity perk tree all SURVIVE (a Collapse is what they are built on).
   // The Dense Singularity perk boosts the Core yield; the Collapse Memory perk
   // seeds some Nebula back as a spending head start (not counted toward the next
   // Collapse, so it can't be farmed). Returns the number of Cores gained (0 if
@@ -305,7 +305,7 @@ export const Store = {
     return gain;
   },
 
-  // Spend Cores to raise an Ascension perk (the prestige tree) by one level.
+  // Spend Cores to raise a Singularity perk (the prestige tree) by one level.
   // Perks persist through a Collapse. Returns true on success.
   buyPrestige(id) {
     const def = PRESTIGE_BY_ID[id];
