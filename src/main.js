@@ -354,7 +354,7 @@ function renderStation() {
         <div class="meta-ico">${def.icon}</div>
         <div class="meta-main">
           <div class="meta-name">${def.name} <span class="meta-lvl">${level}/${def.max}</span></div>
-          <div class="meta-desc">${def.desc}${def.effect ? ` · now <b>${def.effect(Math.max(1, level))}</b>` : ''}</div>
+          <div class="meta-desc">${def.desc}${def.effect && level > 0 ? ` · now <b>${def.effect(level)}</b>` : ''}</div>
           <div class="meta-pips">${pips}</div>
         </div>
         <div class="meta-action">${btn}</div>
@@ -847,7 +847,9 @@ function tickIdle(dt) {
 }
 
 // Grant offline/elapsed Nebula earned since the last recorded tick, then re-stamp.
-function catchUpOffline() {
+// `announce` shows a "welcome back" toast (page load); quick tab-switch returns
+// award silently so a glance away doesn't spam toasts.
+function catchUpOffline(announce = true) {
   const idle = store.getIdle();
   const nowMs = Date.now();
   if (idle.lastTick > 0) {
@@ -856,8 +858,11 @@ function catchUpOffline() {
     const gain = Math.floor(offlineGain(rate, seconds));
     if (gain > 0) {
       store.addNebula(gain);
-      const capped = seconds > OFFLINE_CAP_SECONDS;
-      showToast(`<span class="t-ico">⬡</span><div class="t-body"><b>Welcome back</b><span>Station mined +${formatNumber(gain)} Nebula${capped ? ' (max)' : ''}</span></div>`);
+      // Only shout about it for a meaningful absence (≥60s) on page load.
+      if (announce && seconds >= 60) {
+        const capped = seconds > OFFLINE_CAP_SECONDS;
+        showToast(`<span class="t-ico">⬡</span><div class="t-body"><b>Welcome back</b><span>Station mined +${formatNumber(gain)} Nebula${capped ? ' (max)' : ''}</span></div>`);
+      }
     }
   }
   store.setIdleTick(nowMs);
@@ -949,12 +954,17 @@ $('quit-btn').addEventListener('click', () => {
   $('start').classList.remove('hidden');
 });
 
-// pause when the tab loses focus mid-run
+// Persist the idle clock when leaving, and settle elapsed production on return —
+// requestAnimationFrame is throttled/paused while hidden, so a backgrounded tab
+// earns its Nebula through this catch-up rather than live ticks.
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    // Stamp the idle tick + persist so offline catch-up resumes accurately.
     store.setIdleTick(Date.now());
     if (started && world.state === 'playing') togglePause(true);
+  } else {
+    catchUpOffline(false); // silent: award the gap, no toast for a quick glance away
+    if (!$('hangar').classList.contains('hidden') && hangarTab === 'station') renderStation();
+    if (!started && !$('start').classList.contains('hidden')) updateStartNebula();
   }
 });
 
