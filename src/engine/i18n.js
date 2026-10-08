@@ -131,6 +131,9 @@ const STR = {
   'world.singularity': ['SINGULARITY', 'SINGULARITÄT'],
   'world.magnet': ['MAGNET', 'MAGNET'],
   'world.nova': ['NOVA', 'NOVA'],
+  'world.eliteInbound': ['ELITE INBOUND', 'ELITE IM ANFLUG'],
+  'world.bossDown': ['BOSS DOWN!', 'BOSS BESIEGT!'],
+  'world.phoenixRevive': ['PHOENIX REVIVE', 'PHÖNIX-WIEDERKEHR'],
 
   // ---- Hangar ----
   'hangar.title': ['🛠 HANGAR', '🛠 HANGAR'],

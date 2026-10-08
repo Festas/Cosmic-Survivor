@@ -117,6 +117,47 @@ wireSetting(['opt-music', 'opt-music2'], 'music', (v) => { store.setSetting('mus
 wireSetting(['opt-sfx', 'opt-sfx2'], 'muted', (v) => { store.setSetting('muted', !v); audio.setMuted(!v); });
 wireSetting(['opt-shake', 'opt-shake2'], 'shake', (v) => { store.setSetting('shake', v); });
 
+// ------------------------------------------------------------- language (i18n)
+// Apply all static markup translations: elements tagged with data-i18n* get their
+// text/attribute swapped from the STR table for the active language. Dynamic UI
+// (cards, station, HUD) is re-rendered separately by applyLanguage().
+function applyStaticI18n(root = document) {
+  root.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.getAttribute('data-i18n')); });
+  root.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-i18n-html')); });
+  root.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.getAttribute('data-i18n-title')); });
+  root.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
+  root.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.getAttribute('data-i18n-ph')); });
+}
+
+// Re-skin the entire live UI for the current language: static markup + whichever
+// dynamic overlays happen to be visible. Safe to call any time.
+function applyLanguage() {
+  document.documentElement.lang = getLang();
+  applyStaticI18n();
+  const sel = $('opt-lang');
+  if (sel) sel.value = getLang();
+  // Re-render dynamic overlays that are currently on screen.
+  if (!$('start').classList.contains('hidden')) refreshStart();
+  if (!$('hangar').classList.contains('hidden')) renderHangar();
+  if (stationOpen()) renderStation();
+  if (started && world.state === 'playing') updateHud();
+}
+
+// Build the language <select> from LANGUAGES and keep it in sync with the store.
+function wireLanguagePicker() {
+  const sel = $('opt-lang');
+  if (!sel) return;
+  sel.innerHTML = LANGUAGES.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
+  sel.value = getLang();
+  sel.addEventListener('change', () => {
+    const v = sel.value;
+    store.setSetting('lang', v);
+    setLang(v);
+  });
+}
+// Any part of the app can call setLang(); keep the whole UI reactive to it.
+onLangChange(() => applyLanguage());
+
 // ------------------------------------------------------------- hangar / ships
 // Ships the player actually owns (free ships are always available).
 function ownedShips() {
@@ -1344,6 +1385,16 @@ document.addEventListener('visibilitychange', () => {
     if (!started && !$('start').classList.contains('hidden')) updateStartNebula();
   }
 });
+
+// Initialise language before the first paint: use the saved setting, or fall back
+// to the browser's preferred languages on a first visit, then skin all UI.
+(function initLanguage() {
+  const saved = store.getSettings().lang;
+  setLang(saved || detectLang(navigator.languages || [navigator.language]));
+  if (!saved) store.setSetting('lang', getLang());
+  wireLanguagePicker();
+  applyLanguage();
+})();
 
 applySettingsToUI();
 catchUpOffline();

@@ -18,6 +18,7 @@ import { Player } from './player.js';
 import { ENEMY_TYPES, BOSS_TYPES, pickEnemyType, packSize, rollElite } from './enemies.js';
 import { THEMES, themeIndexForWave, bossKeyForWave, bossTierForWave, pickFromRoster } from './waves.js';
 import { createStatus, applyElement, tickStatus, dominantElement, ELEMENTS } from './elements.js';
+import { t, dName, tReaction } from '../engine/i18n.js';
 import { draftUpgrades } from './upgrades.js';
 import { weaponDef, addOrLevelWeapon, evolveWeapon, createWeaponInst } from './weapons.js';
 import { Background } from './background.js';
@@ -326,7 +327,7 @@ export class World {
         const boss = this.spawnRing(key);
         if (boss) {
           this.addText(this.player.x, this.player.y - 120,
-            boss.type.name.toUpperCase() + ' — WAVE ' + this.wave, COLORS.danger, 26);
+            t('world.bossWave', { name: dName('bosses', boss.type).toUpperCase(), n: this.wave }), COLORS.danger, 26);
         }
       }
       return; // pause spawns during the warning
@@ -382,12 +383,14 @@ export class World {
       this.bossWarn = 2.4;
       this.audio?.play('bosswarn');
       this.shake(12);
-      this.addText(this.player.x, this.player.y - 150, 'WARNING — WAVE ' + w, COLORS.danger, 28);
+      this.addText(this.player.x, this.player.y - 150, t('world.warning', { n: w }), COLORS.danger, 28);
       return;
     }
     const themeStart = (w - 1) % WAVE.themeSize === 0; // first wave of a theme block
-    const name = this.theme ? this.theme.name : '';
-    const label = 'WAVE ' + w + (themeStart && name ? ' · ' + name.toUpperCase() : '');
+    const name = this.theme ? dName('themes', this.theme) : '';
+    const label = (themeStart && name)
+      ? t('world.waveTheme', { n: w, theme: name.toUpperCase() })
+      : t('world.wave', { n: w });
     const color = themeStart && this.theme ? (this.theme.bg.accent || COLORS.gold) : COLORS.gold;
     this.addText(this.player.x, this.player.y - 120, label, color, themeStart ? 24 : 20);
     this.audio?.play('levelup');
@@ -422,7 +425,7 @@ export class World {
     const e = this.spawnRing(key);
     if (e) {
       this.makeElite(e);
-      this.addText(this.player.x, this.player.y - 110, 'ELITE INBOUND', ELITE.ring, 22);
+      this.addText(this.player.x, this.player.y - 110, t('world.eliteInbound'), ELITE.ring, 22);
       this.audio?.play('bosswarn');
     }
   }
@@ -550,7 +553,7 @@ export class World {
       this.explode(e.x, e.y, 110, edmg, COLORS.fire);
     }
 
-    if (e.boss) { this.bossActive = null; this.bossKills++; this.flash = 0.6; this.addText(e.x, e.y - 80, 'BOSS DOWN!', COLORS.gold, 30); }
+    if (e.boss) { this.bossActive = null; this.bossKills++; this.flash = 0.6; this.addText(e.x, e.y - 80, t('world.bossDown'), COLORS.gold, 30); }
   }
 
   explode(x, y, r, dmg, color) {
@@ -570,7 +573,7 @@ export class World {
   applyReaction(r, x, y, source) {
     const mult = this.player.stats.elementMul;
     this.reactions = (this.reactions || 0) + 1;
-    this.addText(x, y - 30, r.name.toUpperCase(), r.color, 18);
+    this.addText(x, y - 30, tReaction(r.name).toUpperCase(), r.color, 18);
     this.audio?.play('reaction');
     this.particles.burst(x, y, r.color, 12, { speed: 300, life: 0.5, size: 3, budget: 360 });
     this.flash = Math.max(this.flash, 0.18);
@@ -650,7 +653,7 @@ export class World {
     this.audio?.play('singularity');
     this.shake(8);
     this.flash = Math.max(this.flash, 0.2);
-    this.addText(x, y - 40, 'SINGULARITY', COLORS.void, 20);
+    this.addText(x, y - 40, t('world.singularity'), COLORS.void, 20);
   }
 
   updateSingularities(dt) {
@@ -829,9 +832,9 @@ export class World {
     if (p.type === 'heal') { this.player.heal(30); this.addText(this.player.x, this.player.y - 30, '+30', COLORS.heal, 18); }
     else if (p.type === 'magnet') {
       for (const o of this.orbs) o.magnet = true;
-      this.addText(this.player.x, this.player.y - 30, 'MAGNET', COLORS.gold, 18);
+      this.addText(this.player.x, this.player.y - 30, t('world.magnet'), COLORS.gold, 18);
     } else if (p.type === 'nuke') {
-      this.addText(this.player.x, this.player.y - 30, 'NOVA', COLORS.danger, 22);
+      this.addText(this.player.x, this.player.y - 30, t('world.nova'), COLORS.danger, 22);
       this.flash = 0.6; this.shake(20); this.audio?.play('implode');
       for (const e of this.enemies.slice()) if (e.alive && !e.boss) this.damageEnemy(e, 200, { source: 'explosion', knockback: 300 });
       for (const e of this.enemies) if (e.boss) this.damageEnemy(e, 400, { source: 'explosion' });
@@ -884,7 +887,7 @@ export class World {
     this.shake(24);
     this.hitStopFor(0.1);
     this.audio?.play('levelup');
-    this.addText(p.x, p.y - 50, 'PHOENIX REVIVE', COLORS.fire, 30);
+    this.addText(p.x, p.y - 50, t('world.phoenixRevive'), COLORS.fire, 30);
     this.particles.burst(p.x, p.y, COLORS.fire, 60, { speed: 360, life: 0.8 });
     // clear nearby threats so the revive actually lands
     for (const e of this.enemies.slice()) {
