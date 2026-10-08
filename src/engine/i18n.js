@@ -540,6 +540,9 @@ const DE = {
     cosmicloom: { name: 'Kosmischer Webstuhl', desc: 'Webt das kosmische Netz selbst zu dichtem Nebel.' },
     realityengine: { name: 'Realitäts-Triebwerk', desc: 'Verändert physikalische Konstanten zur Überproduktion.' },
     infinityspire: { name: 'Unendlichkeitsturm', desc: 'Ein Turm am Rand von allem. Endloser Ausstoß.' },
+    omnimatrix: { name: 'Omni-Matrix', desc: 'Ein Gitter, das Nebel aus ersten Prinzipien errechnet.' },
+    celestialfoundry: { name: 'Himmelsgießerei', desc: 'Gießt geschmolzenen Sternenstoff flottenweise zu Nebel-Barren.' },
+    eternityengine: { name: 'Ewigkeits-Triebwerk', desc: 'Läuft außerhalb der Zeit, sein Ausstoß ist bereits geschehen.' },
   },
   special: {
     siege_overdrive: { name: 'Belagerungs-Overdrive', desc: '+8% Waffenschaden pro Stufe' },
