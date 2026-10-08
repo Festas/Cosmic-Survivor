@@ -21,10 +21,10 @@
     <div id="hud" class="hidden" aria-hidden="true">
       <div class="hud-top">
         <div class="hud-left">
-          <div class="chip"><span class="chip-label">WAVE</span><span id="wave">1</span></div>
-          <div class="chip"><span class="chip-label">ENEMIES</span><span id="enemies">0</span></div>
-          <div id="revive-chip" class="chip revive hidden"><span class="chip-label">PHOENIX</span><span id="revive-n">0</span></div>
-          <div id="directive-chip" class="chip directive hidden"><span class="chip-label">DIRECTIVES</span><span id="directive-n">0</span></div>
+          <div class="chip"><span class="chip-label" data-i18n="hud.wave">WAVE</span><span id="wave">1</span></div>
+          <div class="chip"><span class="chip-label" data-i18n="hud.enemies">ENEMIES</span><span id="enemies">0</span></div>
+          <div id="revive-chip" class="chip revive hidden"><span class="chip-label" data-i18n="hud.phoenix">PHOENIX</span><span id="revive-n">0</span></div>
+          <div id="directive-chip" class="chip directive hidden"><span class="chip-label" data-i18n="hud.directives">DIRECTIVES</span><span id="directive-n">0</span></div>
         </div>
         <div class="hud-center">
           <div id="timer">0:00</div>
@@ -56,29 +56,29 @@
 
     <!-- Mobile controls -->
     <div id="touch-controls" class="hidden">
-      <div id="joy-hint" class="joy-hint" aria-hidden="true"><span>MOVE</span></div>
+      <div id="joy-hint" class="joy-hint" aria-hidden="true"><span data-i18n="touch.move">MOVE</span></div>
       <div id="joy-ring" class="joy-ring"><div id="joy-knob" class="joy-knob"></div></div>
-      <div id="btn-dash" class="touch-btn" aria-label="Dash">💨</div>
-      <div id="btn-sing" class="touch-btn" aria-label="Singularity">🌀</div>
-      <div id="btn-pause" class="touch-btn touch-pause" aria-label="Pause">⏸</div>
+      <div id="btn-dash" class="touch-btn" aria-label="Dash" data-i18n-aria="touch.dash">💨</div>
+      <div id="btn-sing" class="touch-btn" aria-label="Singularity" data-i18n-aria="touch.singularity">🌀</div>
+      <div id="btn-pause" class="touch-btn touch-pause" aria-label="Pause" data-i18n-aria="touch.pause">⏸</div>
     </div>
 
     <!-- Start screen -->
     <div id="start" class="overlay fit">
       <div class="panel">
         <div class="start-pills">
-          <div class="stardust-pill" title="Stardust — earn it in runs, spend it in the Hangar">✦ <b id="start-stardust">0</b> Stardust</div>
-          <div class="nebula-pill" role="button" tabindex="0" title="Open your Orbital Station — produces Nebula even while away" id="start-nebula-pill">⬡ <b id="start-nebula">0</b> <span class="nb-rate" id="start-nebula-rate"></span></div>
+          <div class="stardust-pill" title="Stardust — earn it in runs, spend it in the Hangar" data-i18n-title="start.stardustTitle">✦ <b id="start-stardust">0</b> <span data-i18n="word.stardust">Stardust</span></div>
+          <div class="nebula-pill" role="button" tabindex="0" title="Open your Orbital Station — produces Nebula even while away" data-i18n-title="start.nebulaTitle" id="start-nebula-pill">⬡ <b id="start-nebula">0</b> <span class="nb-rate" id="start-nebula-rate"></span></div>
         </div>
         <h1 class="title">COSMIC SURVIVOR</h1>
-        <p class="tagline">Hold the line against the alien swarm. Stack weapons. Evolve. Overdrive.</p>
+        <p class="tagline" data-i18n="start.tagline">Hold the line against the alien swarm. Stack weapons. Evolve. Overdrive.</p>
         <div class="features">
-          <div><b>🔫 Arsenal</b><span>Auto-fire up to 6 weapons at once — then evolve them into legendary forms.</span></div>
-          <div><b>🔆 Overdrive</b><span>Chain kills to fill the meter and unleash a damage &amp; fire-rate rampage.</span></div>
-          <div><b>✴️ Resonance</b><span>Imbue Fire · Cryo · Shock · Void for screen-clearing reactions.</span></div>
+          <div><b data-i18n="start.feature.arsenal.t">🔫 Arsenal</b><span data-i18n="start.feature.arsenal.d">Auto-fire up to 6 weapons at once — then evolve them into legendary forms.</span></div>
+          <div><b data-i18n="start.feature.overdrive.t">🔆 Overdrive</b><span data-i18n="start.feature.overdrive.d">Chain kills to fill the meter and unleash a damage &amp; fire-rate rampage.</span></div>
+          <div><b data-i18n="start.feature.resonance.t">✴️ Resonance</b><span data-i18n="start.feature.resonance.d">Imbue Fire · Cryo · Shock · Void for screen-clearing reactions.</span></div>
         </div>
         <div class="ship-pick">
-          <button id="ship-prev" class="ship-nav" aria-label="Previous ship">◀</button>
+          <button id="ship-prev" class="ship-nav" aria-label="Previous ship" data-i18n-aria="start.prevShip">◀</button>
           <div class="ship-pick-mid">
             <div class="ship-pick-icon" id="ship-pick-icon">🛸</div>
             <div class="ship-pick-info">
@@ -86,25 +86,28 @@
               <div class="ship-pick-tag" id="ship-pick-tag">Balanced · reliable all-rounder</div>
             </div>
           </div>
-          <button id="ship-next" class="ship-nav" aria-label="Next ship">▶</button>
+          <button id="ship-next" class="ship-nav" aria-label="Next ship" data-i18n-aria="start.nextShip">▶</button>
         </div>
         <div class="start-actions">
-          <button id="play-btn" class="btn">▶ LAUNCH</button>
-          <button id="station-btn" class="btn btn-ghost">🛰 STATION</button>
-          <button id="hangar-btn" class="btn btn-ghost">🛠 HANGAR</button>
+          <button id="play-btn" class="btn" data-i18n="start.launch">▶ LAUNCH</button>
+          <button id="station-btn" class="btn btn-ghost" data-i18n="start.station">🛰 STATION</button>
+          <button id="hangar-btn" class="btn btn-ghost" data-i18n="start.hangar">🛠 HANGAR</button>
         </div>
-        <div id="start-directives" class="start-directives hidden" title="Active challenge Directives — more risk, more Stardust"></div>
+        <div id="start-directives" class="start-directives hidden" title="Active challenge Directives — more risk, more Stardust" data-i18n-title="start.directivesTitle"></div>
         <div class="controls-hint">
-          <span><kbd>WASD</kbd> Move</span>
-          <span><kbd>Space</kbd> Dash</span>
-          <span><kbd>Shift</kbd> Singularity</span>
-          <span><kbd>P</kbd> Pause</span>
-          <span>Auto-fire at the nearest enemy</span>
+          <span><kbd>WASD</kbd> <span data-i18n="hint.move">Move</span></span>
+          <span><kbd>Space</kbd> <span data-i18n="hint.dash">Dash</span></span>
+          <span><kbd>Shift</kbd> <span data-i18n="hint.singularity">Singularity</span></span>
+          <span><kbd>P</kbd> <span data-i18n="hint.pause">Pause</span></span>
+          <span data-i18n="hint.autofire">Auto-fire at the nearest enemy</span>
         </div>
         <div class="settings-row">
-          <label><input type="checkbox" id="opt-music" checked /> Music</label>
-          <label><input type="checkbox" id="opt-sfx" checked /> Sound</label>
-          <label><input type="checkbox" id="opt-shake" checked /> Screen shake</label>
+          <label><input type="checkbox" id="opt-music" checked /> <span data-i18n="opt.music">Music</span></label>
+          <label><input type="checkbox" id="opt-sfx" checked /> <span data-i18n="opt.sfx">Sound</span></label>
+          <label><input type="checkbox" id="opt-shake" checked /> <span data-i18n="opt.shake">Screen shake</span></label>
+          <label class="lang-field"><span data-i18n="opt.language">Language</span>
+            <select id="opt-lang" class="lang-select" aria-label="Language"></select>
+          </label>
         </div>
       </div>
     </div>
@@ -113,27 +116,27 @@
     <div id="hangar" class="overlay hidden">
       <div class="panel hangar-panel">
         <div class="hangar-head">
-          <h2 class="hangar-title">🛠 HANGAR</h2>
-          <div class="stardust-pill big">✦ <b id="hangar-stardust">0</b> Stardust</div>
+          <h2 class="hangar-title" data-i18n="hangar.title">🛠 HANGAR</h2>
+          <div class="stardust-pill big">✦ <b id="hangar-stardust">0</b> <span data-i18n="word.stardust">Stardust</span></div>
         </div>
         <div class="pilot-record" id="pilot-record">
-          <div class="rec"><span class="rec-k">Runs</span><b id="rec-runs">0</b></div>
-          <div class="rec"><span class="rec-k">Best</span><b id="rec-best">0</b></div>
-          <div class="rec"><span class="rec-k">Survived</span><b id="rec-time">0:00</b></div>
-          <div class="rec"><span class="rec-k">Kills</span><b id="rec-kills">0</b></div>
-          <div class="rec"><span class="rec-k">Lifetime ✦</span><b id="rec-ls">0</b></div>
+          <div class="rec"><span class="rec-k" data-i18n="rec.runs">Runs</span><b id="rec-runs">0</b></div>
+          <div class="rec"><span class="rec-k" data-i18n="rec.best">Best</span><b id="rec-best">0</b></div>
+          <div class="rec"><span class="rec-k" data-i18n="rec.survived">Survived</span><b id="rec-time">0:00</b></div>
+          <div class="rec"><span class="rec-k" data-i18n="rec.kills">Kills</span><b id="rec-kills">0</b></div>
+          <div class="rec"><span class="rec-k" data-i18n="rec.lifetime">Lifetime ✦</span><b id="rec-ls">0</b></div>
         </div>
         <div class="hangar-tabs">
-          <button id="tab-ships" class="tab active">STARFIGHTERS</button>
-          <button id="tab-meta" class="tab">ASCENSION</button>
-          <button id="tab-directives" class="tab">DIRECTIVES</button>
-          <button id="tab-codex" class="tab">CODEX</button>
+          <button id="tab-ships" class="tab active" data-i18n="tab.ships">STARFIGHTERS</button>
+          <button id="tab-meta" class="tab" data-i18n="tab.meta">ASCENSION</button>
+          <button id="tab-directives" class="tab" data-i18n="tab.directives">DIRECTIVES</button>
+          <button id="tab-codex" class="tab" data-i18n="tab.codex">CODEX</button>
         </div>
         <div id="hangar-ships" class="hangar-body ship-grid"></div>
         <div id="hangar-meta" class="hangar-body meta-grid hidden"></div>
         <div id="hangar-directives" class="hangar-body directive-grid hidden"></div>
         <div id="hangar-codex" class="hangar-body codex-grid hidden"></div>
-        <button id="hangar-close" class="btn">✔ DONE</button>
+        <button id="hangar-close" class="btn" data-i18n="hangar.done">✔ DONE</button>
       </div>
     </div>
 
@@ -141,27 +144,27 @@
     <div id="station" class="overlay hidden">
       <div class="panel station-panel">
         <div class="station-topbar">
-          <h2 class="station-title">🛰 ORBITAL STATION</h2>
+          <h2 class="station-title" data-i18n="st.title">🛰 ORBITAL STATION</h2>
           <div class="station-cash">
-            <div class="st-cur st-neb"><span class="st-k">⬡ Nebula</span><b id="station-nebula">0</b><span class="st-sub" id="station-rate">0.0/s</span></div>
-            <div class="st-cur st-core"><span class="st-k">🌀 Cores</span><b id="station-cores">0</b><span class="st-sub" id="station-core-mult">×1.00</span></div>
+            <div class="st-cur st-neb"><span class="st-k" data-i18n="st.nebula">⬡ Nebula</span><b id="station-nebula">0</b><span class="st-sub" id="station-rate">0.0/s</span></div>
+            <div class="st-cur st-core"><span class="st-k" data-i18n="st.cores">🌀 Cores</span><b id="station-cores">0</b><span class="st-sub" id="station-core-mult">×1.00</span></div>
           </div>
         </div>
         <!-- Active Surge frenzies (transient RNG buffs) show here, above the tabs -->
         <div id="station-buffs" class="station-buffs hidden" aria-live="polite"></div>
         <div class="station-tabs" role="tablist">
-          <button id="st-tab-mine" class="tab active" role="tab">⬡ MINE</button>
-          <button id="st-tab-gen" class="tab" role="tab">⚙ GENERATORS</button>
-          <button id="st-tab-cores" class="tab" role="tab">🌀 CORES</button>
-          <button id="st-tab-ascend" class="tab" role="tab">✦ COLLAPSE</button>
+          <button id="st-tab-mine" class="tab active" role="tab" data-i18n="st.tab.mine">⬡ MINE</button>
+          <button id="st-tab-gen" class="tab" role="tab" data-i18n="st.tab.gen">⚙ GENERATORS</button>
+          <button id="st-tab-cores" class="tab" role="tab" data-i18n="st.tab.cores">🌀 CORES</button>
+          <button id="st-tab-ascend" class="tab" role="tab" data-i18n="st.tab.ascend">✦ COLLAPSE</button>
         </div>
         <!-- MINE tab: the Cookie-Clicker "big cookie" lives here, in its own space,
              so the tap button no longer crowds out the upgrade lists. -->
         <div id="st-body-mine" class="station-body station-mine">
           <div class="station-tapzone">
-            <button id="station-tap" class="station-tap" aria-label="Mine Nebula">
+            <button id="station-tap" class="station-tap" aria-label="Mine Nebula" data-i18n-aria="st.mineAria">
               <span class="tap-core">⬡</span>
-              <span class="tap-label">MINE</span>
+              <span class="tap-label" data-i18n="st.mineLabel">MINE</span>
               <span class="tap-gain" id="station-tap-gain">+1 ⬡</span>
             </button>
             <div id="station-tapfx" class="station-tapfx" aria-hidden="true"></div>
@@ -171,7 +174,7 @@
         <div id="st-body-gen" class="station-body hidden"></div>
         <div id="st-body-cores" class="station-body hidden"></div>
         <div id="st-body-ascend" class="station-body hidden"></div>
-        <button id="station-close" class="btn">✔ DONE</button>
+        <button id="station-close" class="btn" data-i18n="st.done">✔ DONE</button>
         <!-- Surge orbs (golden-cookie-style RNG) spawn into this overlay layer -->
         <div id="station-surge" class="station-surge" aria-hidden="true"></div>
       </div>
@@ -181,28 +184,28 @@
     <!-- Level up draft -->
     <div id="levelup" class="overlay fit hidden">
       <div class="panel levelup-panel">
-        <h2 class="levelup-title">LEVEL&nbsp;UP</h2>
-        <p class="levelup-sub">Choose an augment</p>
+        <h2 class="levelup-title" data-i18n-html="levelup.title">LEVEL&nbsp;UP</h2>
+        <p class="levelup-sub" data-i18n="levelup.sub">Choose an augment</p>
         <div id="cards" class="cards"></div>
         <div class="draft-tools">
-          <button id="reroll-btn" class="btn btn-ghost btn-sm">🎲 Reroll <b id="reroll-n">0</b></button>
-          <button id="banish-btn" class="btn btn-ghost btn-sm">🚫 Banish <b id="banish-n">0</b></button>
+          <button id="reroll-btn" class="btn btn-ghost btn-sm"><span data-i18n="levelup.reroll">🎲 Reroll</span> <b id="reroll-n">0</b></button>
+          <button id="banish-btn" class="btn btn-ghost btn-sm"><span data-i18n="levelup.banish">🚫 Banish</span> <b id="banish-n">0</b></button>
         </div>
-        <div class="draft-hint">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> to pick · <kbd>R</kbd> reroll · <kbd>B</kbd> banish</div>
+        <div class="draft-hint" data-i18n-html="levelup.hint">Press <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> to pick · <kbd>R</kbd> reroll · <kbd>B</kbd> banish</div>
       </div>
     </div>
 
     <!-- Pause -->
     <div id="pause" class="overlay fit hidden">
       <div class="panel">
-        <h2>PAUSED</h2>
+        <h2 data-i18n="pause.title">PAUSED</h2>
         <div id="pause-stats" class="run-stats"></div>
-        <button id="resume-btn" class="btn">Resume</button>
-        <button id="quit-btn" class="btn btn-ghost">Abandon Run</button>
+        <button id="resume-btn" class="btn" data-i18n="pause.resume">Resume</button>
+        <button id="quit-btn" class="btn btn-ghost" data-i18n="pause.quit">Abandon Run</button>
         <div class="settings-row">
-          <label><input type="checkbox" id="opt-music2" /> Music</label>
-          <label><input type="checkbox" id="opt-sfx2" /> Sound</label>
-          <label><input type="checkbox" id="opt-shake2" /> Screen shake</label>
+          <label><input type="checkbox" id="opt-music2" /> <span data-i18n="opt.music">Music</span></label>
+          <label><input type="checkbox" id="opt-sfx2" /> <span data-i18n="opt.sfx">Sound</span></label>
+          <label><input type="checkbox" id="opt-shake2" /> <span data-i18n="opt.shake">Screen shake</span></label>
         </div>
       </div>
     </div>
@@ -210,15 +213,15 @@
     <!-- Game over -->
     <div id="gameover" class="overlay fit hidden">
       <div class="panel">
-        <h2 id="go-title">SYSTEM&nbsp;FAILURE</h2>
-        <div id="go-newbest" class="newbest hidden">★ NEW BEST ★</div>
+        <h2 id="go-title" data-i18n-html="go.title">SYSTEM&nbsp;FAILURE</h2>
+        <div id="go-newbest" class="newbest hidden" data-i18n="go.newbest">★ NEW BEST ★</div>
         <div id="go-score" class="go-score">0</div>
         <div id="go-stardust" class="go-stardust">✦ +0 Stardust</div>
         <div id="go-nebula" class="go-nebula hidden">⬡ +0 Nebula</div>
         <div id="go-commends" class="go-commends hidden"></div>
         <div id="go-stats" class="run-stats"></div>
-        <button id="retry-btn" class="btn">↻ RETRY</button>
-        <button id="go-hangar-btn" class="btn btn-ghost">🛠 HANGAR</button>
+        <button id="retry-btn" class="btn" data-i18n="go.retry">↻ RETRY</button>
+        <button id="go-hangar-btn" class="btn btn-ghost" data-i18n="go.hangar">🛠 HANGAR</button>
       </div>
     </div>
   </div>

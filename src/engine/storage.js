@@ -27,7 +27,7 @@ const DEFAULT = {
   directives: [],       // active challenge-directive ids (carried across runs)
   // ---- Idle layer ("Orbital Station") -----------------------------------
   idle: createIdleState(), // Nebula/Cores economy; see game/idle.js
-  settings: { muted: false, shake: true, music: true },
+  settings: { muted: false, shake: true, music: true, lang: 'en' },
 };
 
 function load() {
