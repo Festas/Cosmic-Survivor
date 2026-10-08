@@ -174,7 +174,7 @@ const STR = {
   ],
 
   // ---- Level up ----
-  'levelup.title': ['LEVEL&nbsp;UP', 'STUFEN&shy;AUFSTIEG'],
+  'levelup.title': ['LEVEL\u00a0UP', 'STUFEN\u00adAUFSTIEG'],
   'levelup.sub': ['Choose an augment', 'Wähle eine Verbesserung'],
   'levelup.reroll': ['🎲 Reroll', '🎲 Neu'],
   'levelup.banish': ['🚫 Banish', '🚫 Verbannen'],
@@ -206,7 +206,7 @@ const STR = {
   'pause.quit': ['Abandon Run', 'Lauf abbrechen'],
 
   // ---- Game over ----
-  'go.title': ['SYSTEM&nbsp;FAILURE', 'SYSTEM&shy;AUSFALL'],
+  'go.title': ['SYSTEM\u00a0FAILURE', 'SYSTEM\u00adAUSFALL'],
   'go.newbest': ['★ NEW BEST ★', '★ NEUER REKORD ★'],
   'go.retry': ['↻ RETRY', '↻ NOCHMAL'],
   'go.hangar': ['🛠 HANGAR', '🛠 HANGAR'],

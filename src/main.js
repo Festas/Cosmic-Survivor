@@ -123,10 +123,28 @@ wireSetting(['opt-shake', 'opt-shake2'], 'shake', (v) => { store.setSetting('sha
 // (cards, station, HUD) is re-rendered separately by applyLanguage().
 function applyStaticI18n(root = document) {
   root.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.getAttribute('data-i18n')); });
-  root.querySelectorAll('[data-i18n-html]').forEach((el) => { el.innerHTML = t(el.getAttribute('data-i18n-html')); });
+  root.querySelectorAll('[data-i18n-kbd]').forEach((el) => { setKbdMarkup(el, t(el.getAttribute('data-i18n-kbd'))); });
   root.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.getAttribute('data-i18n-title')); });
   root.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
   root.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.getAttribute('data-i18n-ph')); });
+}
+
+// Render a restricted i18n template that may contain <kbd>…</kbd> tags without using
+// innerHTML: only <kbd> is recognised and all other content is inserted verbatim as
+// text nodes, so there is no HTML-injection surface even if the string ever changes.
+function setKbdMarkup(el, str) {
+  el.textContent = '';
+  const re = /<kbd>([\s\S]*?)<\/kbd>/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(str))) {
+    if (m.index > last) el.appendChild(document.createTextNode(str.slice(last, m.index)));
+    const kbd = document.createElement('kbd');
+    kbd.textContent = m[1];
+    el.appendChild(kbd);
+    last = re.lastIndex;
+  }
+  if (last < str.length) el.appendChild(document.createTextNode(str.slice(last)));
 }
 
 // Re-skin the entire live UI for the current language: static markup + whichever
