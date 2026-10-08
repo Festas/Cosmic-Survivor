@@ -52,9 +52,10 @@ function G(id, name, icon, desc, opts) {
   };
 }
 
-// Eight ascending generators. Early ones are cheap trickle; later ones are the
+// Sixteen ascending generators. Early ones are cheap trickle; later ones are the
 // long-haul engine that makes Prestige worthwhile and give post-Collapse runs
-// something to keep chasing.
+// something to keep chasing. baseCost and rate climb strictly monotonically so
+// there is always a meaningful next tier to unlock.
 export const GENERATORS = [
   G('probe', 'Survey Probe', '🛰️', 'A lonely drone sipping stray particles.', { baseCost: 15, rate: 0.1 }),
   G('collector', 'Dust Collector', '📡', 'Sweeps the debris field for Nebula.', { baseCost: 120, rate: 0.8 }),
@@ -64,6 +65,14 @@ export const GENERATORS = [
   G('singtap', 'Singularity Tap', '🕳️', 'Siphons a micro black hole. Obscene yield.', { baseCost: 2000000, rate: 1000 }),
   G('warpforge', 'Warp Forge', '🌌', 'Folds spacetime to mint Nebula wholesale.', { baseCost: 24000000, rate: 5500 }),
   G('quasar', 'Quasar Engine', '💫', 'Harnesses a galactic core. Reality strains.', { baseCost: 300000000, rate: 32000 }),
+  G('pulsar', 'Pulsar Array', '📍', 'A lighthouse of neutron pulses pumps Nebula.', { baseCost: 3600000000, rate: 180000 }),
+  G('antimatter', 'Antimatter Silo', '🔆', 'Annihilates stored antimatter for staggering yield.', { baseCost: 44000000000, rate: 1000000 }),
+  G('wormhole', 'Wormhole Nexus', '🌀', 'Imports raw Nebula from a parallel sky.', { baseCost: 540000000000, rate: 5600000 }),
+  G('galaxyforge', 'Galaxy Forge', '🌠', 'Spins up young galaxies as a refinery line.', { baseCost: 6800000000000, rate: 32000000 }),
+  G('darkstar', 'Dark Star Engine', '⭐', 'Burns a shrouded star no telescope can see.', { baseCost: 85000000000000, rate: 180000000 }),
+  G('cosmicloom', 'Cosmic Loom', '🧵', 'Weaves the cosmic web itself into dense Nebula.', { baseCost: 1100000000000000, rate: 1000000000 }),
+  G('realityengine', 'Reality Engine', '💠', 'Edits physical constants to overproduce.', { baseCost: 14000000000000000, rate: 6000000000 }),
+  G('infinityspire', 'Infinity Spire', '🗼', 'A spire piercing the edge of everything. Endless output.', { baseCost: 180000000000000000, rate: 36000000000 }),
 ];
 
 export const GENERATOR_BY_ID = Object.create(null);
@@ -198,6 +207,9 @@ export function createPerkEffects() {
     startNebulaFrac: 0,    // fraction of pre-Collapse lifetime Nebula seeded back (Collapse Memory)
     surgeChanceMul: 1,     // × Surge spawn frequency (Lucky Resonance)
     surgeRewardMul: 1,     // × Surge payout (Lucky Resonance)
+    surgeDurationMul: 1,   // × Surge frenzy duration (Temporal Lens)
+    offlineRateMul: 1,     // × offline/AFK production rate (Dormant Reactor)
+    nebulaRunMul: 1,       // × the Nebula burst granted at the end of a run (Flux Siphon)
   };
 }
 
@@ -257,6 +269,46 @@ export const PRESTIGE_UPGRADES = [
     max: 6, baseCost: 2, costGrowth: 1.85,
     apply: (fx, l) => { fx.surgeChanceMul *= 1 + 0.25 * l; fx.surgeRewardMul *= 1 + 0.2 * l; },
     effect: (l) => `+${Math.round(0.25 * l * 100)}% Surges · +${Math.round(0.2 * l * 100)}% payout`,
+  }),
+  P('quantum_resonance', 'Quantum Resonance', '🧬', '+18% Nebula production per level', {
+    max: 10, baseCost: 4, costGrowth: 1.95,
+    apply: (fx, l) => { fx.prodMul *= 1 + 0.18 * l; },
+    effect: (l) => `+${Math.round(0.18 * l * 100)}% production`,
+  }),
+  P('overcharged_beam', 'Overcharged Beam', '⚡', '+40% manual-tap yield per level', {
+    max: 8, baseCost: 3, costGrowth: 1.8,
+    apply: (fx, l) => { fx.clickMul *= 1 + 0.4 * l; },
+    effect: (l) => `+${Math.round(0.4 * l * 100)}% tap yield`,
+  }),
+  P('bulk_fabricator', 'Bulk Fabricator', '🏭', '−5% generator cost per level', {
+    max: 8, baseCost: 4, costGrowth: 2.0,
+    apply: (fx, l) => { fx.costMul *= Math.pow(0.95, l); },
+    effect: (l) => `−${Math.round((1 - Math.pow(0.95, l)) * 100)}% generator cost`,
+  }),
+  P('milestone_overdrive', 'Milestone Overdrive', '📊', '+20% to each generator milestone per level', {
+    max: 6, baseCost: 5, costGrowth: 2.0,
+    apply: (fx, l) => { fx.milestoneBonus += 0.2 * l * MILESTONE_BONUS; },
+    effect: (l) => `+${Math.round(0.2 * l * 100)}% milestone power`,
+  }),
+  P('chronal_reservoir', 'Chronal Reservoir', '🕰️', '+3h offline catch-up per level', {
+    max: 8, baseCost: 4, costGrowth: 1.85,
+    apply: (fx, l) => { fx.offlineCapSeconds += 3 * 3600 * l; },
+    effect: (l) => `+${3 * l}h offline`,
+  }),
+  P('temporal_lens', 'Temporal Lens', '🔭', '+25% Surge frenzy duration per level', {
+    max: 6, baseCost: 3, costGrowth: 1.9,
+    apply: (fx, l) => { fx.surgeDurationMul *= 1 + 0.25 * l; },
+    effect: (l) => `+${Math.round(0.25 * l * 100)}% frenzy duration`,
+  }),
+  P('dormant_reactor', 'Dormant Reactor', '🌙', '+15% offline production per level', {
+    max: 6, baseCost: 4, costGrowth: 1.95,
+    apply: (fx, l) => { fx.offlineRateMul *= 1 + 0.15 * l; },
+    effect: (l) => `+${Math.round(0.15 * l * 100)}% offline output`,
+  }),
+  P('flux_siphon', 'Flux Siphon', '🧪', '+20% end-of-run Nebula burst per level', {
+    max: 8, baseCost: 3, costGrowth: 1.85,
+    apply: (fx, l) => { fx.nebulaRunMul *= 1 + 0.2 * l; },
+    effect: (l) => `+${Math.round(0.2 * l * 100)}% run Nebula`,
   }),
 ];
 
@@ -451,6 +503,56 @@ export const SPECIAL_UPGRADES = [
     apply: (b, l) => { b.pickupMul *= 1 + 0.14 * l; },
     effect: (l) => `+${Math.round(0.14 * l * 100)}% pickup range`,
   }),
+  X('kinetic_amplifier', 'Kinetic Amplifier', '🎇', '+15% crit damage per level', {
+    max: 8, baseCost: 3, costGrowth: 1.7,
+    apply: (b, l) => { b.critMultAdd += 0.15 * l; },
+    effect: (l) => `+${Math.round(0.15 * l * 100)}% crit damage`,
+  }),
+  X('phase_shift', 'Phase Shift', '🌫️', '+3% dodge chance per level', {
+    max: 8, baseCost: 3, costGrowth: 1.75,
+    apply: (b, l) => { b.dodgeAdd += 0.03 * l; },
+    effect: (l) => `+${Math.round(0.03 * l * 100)}% dodge`,
+  }),
+  X('vampiric_core', 'Vampiric Core', '🩸', '+2% lifesteal per level', {
+    max: 6, baseCost: 4, costGrowth: 1.8,
+    apply: (b, l) => { b.lifestealAdd += 0.02 * l; },
+    effect: (l) => `+${Math.round(0.02 * l * 100)}% lifesteal`,
+  }),
+  X('blast_capacitor', 'Blast Capacitor', '💣', '+8% area of effect per level', {
+    max: 6, baseCost: 3, costGrowth: 1.7,
+    apply: (b, l) => { b.areaMul *= 1 + 0.08 * l; },
+    effect: (l) => `+${Math.round(0.08 * l * 100)}% area`,
+  }),
+  X('piercing_rounds', 'Piercing Rounds', '🏹', '+1 projectile pierce per level', {
+    max: 4, baseCost: 4, costGrowth: 2.0,
+    apply: (b, l) => { b.pierceAdd += l; },
+    effect: (l) => `+${l} pierce`,
+  }),
+  X('guardian_protocol', 'Guardian Protocol', '🛡️', '+3 armor per level', {
+    max: 8, baseCost: 2, costGrowth: 1.65,
+    apply: (b, l) => { b.armorAdd += 3 * l; },
+    effect: (l) => `+${3 * l} armor`,
+  }),
+  X('nanite_regeneration', 'Nanite Regeneration', '💉', '+1 HP/s regen per level', {
+    max: 8, baseCost: 2, costGrowth: 1.65,
+    apply: (b, l) => { b.regenAdd += 1 * l; },
+    effect: (l) => `+${1 * l} HP/s regen`,
+  }),
+  X('fortune_matrix', 'Fortune Matrix', '🎰', '+6% luck per level', {
+    max: 6, baseCost: 3, costGrowth: 1.7,
+    apply: (b, l) => { b.luckAdd += 0.06 * l; },
+    effect: (l) => `+${Math.round(0.06 * l * 100)}% luck`,
+  }),
+  X('event_horizon', 'Event Horizon', '🕳️', '+12% Singularity charge rate per level', {
+    max: 6, baseCost: 3, costGrowth: 1.75,
+    apply: (b, l) => { b.singChargeMul *= 1 + 0.12 * l; },
+    effect: (l) => `+${Math.round(0.12 * l * 100)}% Singularity charge`,
+  }),
+  X('phoenix_core', 'Phoenix Core', '🔥', '+1 revive per level', {
+    max: 3, baseCost: 12, costGrowth: 2.4,
+    apply: (b, l) => { b.revives += l; },
+    effect: (l) => `+${l} revive${l === 1 ? '' : 's'}`,
+  }),
 ];
 
 export const SPECIAL_BY_ID = Object.create(null);
@@ -503,11 +605,16 @@ export const SURGE_LIFETIME = 13;
 // how to apply it. Timed buffs carry a `mult` and `duration` (seconds); instant
 // rewards are computed from the live snapshot in rollSurge().
 export const SURGE_TYPES = [
-  { id: 'lucky',        name: 'Lucky Nebula',  icon: '🍀', kind: 'nebula', weight: 46 },
-  { id: 'frenzy',       name: 'Production Frenzy', icon: '⚡', kind: 'prod', weight: 26, mult: 7, duration: 45 },
-  { id: 'click_frenzy', name: 'Click Frenzy',  icon: '👆', kind: 'click', weight: 18, mult: 11, duration: 15 },
+  { id: 'lucky',        name: 'Lucky Nebula',  icon: '🍀', kind: 'nebula', weight: 40, payoutMul: 1 },
+  { id: 'frenzy',       name: 'Production Frenzy', icon: '⚡', kind: 'prod', weight: 24, mult: 7, duration: 45 },
+  { id: 'click_frenzy', name: 'Click Frenzy',  icon: '👆', kind: 'click', weight: 16, mult: 11, duration: 15 },
   { id: 'bloom',        name: 'Resonance Bloom', icon: '🌸', kind: 'prod', weight: 8, mult: 3, duration: 20 },
-  { id: 'core_cache',   name: 'Core Cache',    icon: '💠', kind: 'core', weight: 2 },
+  { id: 'windfall',     name: 'Stellar Windfall', icon: '🌟', kind: 'nebula', weight: 10, payoutMul: 2.4 },
+  { id: 'overflow',     name: 'Nebula Overflow', icon: '🌊', kind: 'nebula', weight: 6, payoutMul: 4.5 },
+  { id: 'supernova',    name: 'Supernova Frenzy', icon: '💥', kind: 'prod', weight: 5, mult: 15, duration: 30 },
+  { id: 'overclock',    name: 'Overclock Burst', icon: '🔥', kind: 'click', weight: 5, mult: 20, duration: 12 },
+  { id: 'core_cache',   name: 'Core Cache',    icon: '💠', kind: 'core', weight: 2, cores: 1 },
+  { id: 'core_vault',   name: 'Core Vault',    icon: '🏦', kind: 'core', weight: 1, cores: 3 },
 ];
 
 export const SURGE_BY_ID = Object.create(null);
@@ -534,20 +641,24 @@ export function pickSurgeType(roll = 0) {
 export function rollSurge(roll = 0, ctx = {}) {
   const { rate = 0, nebula = 0, perks = createPerkEffects() } = ctx;
   const rewardMul = Math.max(1, perks.surgeRewardMul || 1);
+  const durationMul = Math.max(1, perks.surgeDurationMul || 1);
   const type = pickSurgeType(roll);
   const base = { id: type.id, name: type.name, icon: type.icon, kind: type.kind };
   if (type.kind === 'prod' || type.kind === 'click') {
-    // A timed frenzy: multiply production (or taps) for a fixed window.
-    return { ...base, mult: type.mult, duration: type.duration };
+    // A timed frenzy: multiply production (or taps) for a fixed window, widened
+    // by the Temporal Lens perk (durationMul).
+    return { ...base, mult: type.mult, duration: Math.round(type.duration * durationMul) };
   }
   if (type.kind === 'core') {
-    // Rare jackpot: a Core straight into the bank (never less than one).
-    return { ...base, cores: Math.max(1, Math.round(rewardMul)) };
+    // Rare jackpot: Cores straight into the bank (type.cores scales the payout).
+    return { ...base, cores: Math.max(1, Math.round((type.cores || 1) * rewardMul)) };
   }
   // Lucky Nebula: the larger of "a chunk of the bank" and "a burst of production",
-  // with a sane floor so an empty/idle Station still gets a worthwhile pop.
-  const fromBank = nebula * 0.15;
-  const fromRate = rate * 900; // ~15 minutes of production
-  const windfall = Math.max(fromBank, fromRate, 25) * rewardMul;
+  // with a sane floor so an empty/idle Station still gets a worthwhile pop. A
+  // per-type payoutMul lets richer Nebula surges hit harder.
+  const payoutMul = type.payoutMul || 1;
+  const fromBank = nebula * 0.15 * payoutMul;
+  const fromRate = rate * 900 * payoutMul; // ~15 minutes of production
+  const windfall = Math.max(fromBank, fromRate, 25 * payoutMul) * rewardMul;
   return { ...base, nebula: Math.max(1, Math.floor(windfall)) };
 }

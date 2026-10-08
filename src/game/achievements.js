@@ -53,6 +53,18 @@ export const ACHIEVEMENTS = [
     (c) => n(c.directives) >= 2),
   A('defiant', 'Defiant', '🔥', 'Finish a run with 4+ Directives active.', 100,
     (c) => n(c.directives) >= 4),
+  A('survive_20', 'Unbreakable', '🕰️', 'Survive for 20 minutes in one run.', 180,
+    (c) => n(c.time) >= 1200),
+  A('ascendant_30', 'Transcendent', '🌠', 'Reach character level 30 in a single run.', 90,
+    (c) => n(c.level) >= 30),
+  A('scorer_250k', 'Mythic', '💎', 'Score 250,000 points in a single run.', 200,
+    (c) => n(c.score) >= 250000),
+  A('chain_reactor', 'Chain Reactor', '🧪', 'Trigger 120 elemental reactions in one run.', 70,
+    (c) => n(c.reactions) >= 120),
+  A('boss_rush', 'Boss Rush', '👹', 'Destroy 5 bosses in a single run.', 110,
+    (c) => n(c.bossKills) >= 5),
+  A('slayer_50k', 'Annihilator', '💀', 'Defeat 50,000 enemies across all runs.', 220,
+    (c) => n(c.totalKills) >= 50000),
 ];
 
 export const ACHIEVEMENT_BY_ID = Object.create(null);

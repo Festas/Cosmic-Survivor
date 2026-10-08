@@ -45,6 +45,7 @@ export const ITEMS = [
   I('area', 'Resonance Lens', 'rare', '🔷', '+18% blast & field radius', (s) => { s.areaMul *= 1.18; }, { maxStacks: 4, tags: ['area'] }),
   I('homing', 'Targeting Array', 'rare', '📡', '+22% range & guided shots', (s) => { s.range *= 1.22; s.homing += 1.6; }, { maxStacks: 3 }),
   I('bigbullets', 'Heavy Slugs', 'common', '⬤', '+35% bullet size & +12% knockback', (s) => { s.bulletRadius *= 1.35; s.knockback *= 1.12; }, { maxStacks: 3 }),
+  I('velocity', 'Overclocked Capacitor', 'rare', '⏩', '+16% projectile speed & +16% range', (s) => { s.projectileSpeedMul *= 1.16; s.range *= 1.16; }, { maxStacks: 4 }),
 
   // ---- Elemental imbues (enable reactions + weapon evolutions) ----------
   I('imbue_fire', 'Plasma Rounds', 'rare', '🔥', 'Shots Ignite enemies (burn)', (s) => { s.imbue.fire = Math.min(1, s.imbue.fire + 0.6); }, { maxStacks: 2, tags: ['element'] }),

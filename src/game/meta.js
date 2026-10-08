@@ -27,6 +27,14 @@ export function createMetaBonus() {
     singChargeMul: 1,
     revives: 0,
     stardustMul: 1,
+    // Extra run-stat fields, neutral by default. Currently only the Orbital
+    // Station's premium "Core" specials (game/idle.js) feed these, but they live
+    // here so World.applyLoadout has a single bonus shape to read.
+    critMultAdd: 0,   // + crit damage multiplier
+    dodgeAdd: 0,      // + dodge chance (capped in applyLoadout)
+    lifestealAdd: 0,  // + lifesteal fraction
+    areaMul: 1,       // × AoE / explosion radius
+    pierceAdd: 0,     // + projectile pierce count
   };
 }
 
@@ -101,6 +109,16 @@ export const META_UPGRADES = [
     max: 5, baseCost: 80, costGrowth: 1.8,
     apply: (b, l) => { b.stardustMul *= 1 + 0.12 * l; },
     effect: (l) => `+${Math.round(0.12 * l * 100)}% Stardust`,
+  }),
+  M('evasion', 'Evasive Servos', '👻', '+3% dodge chance per level', {
+    max: 6, baseCost: 60, costGrowth: 1.6,
+    apply: (b, l) => { b.dodgeAdd += 0.03 * l; },
+    effect: (l) => `+${Math.round(0.03 * l * 100)}% dodge`,
+  }),
+  M('siphon', 'Siphon Reactor', '🩸', '+1% lifesteal per level', {
+    max: 5, baseCost: 70, costGrowth: 1.7,
+    apply: (b, l) => { b.lifestealAdd += 0.01 * l; },
+    effect: (l) => `+${(0.01 * l * 100).toFixed(0)}% lifesteal`,
   }),
   M('phoenix', 'Phoenix Protocol', '🔥', 'Revive once per run, restoring half HP', {
     max: 1, baseCost: 500, costGrowth: 2,

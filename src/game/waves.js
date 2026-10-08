@@ -34,7 +34,7 @@ export const THEMES = [
   },
   {
     id: 'amber', name: 'Amber Legion', boss: 'siegemarshal',
-    roster: [['crab', 7], ['sentinel', 3], ['mortar', 3], ['brute', 3]],
+    roster: [['crab', 7], ['sentinel', 3], ['mortar', 3], ['bulwark', 4], ['brute', 3]],
     bg: { bg0: '#0c0a05', bg1: '#241a08', nebula: ['rgba(200,150,40,0.18)', 'rgba(200,110,40,0.16)', 'rgba(160,100,30,0.16)'], accent: '#ffd23d' },
   },
   {
@@ -64,7 +64,7 @@ export const THEMES = [
   },
   {
     id: 'dread', name: 'Dread Nemesis', boss: 'nemesis',
-    roster: [['dasher', 6], ['weaver', 5], ['mortar', 4], ['bomber', 4], ['sentinel', 3]],
+    roster: [['dasher', 6], ['weaver', 5], ['mortar', 4], ['bomber', 4], ['bulwark', 3], ['sentinel', 3]],
     bg: { bg0: '#0a0608', bg1: '#1e0a12', nebula: ['rgba(200,40,60,0.22)', 'rgba(210,210,210,0.12)', 'rgba(140,30,50,0.18)'], accent: '#ff5d7a' },
   },
 ];

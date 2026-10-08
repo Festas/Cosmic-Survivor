@@ -53,6 +53,15 @@ test('applying an item mutates stats', () => {
   assert.ok(stats.weaponDamageMul > 1);
 });
 
+test('Overclocked Capacitor speeds up and extends projectile reach', () => {
+  const it = ITEM_BY_ID.velocity;
+  assert.ok(it, 'velocity item should exist');
+  const stats = mockStats({ projectileSpeedMul: 1, range: 400 });
+  it.apply(stats);
+  assert.ok(stats.projectileSpeedMul > 1, 'projectile speed increases');
+  assert.ok(stats.range > 400, 'range increases');
+});
+
 test('isItemAvailable blocks items that hit maxStacks', () => {
   const it = ITEM_BY_ID.haste; // maxStacks 6
   const p = mockPlayer();

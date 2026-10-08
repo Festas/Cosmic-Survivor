@@ -517,6 +517,22 @@ export const ENEMY_TYPES = {
       }
     },
   },
+  // Armored frontliner: advances behind its guns and unloads a wide aimed volley,
+  // punishing players who sit still in its firing arc. Heavier than the other
+  // shooters (a 5-shot spread), so it reads as a mini-siege unit, not a harrier.
+  bulwark: {
+    key: 'bulwark', name: 'Bulwark', hp: 64, speed: 64, radius: 17, damage: 13, xp: 3,
+    color: COLORS.invAmber, shape: 'hex',
+    update(e, dt, world) {
+      steerTo(e, world.player.x, world.player.y, dt, 0.7);
+      e.volleyT = (e.volleyT ?? randRange(1.4, 2.6)) - dt;
+      if (e.volleyT <= 0 && dist(e.x, e.y, world.player.x, world.player.y) < 560) {
+        e.volleyT = randRange(2, 3);
+        aimedSpread(world, e, 5, 0.14, 260, e.damage, COLORS.invAmber);
+        world.audio?.play('espit');
+      }
+    },
+  },
 };
 
 // Per-boss `cfg` for the shared bossThink brain, hoisted to module scope so the
@@ -810,6 +826,7 @@ const SPAWN_TABLE = [
   ['brute', 80, (t) => 2 + t * 0.01],
   ['seeder', 60, (t) => 3 + t * 0.01],
   ['sentinel', 90, (t) => 2 + t * 0.008],
+  ['bulwark', 85, (t) => 2 + t * 0.008],
 ];
 
 export function pickEnemyType(t, r = rand) {

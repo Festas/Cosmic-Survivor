@@ -70,3 +70,16 @@ test('isShipUnlocked treats free ships and owned ids as unlocked', () => {
   assert.ok(!isShipUnlocked(SHIP_BY_ID.striker, []), 'paid ship locked by default');
   assert.ok(isShipUnlocked(SHIP_BY_ID.striker, ['striker']), 'owned ship unlocked');
 });
+
+test('Frostbite is a cryo bruiser that opens with the Hailstorm', () => {
+  const frost = SHIP_BY_ID.frostbite;
+  assert.ok(frost, 'frostbite ship should exist');
+  assert.equal(frost.weapon, 'hail');
+  assert.ok(WEAPON_BY_ID.hail && !WEAPON_BY_ID.hail.evolved, 'hail must be a real base weapon');
+  const base = createStats();
+  const s = createStats(); frost.apply(s);
+  assert.ok(s.imbue.cryo > base.imbue.cryo, 'frostbite imbues Cryo');
+  assert.ok(s.maxHp > base.maxHp, 'frostbite is tankier');
+  assert.ok(s.moveSpeed < base.moveSpeed, 'frostbite trades speed for bulk');
+  assert.ok(s.elementMul > base.elementMul, 'frostbite boosts elemental power');
+});

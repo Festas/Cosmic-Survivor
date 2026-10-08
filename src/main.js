@@ -820,6 +820,7 @@ function startRun() {
     metaLevels: store.getMeta(),
     directives: store.getDirectives().slice(),
     idleSpecial: store.getIdle().special,
+    idleNebulaMul: computePerks(store.getIdle().prestige).nebulaRunMul,
   });
   bindWorld();
   resize();
@@ -1195,7 +1196,9 @@ function catchUpOffline(announce = true) {
   const nowMs = Date.now();
   if (idle.lastTick > 0) {
     const seconds = (nowMs - idle.lastTick) / 1000;
-    const rate = totalRate(idle, store.getRunProfile());
+    const perks = computePerks(idle.prestige);
+    // The Dormant Reactor perk lifts offline/AFK production specifically.
+    const rate = totalRate(idle, store.getRunProfile()) * (perks.offlineRateMul || 1);
     const cap = offlineCapSeconds(idle.prestige);
     const gain = Math.floor(offlineGain(rate, seconds, cap));
     if (gain > 0) {

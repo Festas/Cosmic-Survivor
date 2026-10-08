@@ -438,6 +438,57 @@ export const WEAPONS = [
       world.audio?.play('reaction');
     },
   }),
+
+  // 10) Hailstorm — a wide forward hail of chilling shards. -----------------
+  W({
+    id: 'hail', name: 'Hailstorm', rarity: 'rare', icon: '🌨️',
+    desc: 'Sprays a wide hail of frozen shards that pepper and chill the swarm.',
+    baseCd: 0.5, dmgMul: 0.5, lvlDmg: 0.16,
+    evolve: 'blizzard', req: (s) => s.imbue.cryo > 0, reqText: 'Cryo Rounds',
+    fire(world, player, inst) {
+      const s = player.stats;
+      const t = player.acquireTarget(world);
+      const ang = t ? angleTo(player.x, player.y, t.x, t.y) : player.faceAngle;
+      const shards = 5 + inst.level + s.projectilesBonus;
+      fan(world, player.x, player.y, ang, shards, 0.12, () => {
+        const crit = rolledCrit(s);
+        return {
+          damage: withCrit(dmgOf(s, this, inst), crit, s), crit,
+          speed: s.bulletSpeed * randRange(0.92, 1.12), life: s.bulletLife * 0.8,
+          knockback: s.knockback * 1.1, tint: COLORS.cryo, glow: COLORS.cryo,
+        };
+      });
+      world.muzzle(player.x + Math.cos(ang) * 18, player.y + Math.sin(ang) * 18, ang);
+      world.audio?.play('shoot');
+    },
+  }),
+  W({
+    id: 'blizzard', name: 'Absolute Zero', rarity: 'legendary', icon: '❄️', evolved: true,
+    desc: 'A roaring blizzard: a radial shard storm wrapped in a flash-freezing nova.',
+    baseCd: 0.8, dmgMul: 0.7, lvlDmg: 0.16,
+    fire(world, player, inst) {
+      const s = player.stats;
+      // Flash-freeze nova centred on the ship, then a full-circle shard storm.
+      const radius = (120 + inst.level * 8) * s.areaMul;
+      const base = dmgOf(s, this, inst);
+      world.damageEnemiesInRadius(player.x, player.y, radius, base, {
+        source: 'bullet', color: COLORS.cryo, knockback: s.knockback * 1.8, lifesteal: true,
+      });
+      world.ring(player.x, player.y, radius, COLORS.cryo);
+      const n = 10 + inst.level + s.projectilesBonus;
+      inst.phase = (inst.phase || 0) + 0.4;
+      for (let i = 0; i < n; i++) {
+        const ang = inst.phase + (i / n) * TAU;
+        const crit = rolledCrit(s);
+        world.spawnBullet(player.x, player.y, ang, {
+          damage: withCrit(base * 0.8, crit, s), crit,
+          speed: s.bulletSpeed * 0.95, knockback: s.knockback * 1.2,
+          tint: COLORS.cryo, glow: COLORS.cryo,
+        });
+      }
+      world.audio?.play('reaction');
+    },
+  }),
 ];
 
 export const WEAPON_BY_ID = Object.create(null);
