@@ -208,3 +208,78 @@ test('hail evolves into blizzard once cryo imbue is owned', () => {
   assert.equal(hail.id, 'blizzard');
   assert.ok(weaponDef(hail).evolved);
 });
+
+test('Venom Spitter sprays a corrosive cone', () => {
+  let shots = 0;
+  const world = { spawnBullet: () => { shots++; }, muzzle() {}, audio: { play() {} } };
+  const player = { x: 0, y: 0, faceAngle: 0, stats: mockStats({ bulletSpeed: 600, projectilesBonus: 0 }), acquireTarget: () => ({ x: 60, y: 0 }) };
+  WEAPON_BY_ID.venom.fire(world, player, createWeaponInst('venom'));
+  assert.ok(shots >= 3, `expected an acid cone, got ${shots}`);
+});
+
+test('venom evolves into plague only with Corrosive Rounds (toxin imbue)', () => {
+  const p = mockPlayer(['venom'], { imbue: { fire: 0, cryo: 0, shock: 0, void: 0, toxin: 0 } });
+  const venom = p.weapons[0];
+  venom.level = weaponDef(venom).maxLevel;
+  assert.ok(!evolutionReady(p, venom), 'not ready without toxin imbue');
+  p.stats.imbue.toxin = 0.6;
+  assert.ok(evolutionReady(p, venom), 'ready once Corrosive Rounds is owned');
+  evolveWeapon(p, venom);
+  assert.equal(venom.id, 'plague');
+  assert.ok(weaponDef(venom).evolved);
+});
+
+test('Plague Cannon lobs an exploding acid shell', () => {
+  const bullets = [];
+  const world = { spawnBullet: (x, y, a, o) => bullets.push(o), muzzle() {}, audio: { play() {} } };
+  const player = { x: 0, y: 0, faceAngle: 0, stats: mockStats({ bulletSpeed: 600, areaMul: 1 }), acquireTarget: () => ({ x: 60, y: 0 }) };
+  WEAPON_BY_ID.plague.fire(world, player, createWeaponInst('plague'));
+  assert.equal(bullets.length, 1);
+  assert.ok(bullets[0].explodeR > 0 && bullets[0].explodeDmg > 0, 'shell detonates into a cloud');
+});
+
+test('Seeker Mines drop multiple slow, long-lived charges that explode', () => {
+  const bullets = [];
+  const world = { spawnBullet: (x, y, a, o) => bullets.push(o), audio: { play() {} } };
+  const player = { x: 0, y: 0, faceAngle: 0, stats: mockStats({ bulletSpeed: 600, areaMul: 1, bulletLife: 1, knockback: 100 }), acquireTarget: () => null };
+  WEAPON_BY_ID.mines.fire(world, player, createWeaponInst('mines'));
+  assert.ok(bullets.length >= 2, `expected a mine cluster, got ${bullets.length}`);
+  for (const b of bullets) {
+    assert.ok(b.explodeR > 0, 'mines detonate on contact');
+    assert.ok(b.speed < 600, 'mines drift slowly');
+    assert.ok(b.life > 1, 'mines loiter on the field');
+  }
+});
+
+test('mines evolve into minefield once an Area item is owned', () => {
+  const p = mockPlayer(['mines'], { areaMul: 1 });
+  const mines = p.weapons[0];
+  mines.level = weaponDef(mines).maxLevel;
+  assert.ok(!evolutionReady(p, mines), 'not ready without Area');
+  p.stats.areaMul = 1.18;
+  assert.ok(evolutionReady(p, mines), 'ready once a Resonance Lens is owned');
+  evolveWeapon(p, mines);
+  assert.equal(mines.id, 'minefield');
+  assert.ok(weaponDef(mines).evolved);
+});
+
+test('Prism Beam rakes a fan of piercing lances', () => {
+  const bullets = [];
+  const world = { spawnBullet: (x, y, a, o) => bullets.push(o), muzzle() {}, audio: { play() {} } };
+  const player = { x: 0, y: 0, aimAngle: 0, stats: mockStats({ bulletSpeed: 600, pierce: 0, projectilesBonus: 0 }), acquireTarget: () => ({ x: 60, y: 0 }) };
+  WEAPON_BY_ID.prism.fire(world, player, createWeaponInst('prism'));
+  assert.ok(bullets.length >= 3, `expected a prism fan, got ${bullets.length}`);
+  for (const b of bullets) assert.ok(b.pierce >= 2, 'prism lances punch through');
+});
+
+test('prism evolves into trinity once enough pierce is owned', () => {
+  const p = mockPlayer(['prism'], { pierce: 0 });
+  const prism = p.weapons[0];
+  prism.level = weaponDef(prism).maxLevel;
+  assert.ok(!evolutionReady(p, prism), 'not ready without pierce');
+  p.stats.pierce = 2;
+  assert.ok(evolutionReady(p, prism), 'ready once +2 pierce is owned');
+  evolveWeapon(p, prism);
+  assert.equal(prism.id, 'trinity');
+  assert.ok(weaponDef(prism).evolved);
+});

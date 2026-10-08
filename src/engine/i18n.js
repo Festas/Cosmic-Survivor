@@ -364,6 +364,12 @@ const DE = {
     reaver: { name: 'Riss-Räuber', desc: 'Eine wirbelnde Risssense, die rundum mäht und die Essenz der Gegner raubt.' },
     hail: { name: 'Hagelsturm', desc: 'Versprüht einen breiten Hagel gefrorener Splitter, die den Schwarm durchlöchern und unterkühlen.' },
     blizzard: { name: 'Absoluter Nullpunkt', desc: 'Ein tosender Blizzard: ein radialer Splittersturm, umhüllt von einer blitzgefrierenden Nova.' },
+    venom: { name: 'Giftspucker', desc: 'Spuckt einen schnellen Kegel ätzender Geschosse. Zersetzt alles, was in den Sprühnebel gerät.' },
+    plague: { name: 'Seuchenkanone', desc: 'Schleudert eine schwere Säuregranate, die beim Aufprall in einer korrosiven Wolke zerbirst.' },
+    mines: { name: 'Suchminen', desc: 'Legt langsam treibende Näherungsminen, die zünden, wenn der Schwarm herankommt.' },
+    minefield: { name: 'Minenfeld', desc: 'Übersät die Arena mit zielsuchenden Minen, die zu überlappenden Explosionen verketten.' },
+    prism: { name: 'Prismastrahl', desc: 'Spaltet eine Salve durchdringender Lichtlanzen, die geradewegs durch eine Linie harken.' },
+    trinity: { name: 'Trinitätsstrahl', desc: 'Ein strahlender Dreizack unaufhaltsamer Prismen, der alles durchbohrt, was er berührt.' },
   },
   items: {
     damage: { name: 'Überladene Geschosse', desc: '+20% Waffenschaden' },
