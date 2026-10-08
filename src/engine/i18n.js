@@ -342,6 +342,9 @@ const DE = {
     pyre: { name: 'Pyre', tag: 'Pyromant · Brand & Explosion', desc: 'Entzündet alles und detoniert beim Tod. Startet mit dem Raketenwerfer.' },
     oracle: { name: 'Orakel', tag: 'Leerenrufer · Schwerkraft & Reaktionen', desc: 'Verbiegt die Raumzeit. Leere-verzauberte Schüsse und eine aufgeladene Singularität. Gravitonmörser.' },
     frostbite: { name: 'Frostbiss', tag: 'Kryomant · Kälte & Kontrolle', desc: 'Ein Frost-Brecher, der den Schwarm gefrieren lässt. Eröffnet mit dem Hagelsturm.' },
+    basilisk: { name: 'Basilisk', tag: 'Seuchenbringer · Säure & Zerfall', desc: 'Zersetzt den Schwarm mit ätzendem Gift. Startet mit dem Giftspucker.' },
+    demolisher: { name: 'Sprengmeister', tag: 'Pionier · Minen & Explosionen', desc: 'Übersät die Arena mit Sprengstoff und steckt den Gegenschlag weg. Legt Suchminen.' },
+    spectre: { name: 'Phantom', tag: 'Lichtbringer · Durchschlag & Reichweite', desc: 'Harkt durchdringendes Licht durch ganze Gegnerreihen. Eröffnet mit dem Prismastrahl.' },
   },
   weapons: {
     ion: { name: 'Ionen-Blaster', desc: 'Zielt automatisch auf den nächsten Angreifer. Höhere Stufen fügen Läufe hinzu.' },
