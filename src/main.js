@@ -964,6 +964,7 @@ function toggleBanishMode() {
 // ------------------------------------------------------------- game over UI
 function showGameOver(summary) {
   $('hud').classList.add('hidden');
+  audio.setIntensity(0);
   // Evaluate commendations first: career totals were already persisted by
   // world.endRun (recordRun), so the merged context is up to date. Any bounty
   // Stardust is added before we read the running total below.
@@ -1180,8 +1181,10 @@ function updateHud() {
     el.bossBar.classList.remove('hidden');
     el.bossName.textContent = dName('bosses', h.boss.type).toUpperCase();
     el.bossFill.style.width = Math.max(0, (h.boss.hp / h.boss.maxHp) * 100) + '%';
+    audio.setIntensity(1);
   } else {
     el.bossBar.classList.add('hidden');
+    audio.setIntensity(0);
   }
 
   // combo popup on tier change
