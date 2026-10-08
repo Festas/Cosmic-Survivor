@@ -6,6 +6,10 @@ import { Store } from './engine/storage.js';
 import { rng } from './engine/utils.js';
 import { World } from './game/world.js';
 import { RARITY } from './game/upgrades.js';
+import {
+  t, dName, dDesc, dTag, dRisk, tReaction, translateEffect,
+  getLang, setLang, onLangChange, detectLang, LANGUAGES,
+} from './engine/i18n.js';
 import { weaponDef } from './game/weapons.js';
 import { SHIPS, shipById, DEFAULT_SHIP_ID } from './game/ships.js';
 import { META_UPGRADES, metaCost } from './game/meta.js';
@@ -113,6 +117,65 @@ wireSetting(['opt-music', 'opt-music2'], 'music', (v) => { store.setSetting('mus
 wireSetting(['opt-sfx', 'opt-sfx2'], 'muted', (v) => { store.setSetting('muted', !v); audio.setMuted(!v); });
 wireSetting(['opt-shake', 'opt-shake2'], 'shake', (v) => { store.setSetting('shake', v); });
 
+// ------------------------------------------------------------- language (i18n)
+// Apply all static markup translations: elements tagged with data-i18n* get their
+// text/attribute swapped from the STR table for the active language. Dynamic UI
+// (cards, station, HUD) is re-rendered separately by applyLanguage().
+function applyStaticI18n(root = document) {
+  root.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.getAttribute('data-i18n')); });
+  root.querySelectorAll('[data-i18n-kbd]').forEach((el) => { setKbdMarkup(el, t(el.getAttribute('data-i18n-kbd'))); });
+  root.querySelectorAll('[data-i18n-title]').forEach((el) => { el.title = t(el.getAttribute('data-i18n-title')); });
+  root.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
+  root.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.getAttribute('data-i18n-ph')); });
+}
+
+// Render a restricted i18n template that may contain <kbd>…</kbd> tags without using
+// innerHTML: only <kbd> is recognised and all other content is inserted verbatim as
+// text nodes, so there is no HTML-injection surface even if the string ever changes.
+function setKbdMarkup(el, str) {
+  el.textContent = '';
+  const re = /<kbd>([\s\S]*?)<\/kbd>/g;
+  let last = 0;
+  let m;
+  while ((m = re.exec(str))) {
+    if (m.index > last) el.appendChild(document.createTextNode(str.slice(last, m.index)));
+    const kbd = document.createElement('kbd');
+    kbd.textContent = m[1];
+    el.appendChild(kbd);
+    last = re.lastIndex;
+  }
+  if (last < str.length) el.appendChild(document.createTextNode(str.slice(last)));
+}
+
+// Re-skin the entire live UI for the current language: static markup + whichever
+// dynamic overlays happen to be visible. Safe to call any time.
+function applyLanguage() {
+  document.documentElement.lang = getLang();
+  applyStaticI18n();
+  const sel = $('opt-lang');
+  if (sel) sel.value = getLang();
+  // Re-render dynamic overlays that are currently on screen.
+  if (!$('start').classList.contains('hidden')) refreshStart();
+  if (!$('hangar').classList.contains('hidden')) renderHangar();
+  if (stationOpen()) renderStation();
+  if (started && world.state === 'playing') updateHud();
+}
+
+// Build the language <select> from LANGUAGES and keep it in sync with the store.
+function wireLanguagePicker() {
+  const sel = $('opt-lang');
+  if (!sel) return;
+  sel.innerHTML = LANGUAGES.map((l) => `<option value="${l.id}">${l.label}</option>`).join('');
+  sel.value = getLang();
+  sel.addEventListener('change', () => {
+    const v = sel.value;
+    store.setSetting('lang', v);
+    setLang(v);
+  });
+}
+// Any part of the app can call setLang(); keep the whole UI reactive to it.
+onLangChange(() => applyLanguage());
+
 // ------------------------------------------------------------- hangar / ships
 // Ships the player actually owns (free ships are always available).
 function ownedShips() {
@@ -134,8 +197,8 @@ function updateShipPick() {
   store.selectShip(ship.id);
   $('ship-pick-icon').textContent = ship.icon;
   $('ship-pick-icon').style.color = ship.color;
-  $('ship-pick-name').textContent = ship.name;
-  $('ship-pick-tag').textContent = ship.tag;
+  $('ship-pick-name').textContent = dName('ships', ship);
+  $('ship-pick-tag').textContent = dTag('ships', ship);
   const multi = owned.length > 1;
   $('ship-prev').classList.toggle('hidden', !multi);
   $('ship-next').classList.toggle('hidden', !multi);
@@ -228,17 +291,17 @@ function renderShips() {
     card.className = 'ship-card' + (selected ? ' selected' : '') + (unlocked ? '' : ' locked');
     card.style.setProperty('--accent', ship.color);
     let action;
-    if (selected) action = '<div class="ship-badge">✓ SELECTED</div>';
-    else if (unlocked) action = '<button class="btn btn-sm ship-select">SELECT</button>';
+    if (selected) action = `<div class="ship-badge">${t('ship.selected')}</div>`;
+    else if (unlocked) action = `<button class="btn btn-sm ship-select">${t('ship.select')}</button>`;
     else {
       const afford = store.stardust >= ship.unlockCost;
-      action = `<button class="btn btn-sm ship-unlock"${afford ? '' : ' disabled'}>✦ ${formatNumber(ship.unlockCost)} UNLOCK</button>`;
+      action = `<button class="btn btn-sm ship-unlock"${afford ? '' : ' disabled'}>${t('ship.unlock', { cost: formatNumber(ship.unlockCost) })}</button>`;
     }
     card.innerHTML = `
-      <div class="ship-card-head"><span class="ship-ico">${ship.icon}</span><span class="ship-name">${ship.name}</span></div>
-      <div class="ship-tag">${ship.tag}</div>
-      <div class="ship-desc">${ship.desc}</div>
-      <div class="ship-weapon">Starter: <b>${def ? def.name : ship.weapon}</b></div>
+      <div class="ship-card-head"><span class="ship-ico">${ship.icon}</span><span class="ship-name">${dName('ships', ship)}</span></div>
+      <div class="ship-tag">${dTag('ships', ship)}</div>
+      <div class="ship-desc">${dDesc('ships', ship)}</div>
+      <div class="ship-weapon">${t('ship.starter', { weapon: `<b>${def ? dName('weapons', def) : ship.weapon}</b>` })}</div>
       <div class="ship-action">${action}</div>`;
     const selectBtn = card.querySelector('.ship-select');
     const unlockBtn = card.querySelector('.ship-unlock');
@@ -262,13 +325,13 @@ function renderMeta() {
     row.className = 'meta-row' + (maxed ? ' maxed' : '');
     const pips = Array.from({ length: def.max }, (_, i) => `<span class="pip${i < level ? ' on' : ''}"></span>`).join('');
     const btn = maxed
-      ? '<div class="meta-max">MAX</div>'
+      ? `<div class="meta-max">${t('common.max')}</div>`
       : `<button class="btn btn-sm meta-buy"${afford ? '' : ' disabled'}>✦ ${formatNumber(cost)}</button>`;
     row.innerHTML = `
       <div class="meta-ico">${def.icon}</div>
       <div class="meta-main">
-        <div class="meta-name">${def.name} <span class="meta-lvl">${level}/${def.max}</span></div>
-        <div class="meta-desc">${def.desc}</div>
+        <div class="meta-name">${dName('meta', def)} <span class="meta-lvl">${level}/${def.max}</span></div>
+        <div class="meta-desc">${dDesc('meta', def)}</div>
         <div class="meta-pips">${pips}</div>
       </div>
       <div class="meta-action">${btn}</div>`;
@@ -417,7 +480,7 @@ function spawnTapFx(amount, ev) {
 // Quantity selector (×1 / ×10 / MAX) shared by the generator tab.
 function stationQtyButtonsHtml() {
   return [1, 10, 'max'].map((q) =>
-    `<button class="btn btn-sm st-qty${stationBuyQty === q ? ' active' : ''}" data-qty="${q}">${q === 'max' ? 'MAX' : '×' + q}</button>`).join('');
+    `<button class="btn btn-sm st-qty${stationBuyQty === q ? ' active' : ''}" data-qty="${q}">${q === 'max' ? t('st.qtyMax') : '×' + q}</button>`).join('');
 }
 
 // Render just the currently-visible tab (cheap enough to call on every purchase
@@ -447,7 +510,7 @@ function renderStationBuffs() {
   wrap.classList.remove('hidden');
   wrap.innerHTML = live.map((b) => {
     const left = Math.max(0, Math.ceil(b.until - now));
-    return `<div class="buff-chip buff-${b.kind}"><span class="buff-ico">${b.icon}</span><span class="buff-txt">${b.name} ×${b.mult}</span><span class="buff-time">${left}s</span></div>`;
+    return `<div class="buff-chip buff-${b.kind}"><span class="buff-ico">${b.icon}</span><span class="buff-txt">${dName('surges', b)} ×${b.mult}</span><span class="buff-time">${left}s</span></div>`;
   }).join('');
 }
 
@@ -463,22 +526,22 @@ function renderStationMine() {
   const clickAfford = idle.nebula >= clickCost;
   const perTap = Math.max(1, Math.round(clickYield(idle, profile) * buffClickMult()));
   host.innerHTML = `
-    <div class="station-sec"><span class="st-sec-head">MANUAL MINING <span class="st-sec-sub">tap the beam above</span></span></div>
+    <div class="station-sec"><span class="st-sec-head">${t('st.manualMining')} <span class="st-sec-sub">${t('st.tapBeam')}</span></span></div>
     <div class="gen-list">
       <div class="gen-row${clickLvl > 0 ? ' owned' : ''}">
         <div class="gen-ico">${CLICK_UPGRADE.icon}</div>
         <div class="gen-main">
-          <div class="gen-name">${CLICK_UPGRADE.name} <span class="gen-owned">Lv ${formatNumber(clickLvl)}</span></div>
-          <div class="gen-desc">${CLICK_UPGRADE.desc}</div>
-          <div class="gen-rate">${formatNumber(perTap)} ⬡ per tap</div>
+          <div class="gen-name">${dName('clickUpgrade', CLICK_UPGRADE)} <span class="gen-owned">${t('common.lv', { n: formatNumber(clickLvl) })}</span></div>
+          <div class="gen-desc">${dDesc('clickUpgrade', CLICK_UPGRADE)}</div>
+          <div class="gen-rate">${t('st.perTap', { n: formatNumber(perTap) })}</div>
         </div>
         <button class="btn btn-sm click-buy"${clickAfford ? '' : ' disabled'}>
-          <span class="gb-q">+${formatNumber(CLICK_UPGRADE.power)} power</span>
+          <span class="gb-q">${t('st.addPower', { n: formatNumber(CLICK_UPGRADE.power) })}</span>
           <span class="gb-c">⬡ ${formatNumber(clickCost)}</span>
         </button>
       </div>
     </div>
-    <div class="station-note">Your Station mines <b>Nebula</b> in real time — even while the tab is closed. <b>Tap the beam</b> to mine by hand, then automate it under <b>Generators</b>. Watch for drifting <b>Nebula Surges</b> — tap one for a windfall or a frenzy. Run progress adds <b>+${boostPct}%</b> production.</div>`;
+    <div class="station-note">${t('st.mineNote', { pct: boostPct })}</div>`;
   host.querySelector('.click-buy')?.addEventListener('click', () => {
     if (store.buyClickUpgrade()) { audio.play('pickup'); renderStationMine(); updateStationLive(); }
   });
@@ -491,7 +554,7 @@ function renderStationGenerators() {
   const idle = store.getIdle();
   const fx = computePerks(idle.prestige);
   const mult = stationRateMult();
-  let html = `<div class="station-sec"><span class="st-sec-head">GENERATORS <span class="st-sec-sub">every ${MILESTONE_STEP} → +${Math.round(fx.milestoneBonus * 100)}%</span></span><span class="st-qtyrow">${stationQtyButtonsHtml()}</span></div><div class="gen-list">`;
+  let html = `<div class="station-sec"><span class="st-sec-head">${t('st.genHead')} <span class="st-sec-sub">${t('st.genSub', { step: MILESTONE_STEP, pct: Math.round(fx.milestoneBonus * 100) })}</span></span><span class="st-qtyrow">${stationQtyButtonsHtml()}</span></div><div class="gen-list">`;
   for (const def of GENERATORS) {
     const owned = idle.generators[def.id] || 0;
     const qty = stationBuyQty === 'max' ? Math.max(1, maxAffordable(def, owned, idle.nebula, fx.costMul)) : stationBuyQty;
@@ -501,19 +564,19 @@ function renderStationGenerators() {
     const contrib = def.rate * owned * gmul * mult;
     const ms = generatorMilestoneProgress(owned, fx.milestoneBonus);
     const mile = owned > 0
-      ? `<div class="gen-mile">${ms.reached > 0 ? `<b>×${gmul % 1 ? gmul.toFixed(1) : gmul}</b> milestone · ` : ''}${formatNumber(ms.remaining)} to ×${ms.nextMultiplier % 1 ? ms.nextMultiplier.toFixed(1) : ms.nextMultiplier}</div>`
+      ? `<div class="gen-mile">${ms.reached > 0 ? t('st.milestoneReached', { mult: gmul % 1 ? gmul.toFixed(1) : gmul }) : ''}${t('st.milestoneTo', { n: formatNumber(ms.remaining), next: ms.nextMultiplier % 1 ? ms.nextMultiplier.toFixed(1) : ms.nextMultiplier })}</div>`
       : '';
     html += `
       <div class="gen-row${owned > 0 ? ' owned' : ''}">
         <div class="gen-ico">${def.icon}</div>
         <div class="gen-main">
-          <div class="gen-name">${def.name} <span class="gen-owned">×${formatNumber(owned)}</span></div>
-          <div class="gen-desc">${def.desc}</div>
-          <div class="gen-rate">${owned > 0 ? `${contrib >= 100 ? formatNumber(contrib) : contrib.toFixed(1)} ⬡/s` : `${def.rate} ⬡/s each`}</div>
+          <div class="gen-name">${dName('generators', def)} <span class="gen-owned">×${formatNumber(owned)}</span></div>
+          <div class="gen-desc">${dDesc('generators', def)}</div>
+          <div class="gen-rate">${owned > 0 ? t('st.rateContrib', { n: contrib >= 100 ? formatNumber(contrib) : contrib.toFixed(1) }) : t('st.rateEach', { n: def.rate })}</div>
           ${mile}
         </div>
         <button class="btn btn-sm gen-buy" data-id="${def.id}"${afford ? '' : ' disabled'}>
-          <span class="gb-q">${stationBuyQty === 'max' ? 'MAX ' + formatNumber(qty) : '×' + qty}</span>
+          <span class="gb-q">${stationBuyQty === 'max' ? t('st.buyMax', { n: formatNumber(qty) }) : '×' + qty}</span>
           <span class="gb-c">⬡ ${formatNumber(cost)}</span>
         </button>
       </div>`;
@@ -541,7 +604,7 @@ function renderStationCores() {
   const wrap = $('st-body-cores');
   if (!wrap) return;
   const idle = store.getIdle();
-  let html = `<div class="station-note">Spend <b>🌀 Singularity Cores</b> (earned by Collapsing under COLLAPSE) on permanent buffs that apply to <b>every run</b>.</div><div class="station-sec"><span class="st-sec-head">CORE UPGRADES <span class="st-sec-sub">applied on every run</span></span></div><div class="special-list">`;
+  let html = `<div class="station-note">${t('st.coresNote')}</div><div class="station-sec"><span class="st-sec-head">${t('st.coreUpgrades')} <span class="st-sec-sub">${t('st.everyRun')}</span></span></div><div class="special-list">`;
   for (const def of SPECIAL_UPGRADES) {
     const level = idle.special[def.id] || 0;
     const maxed = level >= def.max;
@@ -549,14 +612,14 @@ function renderStationCores() {
     const afford = canBuySpecial(def, idle.special, idle.cores);
     const pips = Array.from({ length: def.max }, (_, i) => `<span class="pip${i < level ? ' on' : ''}"></span>`).join('');
     const btn = maxed
-      ? '<div class="meta-max">MAX</div>'
+      ? `<div class="meta-max">${t('common.max')}</div>`
       : `<button class="btn btn-sm special-buy" data-id="${def.id}"${afford ? '' : ' disabled'}>🌀 ${formatNumber(cost)}</button>`;
     html += `
       <div class="special-row${maxed ? ' maxed' : ''}">
         <div class="meta-ico">${def.icon}</div>
         <div class="meta-main">
-          <div class="meta-name">${def.name} <span class="meta-lvl">${level}/${def.max}</span></div>
-          <div class="meta-desc">${def.desc}${def.effect && level > 0 ? ` · now <b>${def.effect(level)}</b>` : ''}</div>
+          <div class="meta-name">${dName('special', def)} <span class="meta-lvl">${level}/${def.max}</span></div>
+          <div class="meta-desc">${dDesc('special', def)}${def.effect && level > 0 ? t('st.nowEffect', { effect: translateEffect(def.effect(level)) }) : ''}</div>
           <div class="meta-pips">${pips}</div>
         </div>
         <div class="meta-action">${btn}</div>
@@ -583,16 +646,16 @@ function renderStationAscend() {
   let html = `
     <div class="prestige-row">
       <div class="prestige-info">
-        <div class="prestige-title">🌀 Collapse Station</div>
+        <div class="prestige-title">${t('st.collapseTitle')}</div>
         <div class="prestige-sub">${gain > 0
-          ? `Mint <b>${formatNumber(gain)}</b> Core${gain === 1 ? '' : 's'} · resets generators &amp; Nebula${seed > 0 ? ` · keeps <b>${formatNumber(seed)}</b> Nebula` : ''}`
-          : `Reach ${formatNumber(nextCoreAt)} lifetime Nebula for your first Core`}</div>
+          ? t('st.collapseMint', { gain: formatNumber(gain), seed: seed > 0 ? formatNumber(seed) : 0 })
+          : t('st.collapseNeed', { n: formatNumber(nextCoreAt) })}</div>
         <div class="prestige-bar"><span style="width:${prestigePct}%"></span></div>
       </div>
-      <button class="btn prestige-btn"${gain > 0 ? '' : ' disabled'}>COLLAPSE</button>
+      <button class="btn prestige-btn"${gain > 0 ? '' : ' disabled'}>${t('st.collapseBtn')}</button>
     </div>
-    <div class="station-note">Singularity perks are bought with <b>🌀 Cores</b> and <b>survive every Collapse</b> — they permanently upgrade the Station itself.</div>
-    <div class="station-sec"><span class="st-sec-head">SINGULARITY PERKS <span class="st-sec-sub">permanent · survive Collapse</span></span></div>
+    <div class="station-note">${t('st.collapseNote')}</div>
+    <div class="station-sec"><span class="st-sec-head">${t('st.perksHead')} <span class="st-sec-sub">${t('st.perksSub')}</span></span></div>
     <div class="perk-list">`;
   for (const def of PRESTIGE_UPGRADES) {
     const level = idle.prestige[def.id] || 0;
@@ -601,14 +664,14 @@ function renderStationAscend() {
     const afford = canBuyPrestige(def, idle.prestige, idle.cores);
     const pips = Array.from({ length: def.max }, (_, i) => `<span class="pip${i < level ? ' on' : ''}"></span>`).join('');
     const btn = maxed
-      ? '<div class="meta-max">MAX</div>'
+      ? `<div class="meta-max">${t('common.max')}</div>`
       : `<button class="btn btn-sm perk-buy" data-id="${def.id}"${afford ? '' : ' disabled'}>🌀 ${formatNumber(cost)}</button>`;
     html += `
       <div class="special-row${maxed ? ' maxed' : ''}">
         <div class="meta-ico">${def.icon}</div>
         <div class="meta-main">
-          <div class="meta-name">${def.name} <span class="meta-lvl">${level}/${def.max}</span></div>
-          <div class="meta-desc">${def.desc}${def.effect && level > 0 ? ` · now <b>${def.effect(level)}</b>` : ''}</div>
+          <div class="meta-name">${dName('prestige', def)} <span class="meta-lvl">${level}/${def.max}</span></div>
+          <div class="meta-desc">${dDesc('prestige', def)}${def.effect && level > 0 ? t('st.nowEffect', { effect: translateEffect(def.effect(level)) }) : ''}</div>
           <div class="meta-pips">${pips}</div>
         </div>
         <div class="meta-action">${btn}</div>
@@ -620,7 +683,7 @@ function renderStationAscend() {
     const got = store.prestigeIdle();
     if (got > 0) {
       audio.play('gameover');
-      showToast(`<span class="t-ico">🌀</span><div class="t-body"><b>Station Collapsed</b><span>+${formatNumber(got)} Singularity Core${got === 1 ? '' : 's'}</span></div>`);
+      showToast(`<span class="t-ico">🌀</span><div class="t-body"><b>${t('toast.collapsed.t')}</b><span>${t('toast.collapsed.d', { n: formatNumber(got) })}</span></div>`);
       renderStation();
     }
   });
@@ -650,8 +713,8 @@ function spawnSurge() {
   orb.type = 'button';
   orb.className = `surge-orb surge-${type.kind}`;
   orb.dataset.roll = String(roll);
-  orb.title = type.name;
-  orb.setAttribute('aria-label', `Collect ${type.name}`);
+  orb.title = dName('surges', type);
+  orb.setAttribute('aria-label', t('surge.collect', { name: dName('surges', type) }));
   orb.textContent = type.icon;
   orb.style.left = `${10 + rng() * 78}%`;
   orb.style.top = `${16 + rng() * 60}%`;
@@ -687,18 +750,18 @@ function applySurgeReward(reward, ev) {
   if (reward.kind === 'nebula') {
     store.addNebula(reward.nebula);
     if (ev && stationTab === 'mine') spawnTapFx(reward.nebula, ev);
-    showToast(`<span class="t-ico">${reward.icon}</span><div class="t-body"><b>${reward.name}</b><span>+${formatNumber(reward.nebula)} Nebula</span></div>`);
+    showToast(`<span class="t-ico">${reward.icon}</span><div class="t-body"><b>${dName('surges', reward)}</b><span>${t('surge.rewardNebula', { n: formatNumber(reward.nebula) })}</span></div>`);
   } else if (reward.kind === 'core') {
     const idle = store.getIdle();
     idle.cores += reward.cores;
     idle.lifetimeCores += reward.cores;
     store.save();
-    showToast(`<span class="t-ico">${reward.icon}</span><div class="t-body"><b>${reward.name}</b><span>+${formatNumber(reward.cores)} Singularity Core${reward.cores === 1 ? '' : 's'}</span></div>`);
+    showToast(`<span class="t-ico">${reward.icon}</span><div class="t-body"><b>${dName('surges', reward)}</b><span>${t('surge.rewardCore', { n: formatNumber(reward.cores) })}</span></div>`);
   } else { // 'prod' | 'click' timed frenzy
     const until = performance.now() / 1000 + reward.duration;
     activeBuffs = activeBuffs.filter((b) => b.id !== reward.id); // refresh, don't stack the same one
     activeBuffs.push({ id: reward.id, name: reward.name, icon: reward.icon, kind: reward.kind, mult: reward.mult, until });
-    showToast(`<span class="t-ico">${reward.icon}</span><div class="t-body"><b>${reward.name}</b><span>×${reward.mult} for ${reward.duration}s</span></div>`);
+    showToast(`<span class="t-ico">${reward.icon}</span><div class="t-body"><b>${dName('surges', reward)}</b><span>${t('surge.rewardFrenzy', { mult: reward.mult, dur: reward.duration })}</span></div>`);
     renderStationBuffs();
   }
   updateStationLive();
@@ -736,8 +799,8 @@ function renderDirectives() {
   note.className = 'directive-note';
   const mult = directiveStardustMultiplier(store.getDirectives());
   note.innerHTML = active.size
-    ? `<b>${active.size}</b> active · Stardust reward <b>×${mult.toFixed(2)}</b>`
-    : 'Toggle Directives to make runs harder — and multiply the Stardust you earn.';
+    ? t('dir.summary', { n: active.size, mult: mult.toFixed(2) })
+    : t('dir.hint');
   wrap.appendChild(note);
 
   for (const d of DIRECTIVES) {
@@ -748,13 +811,13 @@ function renderDirectives() {
     card.innerHTML = `
       <div class="dir-head">
         <span class="dir-ico">${d.icon}</span>
-        <span class="dir-name">${d.name}</span>
+        <span class="dir-name">${dName('directives', d)}</span>
         <span class="dir-reward">✦ +${pct}%</span>
       </div>
-      <div class="dir-desc">${d.desc}</div>
+      <div class="dir-desc">${dDesc('directives', d)}</div>
       <div class="dir-foot">
-        <span class="dir-risk">${d.risk}</span>
-        <span class="dir-toggle">${on ? 'ACTIVE' : 'ENABLE'}</span>
+        <span class="dir-risk">${dRisk('directives', d)}</span>
+        <span class="dir-toggle">${on ? t('dir.active') : t('dir.enable')}</span>
       </div>`;
     card.addEventListener('click', () => {
       store.toggleDirective(d.id);
@@ -775,7 +838,7 @@ function renderCodex() {
 
   const head = document.createElement('div');
   head.className = 'codex-progress';
-  head.innerHTML = `<b>${owned.size}</b> / ${ACHIEVEMENTS.length} commendations earned`;
+  head.innerHTML = t('codex.progress', { owned: owned.size, total: ACHIEVEMENTS.length });
   wrap.appendChild(head);
 
   for (const a of ACHIEVEMENTS) {
@@ -785,8 +848,8 @@ function renderCodex() {
     cell.innerHTML = `
       <div class="cx-ico">${got ? a.icon : '🔒'}</div>
       <div class="cx-main">
-        <div class="cx-name">${a.name}</div>
-        <div class="cx-desc">${a.desc}</div>
+        <div class="cx-name">${dName('achievements', a)}</div>
+        <div class="cx-desc">${dDesc('achievements', a)}</div>
       </div>
       <div class="cx-reward">✦ ${a.reward}</div>`;
     wrap.appendChild(cell);
@@ -801,10 +864,10 @@ function updateStartDirectives() {
   if (!ids.length) { node.classList.add('hidden'); node.innerHTML = ''; return; }
   const icons = ids.map((id) => {
     const d = DIRECTIVE_BY_ID[id];
-    return d ? `<span class="sd-ico" title="${d.name}">${d.icon}</span>` : '';
+    return d ? `<span class="sd-ico" title="${dName('directives', d)}">${d.icon}</span>` : '';
   }).join('');
   const mult = directiveStardustMultiplier(ids);
-  node.innerHTML = `<span class="sd-label">DIRECTIVES</span>${icons}<span class="sd-mult">✦ ×${mult.toFixed(2)}</span>`;
+  node.innerHTML = `<span class="sd-label">${t('dir.label')}</span>${icons}<span class="sd-mult">✦ ×${mult.toFixed(2)}</span>`;
   node.classList.remove('hidden');
 }
 
@@ -854,9 +917,11 @@ function togglePause(force) {
 }
 
 // ------------------------------------------------------------- level up UI
-const KIND_LABEL = {
-  'weapon-new': 'NEW WEAPON', 'weapon-up': 'UPGRADE', 'evolve': 'EVOLVE', 'item': 'ITEM',
+const KIND_KEY = {
+  'weapon-new': 'kind.weaponNew', 'weapon-up': 'kind.weaponUp', 'evolve': 'kind.evolve', 'item': 'kind.item',
 };
+function kindLabel(kind) { return KIND_KEY[kind] ? t(KIND_KEY[kind]) : ''; }
+function rarityLabel(rarity) { return t('rarity.' + rarity); }
 
 function showLevelUp(choices) {
   banishMode = false;
@@ -869,11 +934,11 @@ function showLevelUp(choices) {
     card.className = 'card' + (up.kind === 'evolve' ? ' evolve' : '');
     card.style.setProperty('--rarity', r.color);
     card.innerHTML = `
-      <div class="kind">${KIND_LABEL[up.kind] || ''}</div>
+      <div class="kind">${kindLabel(up.kind)}</div>
       <div class="icon">${up.icon}</div>
       <div class="name">${up.name}</div>
       <div class="desc">${up.desc}</div>
-      <div class="rarity">${up.tag || r.label} · ${i + 1}</div>`;
+      <div class="rarity">${up.tag || rarityLabel(up.rarity)} · ${i + 1}</div>`;
     card.addEventListener('click', () => {
       if (banishMode) doBanish(up);
       else pickUpgrade(up);
@@ -917,6 +982,7 @@ function toggleBanishMode() {
 // ------------------------------------------------------------- game over UI
 function showGameOver(summary) {
   $('hud').classList.add('hidden');
+  audio.setIntensity(0);
   // Evaluate commendations first: career totals were already persisted by
   // world.endRun (recordRun), so the merged context is up to date. Any bounty
   // Stardust is added before we read the running total below.
@@ -927,7 +993,7 @@ function showGameOver(summary) {
   const earned = summary.stardust || 0;
   const total = store.stardust;
   const goSd = $('go-stardust');
-  goSd.textContent = `✦ +${formatNumber(earned)} Stardust  ·  ${formatNumber(total)} total`;
+  goSd.textContent = t('go.stardust', { earned: formatNumber(earned), total: formatNumber(total) });
   goSd.classList.toggle('none', earned <= 0);
 
   // Nebula burst for the Orbital Station (idle layer) — shown only when earned so
@@ -935,7 +1001,7 @@ function showGameOver(summary) {
   const goNeb = $('go-nebula');
   if (goNeb) {
     const neb = summary.nebula || 0;
-    goNeb.textContent = `⬡ +${formatNumber(neb)} Nebula  ·  ${formatNumber(summary.nebulaTotal || store.getIdle().nebula)} banked`;
+    goNeb.textContent = t('go.nebula', { earned: formatNumber(neb), banked: formatNumber(summary.nebulaTotal || store.getIdle().nebula) });
     goNeb.classList.toggle('hidden', neb <= 0);
   }
 
@@ -943,7 +1009,7 @@ function showGameOver(summary) {
   if (gc) {
     if (newCommends.length) {
       gc.innerHTML = newCommends.map((a) =>
-        `<div class="commend"><span class="c-ico">${a.icon}</span><span class="c-name">${a.name}</span><span class="c-rew">✦ +${a.reward}</span></div>`).join('');
+        `<div class="commend"><span class="c-ico">${a.icon}</span><span class="c-name">${dName('achievements', a)}</span><span class="c-rew">✦ +${a.reward}</span></div>`).join('');
       gc.classList.remove('hidden');
     } else {
       gc.innerHTML = '';
@@ -988,7 +1054,7 @@ function awardCommendations(summary) {
   for (const a of fresh) if (store.unlockAchievement(a.id)) bounty += a.reward || 0;
   if (bounty > 0) { store.addStardust(bounty); audio.play('levelup'); }
   for (const a of fresh) {
-    showToast(`<span class="t-ico">${a.icon}</span><div class="t-body"><b>${a.name}</b><span>Commendation · ✦ +${a.reward}</span></div>`);
+    showToast(`<span class="t-ico">${a.icon}</span><div class="t-body"><b>${dName('achievements', a)}</b><span>${t('toast.commendation', { reward: a.reward })}</span></div>`);
   }
   return fresh;
 }
@@ -997,15 +1063,15 @@ function awardCommendations(summary) {
 function showToast(html) {
   const wrap = $('toast');
   if (!wrap) return;
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.innerHTML = html;
-  wrap.appendChild(t);
-  setTimeout(() => t.remove(), 3200);
+  const node = document.createElement('div');
+  node.className = 'toast';
+  node.innerHTML = html;
+  wrap.appendChild(node);
+  setTimeout(() => node.remove(), 3200);
 }
 
 function statRows(obj) {
-  return Object.entries(obj).map(([k, v]) => `<div>${k} <b>${v}</b></div>`).join('');
+  return Object.entries(obj).map(([k, v]) => `<div>${t('stat.' + k)} <b>${v}</b></div>`).join('');
 }
 
 // ------------------------------------------------------------- touch
@@ -1093,13 +1159,13 @@ function updateHud() {
   el.timer.textContent = formatTime(h.time);
   el.score.textContent = formatNumber(h.score);
   el.mult.textContent = 'x' + h.multiplier.toFixed(1);
-  el.hiscore.textContent = 'BEST ' + formatNumber(store.get().highScore);
+  el.hiscore.textContent = t('hud.best', { n: formatNumber(store.get().highScore) });
 
   const hpFrac = Math.max(0, h.hp / h.maxHp);
   el.healthFill.style.width = (hpFrac * 100) + '%';
   el.healthText.textContent = `${h.hp} / ${h.maxHp}`;
   el.xpFill.style.width = Math.min(100, (h.xp / h.xpToNext) * 100) + '%';
-  el.levelText.textContent = 'LV ' + h.level;
+  el.levelText.textContent = t('hud.lv', { n: h.level });
 
   el.singArc.style.strokeDashoffset = ARC_LEN * (1 - Math.min(1, h.singCharge / h.singMax));
   el.abilitySing.classList.toggle('ready', h.singReady);
@@ -1114,7 +1180,7 @@ function updateHud() {
   el.odFill.style.width = (odFrac * 100) + '%';
   el.odBar.classList.toggle('ready', p.overdrive >= 100 && !odActive);
   el.odBar.classList.toggle('active', odActive);
-  el.odText.textContent = odActive ? 'OVERDRIVE!' : 'OVERDRIVE';
+  el.odText.textContent = odActive ? t('hud.overdriveOn') : t('hud.overdrive');
 
   // Weapon loadout strip (rebuild only when the loadout actually changes)
   const sig = p.weapons.map((w) => w.id + w.level).join(',');
@@ -1123,7 +1189,7 @@ function updateHud() {
     el.loadout.innerHTML = p.weapons.map((w) => {
       const def = weaponDef(w);
       const evolved = def && def.evolved ? ' evolved' : '';
-      const name = def ? def.name : w.id;
+      const name = def ? dName('weapons', def) : w.id;
       const icon = def ? def.icon : '❓';
       return `<div class="w${evolved}" title="${name}">${icon}<b>${w.level}</b></div>`;
     }).join('');
@@ -1131,16 +1197,18 @@ function updateHud() {
 
   if (h.boss) {
     el.bossBar.classList.remove('hidden');
-    el.bossName.textContent = h.boss.type.name.toUpperCase();
+    el.bossName.textContent = dName('bosses', h.boss.type).toUpperCase();
     el.bossFill.style.width = Math.max(0, (h.boss.hp / h.boss.maxHp) * 100) + '%';
+    audio.setIntensity(1);
   } else {
     el.bossBar.classList.add('hidden');
+    audio.setIntensity(0);
   }
 
   // combo popup on tier change
   const tier = Math.floor(h.multiplier * 10) / 10;
   if (tier > lastMultTier && h.multiplier > 1) {
-    el.comboPop.textContent = 'COMBO x' + h.multiplier.toFixed(1);
+    el.comboPop.textContent = t('hud.combo', { n: h.multiplier.toFixed(1) });
     el.comboPop.classList.remove('show');
     void el.comboPop.offsetWidth;
     el.comboPop.classList.add('show');
@@ -1338,6 +1406,16 @@ document.addEventListener('visibilitychange', () => {
     if (!started && !$('start').classList.contains('hidden')) updateStartNebula();
   }
 });
+
+// Initialise language before the first paint: use the saved setting, or fall back
+// to the browser's preferred languages on a first visit, then skin all UI.
+(function initLanguage() {
+  const saved = store.getSettings().lang;
+  setLang(saved || detectLang(navigator.languages || [navigator.language]));
+  if (!saved) store.setSetting('lang', getLang());
+  wireLanguagePicker();
+  applyLanguage();
+})();
 
 applySettingsToUI();
 catchUpOffline();

@@ -12,6 +12,7 @@ import { weightedPick, shuffle } from '../engine/utils.js';
 import {
   BASE_WEAPONS, weaponDef, hasWeapon, canTakeWeapon, evolutionReady,
 } from './weapons.js';
+import { t, dName, dDesc } from '../engine/i18n.js';
 
 export const RARITY = {
   common: { label: 'Common', color: '#b9c6ff', weight: 100, rank: 0 },
@@ -99,7 +100,7 @@ export const isAvailable = isItemAvailable;
 // ---- Draft ---------------------------------------------------------------
 
 function weaponUpDesc(def, level) {
-  return `Lv ${level} → ${level + 1}: +${Math.round(def.lvlDmg * 100)}% damage, faster fire`;
+  return t('card.weaponUpDesc', { from: level, to: level + 1, dmg: Math.round(def.lvlDmg * 100) });
 }
 
 // Build the full candidate pool for the current player, honouring owned
@@ -117,15 +118,15 @@ function buildPool(player) {
       const evo = weaponDef(def.evolve);
       pool.push({
         kind: 'evolve', id: 'evolve_' + inst.id, weaponId: inst.id,
-        name: 'EVOLVE · ' + evo.name, rarity: 'legendary', icon: evo.icon,
-        desc: evo.desc, tag: 'Evolution',
+        name: t('card.evolvePrefix', { name: dName('weapons', evo) }), rarity: 'legendary', icon: evo.icon,
+        desc: dDesc('weapons', evo), tag: t('card.tagEvolution'),
       });
     } else if (inst.level < def.maxLevel) {
       if (banished['wup_' + inst.id]) continue;
       pool.push({
         kind: 'weapon-up', id: 'wup_' + inst.id, weaponId: inst.id,
-        name: def.name, rarity: def.rarity, icon: def.icon,
-        desc: weaponUpDesc(def, inst.level), tag: `Weapon · Lv ${inst.level + 1}`,
+        name: dName('weapons', def), rarity: def.rarity, icon: def.icon,
+        desc: weaponUpDesc(def, inst.level), tag: t('card.tagWeaponLv', { n: inst.level + 1 }),
       });
     }
   }
@@ -137,8 +138,8 @@ function buildPool(player) {
       if (banished[id]) continue;
       pool.push({
         kind: 'weapon-new', id, weaponId: def.id,
-        name: def.name, rarity: def.rarity, icon: def.icon,
-        desc: def.desc, tag: 'New Weapon',
+        name: dName('weapons', def), rarity: def.rarity, icon: def.icon,
+        desc: dDesc('weapons', def), tag: t('card.tagNewWeapon'),
       });
     }
   }
@@ -146,7 +147,7 @@ function buildPool(player) {
   for (const it of ITEMS) {
     if (banished[it.id]) continue;
     if (!isItemAvailable(it, player)) continue;
-    pool.push({ ...it, tag: 'Item' });
+    pool.push({ ...it, name: dName('items', it), desc: dDesc('items', it), tag: t('card.tagItem') });
   }
   return pool;
 }

@@ -22,6 +22,7 @@ const ASSETS = [
   './src/engine/camera.js',
   './src/engine/sprites.js',
   './src/engine/storage.js',
+  './src/engine/i18n.js',
   './src/game/config.js',
   './src/game/elements.js',
   './src/game/upgrades.js',

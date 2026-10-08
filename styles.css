@@ -233,6 +233,27 @@ html, body {
 kbd { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; padding: 1px 7px; font-size: 11px; color: #fff; }
 .settings-row { display: flex; gap: 18px; justify-content: center; margin-top: 18px; color: var(--muted); font-size: 13px; }
 .settings-row label { display: flex; align-items: center; gap: 6px; cursor: pointer; pointer-events: auto; }
+.lang-field { gap: 8px; }
+.lang-select {
+  pointer-events: auto;
+  appearance: none;
+  background: rgba(12, 18, 38, 0.85);
+  color: var(--text, #eaf0ff);
+  border: 1px solid rgba(120, 150, 220, 0.35);
+  border-radius: 8px;
+  padding: 5px 28px 5px 10px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: right 12px center, right 7px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.lang-select:hover { border-color: rgba(150, 180, 255, 0.6); }
+.lang-select:focus-visible { outline: none; border-color: var(--gold, #ffd447); box-shadow: 0 0 0 2px rgba(255, 212, 71, 0.3); }
+.lang-select option { background: #0c1226; color: var(--text, #eaf0ff); }
 
 /* Level up */
 .levelup-panel { width: min(900px, 96vw); }
