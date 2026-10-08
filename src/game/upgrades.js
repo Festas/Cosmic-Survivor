@@ -83,6 +83,16 @@ export const ITEMS = [
   I('speed', 'Ion Thrusters', 'common', '🚀', '+12% move speed', (s) => { s.moveSpeed *= 1.12; }, { maxStacks: 4 }),
   I('magnet', 'Graviton Magnet', 'common', '🧲', '+45% pickup radius & +12% XP', (s) => { s.pickupRadius *= 1.45; s.xpMul *= 1.12; }, { maxStacks: 4 }),
   I('luck', 'Lucky Core', 'rare', '🍀', '+20% rarer card odds', (s) => { s.luck = (s.luck || 0) + 0.2; }, { maxStacks: 3 }),
+
+  // ---- Corrosion Protocol: new synergy items ---------------------------
+  I('catalyst', 'Corrosive Catalyst', 'epic', '⚗️', '+30% elemental & reaction damage & +11% attack speed', (s) => { s.elementMul *= 1.3; s.cooldownMul *= 0.89; }, { maxStacks: 3, tags: ['element'], req: (s) => hasAnyImbue(s) }),
+  I('xpgain', 'Synaptic Booster', 'rare', '🧠', '+30% XP gain', (s) => { s.xpMul *= 1.3; }, { maxStacks: 4 }),
+  I('overcharge_area', 'Graviton Overcharge', 'rare', '🧿', '+20% blast radius, +15% range & +20% knockback', (s) => { s.areaMul *= 1.2; s.range *= 1.15; s.knockback *= 1.2; }, { maxStacks: 3, tags: ['area'] }),
+  I('juggernaut', 'Juggernaut Plating', 'epic', '🦾', '+40 max HP & +2 armor', (s) => { s.maxHp += 40; s.pendingHeal = (s.pendingHeal || 0) + 40; s.armor += 2; }, { maxStacks: 3 }),
+  I('bloodrush', 'Blood Rush', 'epic', '🫀', '+2% lifesteal & +8% attack speed', (s) => { s.lifesteal += 0.02; s.cooldownMul *= 0.92; }, { maxStacks: 3 }),
+  I('evasion', 'Mirage Drive', 'rare', '🫧', '+6% dodge & +9% move speed', (s) => { s.dodge = Math.min(0.5, s.dodge + 0.06); s.moveSpeed *= 1.09; }, { maxStacks: 4 }),
+  I('unstable', 'Unstable Core', 'legendary', '🧬', '+45% weapon damage & +12% attack speed', (s) => { s.weaponDamageMul *= 1.45; s.cooldownMul *= 0.88; }, { maxStacks: 2 }),
+  I('swarm_drone', 'Swarm Protocol', 'epic', '🛸', '+1 drone & +20% drone damage', (s) => { s.droneCount += 1; s.droneDamageMul *= 1.2; }, { maxStacks: 3, tags: ['drone'] }),
 ];
 
 export const ITEM_BY_ID = Object.create(null);
