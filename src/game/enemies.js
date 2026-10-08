@@ -533,6 +533,95 @@ export const ENEMY_TYPES = {
       }
     },
   },
+
+  // ---- Corrosion Protocol archetypes --------------------------------------
+  // A fifth wave of mobs: three themed around the new Toxin element plus two
+  // heavier pressure units. Each reuses an existing silhouette + bullet
+  // primitive, so there are no new render or world hooks.
+
+  // Toxin zoner: hangs at mid range and lobs a slow aimed acid spread, staking
+  // out ground the player has to push through.
+  corroder: {
+    key: 'corroder', name: 'Corroder', hp: 46, speed: 60, radius: 16, damage: 11, xp: 3,
+    color: COLORS.toxin, shape: 'octopus',
+    update(e, dt, world) {
+      const p = world.player;
+      const d = dist(e.x, e.y, p.x, p.y);
+      if (d < 220) steerTo(e, p.x, p.y, dt, -0.6);
+      else if (d > 360) steerTo(e, p.x, p.y, dt, 0.8);
+      else {
+        const a = angleTo(e.x, e.y, p.x, p.y) + Math.PI / 2;
+        steerTo(e, e.x + Math.cos(a) * 50, e.y + Math.sin(a) * 50, dt, 0.6);
+      }
+      e.spitT = (e.spitT ?? randRange(1, 2)) - dt;
+      if (e.spitT <= 0 && d < 600) {
+        e.spitT = 2.2;
+        aimedSpread(world, e, 4, 0.18, 230, e.damage, COLORS.toxin, 3.4, 9);
+        world.audio?.play('espit');
+      }
+    },
+  },
+  // Toxin pod: drifts straight in and, when destroyed, bursts into a slow ring of
+  // lingering spores — punishing point-blank kills and seeding the arena.
+  sporepod: {
+    key: 'sporepod', name: 'Spore Pod', hp: 40, speed: 64, radius: 16, damage: 10, xp: 3,
+    color: COLORS.toxin, shape: 'blob',
+    update(e, dt, world) { steerTo(e, world.player.x, world.player.y, dt, 0.85); },
+    onDeath(e, world) {
+      ringBurst(world, e, 10, 90, Math.max(6, Math.round(e.damage * 0.7)), COLORS.toxin, rand() * TAU, 3.4);
+      world.audio?.play('implode');
+    },
+  },
+  // Walking bullet-garden: keeps mid distance and continuously bleeds a slow
+  // rotating spiral, forcing constant repositioning.
+  vortex: {
+    key: 'vortex', name: 'Vortex', hp: 72, speed: 46, radius: 17, damage: 12, xp: 4,
+    color: COLORS.void, shape: 'ufo',
+    update(e, dt, world) {
+      const p = world.player;
+      const d = dist(e.x, e.y, p.x, p.y);
+      if (d < 260) steerTo(e, p.x, p.y, dt, -0.5);
+      else if (d > 420) steerTo(e, p.x, p.y, dt, 0.7);
+      else {
+        const a = angleTo(e.x, e.y, p.x, p.y) + Math.PI / 2;
+        steerTo(e, e.x + Math.cos(a) * 60, e.y + Math.sin(a) * 60, dt, 0.5);
+      }
+      e.emitT = (e.emitT ?? 0) - dt;
+      if (e.emitT <= 0 && d < 680) {
+        e.emitT = 0.22;
+        spiralEmit(world, e, 2, 0.42, 150, Math.round(e.damage * 0.7), COLORS.void, 3.8, 7);
+      }
+    },
+  },
+  // Heavy siege unit: creeps forward and telegraphs a dodgeable bullet wall with
+  // a single central gap, rewarding players who read the opening and thread it.
+  harbinger: {
+    key: 'harbinger', name: 'Harbinger', hp: 120, speed: 40, radius: 24, damage: 15, xp: 5,
+    color: COLORS.invAmber, shape: 'hex', massive: true,
+    update(e, dt, world) {
+      steerTo(e, world.player.x, world.player.y, dt, 0.4);
+      e.wallT = (e.wallT ?? randRange(1.6, 2.6)) - dt;
+      if (e.wallT <= 0 && dist(e.x, e.y, world.player.x, world.player.y) < 680) {
+        e.wallT = 3;
+        wallWithGap(world, e, 11, 1.5, 180, Math.round(e.damage * 0.7), COLORS.invAmber);
+        world.audio?.play('bossfire');
+      }
+    },
+  },
+  // Splits on death into a pair of fast harriers that scatter outward, so
+  // cornering it just trades one threat for two quicker ones.
+  revenant: {
+    key: 'revenant', name: 'Revenant', hp: 50, speed: 98, radius: 14, damage: 12, xp: 3,
+    color: COLORS.invMagenta, shape: 'arrow',
+    update(e, dt, world) { steerTo(e, world.player.x, world.player.y, dt, 0.95); },
+    onDeath(e, world) {
+      if (e.isSplit) return;
+      for (let i = 0; i < 2; i++) {
+        const c = world.spawnEnemy('sparkling', e.x + randRange(-14, 14), e.y + randRange(-14, 14));
+        if (c) { c.isSplit = true; c.hp = c.maxHp = 16; c.xp = 1; }
+      }
+    },
+  },
 };
 
 // Per-boss `cfg` for the shared bossThink brain, hoisted to module scope so the
@@ -827,6 +916,11 @@ const SPAWN_TABLE = [
   ['seeder', 60, (t) => 3 + t * 0.01],
   ['sentinel', 90, (t) => 2 + t * 0.008],
   ['bulwark', 85, (t) => 2 + t * 0.008],
+  ['corroder', 65, (t) => 3 + t * 0.01],
+  ['sporepod', 75, (t) => 2.5 + t * 0.008],
+  ['vortex', 110, (t) => 2 + t * 0.008],
+  ['harbinger', 120, (t) => 1.5 + t * 0.006],
+  ['revenant', 100, (t) => 2 + t * 0.008],
 ];
 
 export function pickEnemyType(t, r = rand) {

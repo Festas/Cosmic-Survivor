@@ -29,17 +29,17 @@ export const THEMES = [
   },
   {
     id: 'verdant', name: 'Verdant Hive', boss: 'hivequeen',
-    roster: [['swarm', 8], ['seeder', 5], ['bomber', 4], ['splitter', 4]],
+    roster: [['swarm', 8], ['seeder', 5], ['bomber', 4], ['splitter', 4], ['corroder', 4], ['sporepod', 4]],
     bg: { bg0: '#050c08', bg1: '#0a2416', nebula: ['rgba(40,160,90,0.18)', 'rgba(90,185,60,0.16)', 'rgba(40,120,80,0.16)'], accent: '#5dff7a' },
   },
   {
     id: 'amber', name: 'Amber Legion', boss: 'siegemarshal',
-    roster: [['crab', 7], ['sentinel', 3], ['mortar', 3], ['bulwark', 4], ['brute', 3]],
+    roster: [['crab', 7], ['sentinel', 3], ['mortar', 3], ['bulwark', 4], ['brute', 3], ['harbinger', 3]],
     bg: { bg0: '#0c0a05', bg1: '#241a08', nebula: ['rgba(200,150,40,0.18)', 'rgba(200,110,40,0.16)', 'rgba(160,100,30,0.16)'], accent: '#ffd23d' },
   },
   {
     id: 'void', name: 'Void Choir', boss: 'singularis',
-    roster: [['swarm', 7], ['splitter', 5], ['seeder', 4], ['weaver', 4]],
+    roster: [['swarm', 7], ['splitter', 5], ['seeder', 4], ['weaver', 4], ['vortex', 4]],
     bg: { bg0: '#08060f', bg1: '#160a24', nebula: ['rgba(120,60,200,0.20)', 'rgba(160,60,185,0.16)', 'rgba(90,40,165,0.16)'], accent: '#b06bff' },
   },
   {
@@ -49,7 +49,7 @@ export const THEMES = [
   },
   {
     id: 'spectral', name: 'Spectral Shoal', boss: 'phantom',
-    roster: [['weaver', 7], ['dasher', 6], ['orbiter', 5], ['sparkling', 4]],
+    roster: [['weaver', 7], ['dasher', 6], ['orbiter', 5], ['sparkling', 4], ['revenant', 4]],
     bg: { bg0: '#0c050c', bg1: '#240a22', nebula: ['rgba(200,50,160,0.20)', 'rgba(180,60,200,0.16)', 'rgba(150,40,120,0.16)'], accent: '#ff5df0' },
   },
   {
@@ -64,7 +64,7 @@ export const THEMES = [
   },
   {
     id: 'dread', name: 'Dread Nemesis', boss: 'nemesis',
-    roster: [['dasher', 6], ['weaver', 5], ['mortar', 4], ['bomber', 4], ['bulwark', 3], ['sentinel', 3]],
+    roster: [['dasher', 6], ['weaver', 5], ['mortar', 4], ['bomber', 4], ['bulwark', 3], ['sentinel', 3], ['harbinger', 3], ['corroder', 3], ['vortex', 3]],
     bg: { bg0: '#0a0608', bg1: '#1e0a12', nebula: ['rgba(200,40,60,0.22)', 'rgba(210,210,210,0.12)', 'rgba(140,30,50,0.18)'], accent: '#ff5d7a' },
   },
 ];

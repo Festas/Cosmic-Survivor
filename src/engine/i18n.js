@@ -438,6 +438,11 @@ const DE = {
     sparkling: { name: 'Funkling' },
     mortar: { name: 'Mörser' },
     bulwark: { name: 'Bollwerk' },
+    corroder: { name: 'Zersetzer' },
+    sporepod: { name: 'Sporenkapsel' },
+    vortex: { name: 'Wirbel' },
+    harbinger: { name: 'Vorbote' },
+    revenant: { name: 'Wiedergänger' },
   },
   bosses: {
     devourer: { name: 'Der Verschlinger' },

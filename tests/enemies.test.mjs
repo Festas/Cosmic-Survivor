@@ -121,6 +121,58 @@ test('the Bulwark is registered, well-formed and lays down an aimed volley', () 
   assert.ok(world.enemyBullets.length >= 5, 'bulwark should fire an aimed spread');
 });
 
+test('Corrosion Protocol mobs are registered, well-formed and behave', () => {
+  for (const key of ['corroder', 'sporepod', 'vortex', 'harbinger', 'revenant']) {
+    const def = ENEMY_TYPES[key];
+    assert.ok(def, `${key} should be registered`);
+    assert.equal(def.key, key, `${key} key mismatch`);
+    assert.ok(def.hp > 0 && def.radius > 0 && def.color, `${key} needs core fields`);
+    assert.equal(typeof def.update, 'function', `${key} needs an update()`);
+    assert.ok((def.xp || 0) >= 2, `${key} should be elite-eligible mid-tier`);
+  }
+  // Toxin/void shooters emit enemy bullets while active.
+  const world = {
+    player: { x: 300, y: 300 }, enemyBullets: [],
+    spawnEnemy() { return {}; }, shake() {}, audio: { play() {} },
+  };
+  for (const def of [ENEMY_TYPES.corroder, ENEMY_TYPES.vortex, ENEMY_TYPES.harbinger]) {
+    const e = { x: 0, y: 0, vx: 0, vy: 0, spin: 0, speed: def.speed, damage: def.damage };
+    assert.doesNotThrow(() => { for (let i = 0; i < 400; i++) def.update(e, 0.05, world); }, `${def.key} update threw`);
+  }
+  assert.ok(world.enemyBullets.length > 0, 'shooters should fire enemy bullets');
+});
+
+test('Spore Pod bursts into a spore ring on death', () => {
+  const world = { enemyBullets: [], audio: { play() {} } };
+  const e = { x: 100, y: 100, damage: 10 };
+  ENEMY_TYPES.sporepod.onDeath(e, world);
+  assert.ok(world.enemyBullets.length >= 8, 'spore pod seeds a ring of spores');
+});
+
+test('Revenant splits into two faster harriers on death (no infinite recursion)', () => {
+  let spawned = 0;
+  const world = { spawnEnemy() { spawned++; return { }; } };
+  ENEMY_TYPES.revenant.onDeath({ x: 0, y: 0, damage: 12 }, world);
+  assert.equal(spawned, 2, 'revenant splits into two');
+  // A split child must not split again.
+  ENEMY_TYPES.revenant.onDeath({ x: 0, y: 0, damage: 12, isSplit: true }, world);
+  assert.equal(spawned, 2, 'split children do not re-split');
+});
+
+test('new mobs appear in the late-game spawn table but not before unlock', () => {
+  const r = makeRng(11);
+  const seen = new Set();
+  for (let i = 0; i < 6000; i++) seen.add(pickEnemyType(240, r));
+  for (const key of ['corroder', 'sporepod', 'vortex', 'harbinger', 'revenant']) {
+    assert.ok(seen.has(key), `${key} should appear in the late game`);
+  }
+  const early = makeRng(13);
+  for (let i = 0; i < 1500; i++) {
+    assert.notEqual(pickEnemyType(50, early), 'vortex'); // unlocks at 110s
+    assert.notEqual(pickEnemyType(50, early), 'harbinger'); // unlocks at 120s
+  }
+});
+
 // ---- Elite affix ----------------------------------------------------------
 
 test('rollElite never promotes bosses or the xp:1 trash tier', () => {
