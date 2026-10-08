@@ -489,6 +489,147 @@ export const WEAPONS = [
       world.audio?.play('reaction');
     },
   }),
+
+  // 11) Venom Spitter — a rapid acid cone that corrodes the swarm. ----------
+  W({
+    id: 'venom', name: 'Venom Spitter', rarity: 'rare', icon: '☣️',
+    desc: 'Spits a fast cone of corrosive bolts. Melts anything caught in the spray.',
+    baseCd: 0.34, dmgMul: 0.7, lvlDmg: 0.16,
+    evolve: 'plague', req: (s) => s.imbue.toxin > 0, reqText: 'Corrosive Rounds',
+    fire(world, player, inst) {
+      const s = player.stats;
+      const t = player.acquireTarget(world);
+      const ang = t ? angleTo(player.x, player.y, t.x, t.y) : player.faceAngle;
+      const n = 3 + Math.floor((inst.level - 1) / 2) + s.projectilesBonus;
+      fan(world, player.x, player.y, ang, n, 0.14, () => {
+        const crit = rolledCrit(s);
+        return {
+          damage: withCrit(dmgOf(s, this, inst), crit, s), crit,
+          speed: s.bulletSpeed * randRange(0.9, 1.1), life: s.bulletLife * 0.7,
+          tint: COLORS.toxin, glow: COLORS.toxin,
+        };
+      });
+      world.muzzle(player.x + Math.cos(ang) * 18, player.y + Math.sin(ang) * 18, ang);
+      world.audio?.play('shoot');
+    },
+  }),
+  W({
+    id: 'plague', name: 'Plague Cannon', rarity: 'legendary', icon: '🧪', evolved: true,
+    desc: 'Hurls a heavy acid shell that bursts into a corrosive cloud on impact.',
+    baseCd: 0.5, dmgMul: 1.25, lvlDmg: 0.18,
+    fire(world, player, inst) {
+      const s = player.stats;
+      const t = player.acquireTarget(world);
+      const ang = t ? angleTo(player.x, player.y, t.x, t.y) : player.faceAngle;
+      const crit = rolledCrit(s);
+      const blast = (70 + inst.level * 5) * s.areaMul;
+      world.spawnBullet(player.x, player.y, ang, {
+        damage: withCrit(dmgOf(s, this, inst), crit, s), crit, pierce: 0,
+        radius: s.bulletRadius * 1.6, speed: s.bulletSpeed * 0.95, life: s.bulletLife * 1.1,
+        tint: COLORS.toxin, glow: COLORS.toxin,
+        explodeR: blast, explodeDmg: dmgOf(s, this, inst) * 0.7,
+      });
+      world.muzzle(player.x + Math.cos(ang) * 18, player.y + Math.sin(ang) * 18, ang);
+      world.audio?.play('shoot');
+    },
+  }),
+
+  // 12) Seeker Mines — drifting proximity charges that carpet the field. -----
+  W({
+    id: 'mines', name: 'Seeker Mines', rarity: 'rare', icon: '💣',
+    desc: 'Lays slow-drifting proximity mines that detonate when the swarm closes in.',
+    baseCd: 1.05, dmgMul: 1.7, lvlDmg: 0.2,
+    evolve: 'minefield', req: (s) => s.areaMul > 1.0001, reqText: 'any Area item',
+    fire(world, player, inst) {
+      const s = player.stats;
+      const t = player.acquireTarget(world);
+      const ang = t ? angleTo(player.x, player.y, t.x, t.y) : player.faceAngle;
+      const count = 2 + Math.floor(inst.level / 3);
+      const blast = (70 + inst.level * 6) * s.areaMul;
+      for (let i = 0; i < count; i++) {
+        const a = ang + randRange(-0.8, 0.8);
+        const crit = rolledCrit(s);
+        world.spawnBullet(player.x, player.y, a, {
+          damage: withCrit(dmgOf(s, this, inst) * 0.4, crit, s), crit, pierce: 0,
+          radius: s.bulletRadius * 1.3, speed: s.bulletSpeed * randRange(0.2, 0.34),
+          life: s.bulletLife * 3.2, homing: 0.8, knockback: s.knockback * 1.4,
+          tint: COLORS.danger, glow: COLORS.danger,
+          explodeR: blast, explodeDmg: dmgOf(s, this, inst),
+        });
+      }
+      world.audio?.play('shoot');
+    },
+  }),
+  W({
+    id: 'minefield', name: 'Minefield', rarity: 'legendary', icon: '💥', evolved: true,
+    desc: 'Saturates the arena with homing mines that chain into overlapping blasts.',
+    baseCd: 0.95, dmgMul: 1.9, lvlDmg: 0.2,
+    fire(world, player, inst) {
+      const s = player.stats;
+      const count = 3 + Math.floor(inst.level / 2) + s.projectilesBonus;
+      const blast = (90 + inst.level * 7) * s.areaMul;
+      for (let i = 0; i < count; i++) {
+        const a = (i / count) * TAU + (inst.phase = (inst.phase || 0) + 0.2);
+        const crit = rolledCrit(s);
+        world.spawnBullet(player.x, player.y, a, {
+          damage: withCrit(dmgOf(s, this, inst) * 0.45, crit, s), crit, pierce: 0,
+          radius: s.bulletRadius * 1.4, speed: s.bulletSpeed * randRange(0.25, 0.45),
+          life: s.bulletLife * 3.4, homing: 1.4, knockback: s.knockback * 1.5,
+          tint: COLORS.danger, glow: COLORS.fire,
+          explodeR: blast, explodeDmg: dmgOf(s, this, inst) * 1.1,
+        });
+      }
+      world.audio?.play('shoot');
+    },
+  }),
+
+  // 13) Prism Beam — a parallel lattice of piercing light lances. -----------
+  W({
+    id: 'prism', name: 'Prism Beam', rarity: 'epic', icon: '🔱',
+    desc: 'Splits a volley of piercing light-lances that rake straight through a line.',
+    baseCd: 0.85, dmgMul: 1.3, lvlDmg: 0.2,
+    evolve: 'trinity', req: (s) => s.pierce >= 2, reqText: '+2 pierce',
+    fire(world, player, inst) {
+      const s = player.stats;
+      const t = player.acquireTarget(world);
+      const ang = t ? angleTo(player.x, player.y, t.x, t.y) : player.aimAngle;
+      const lanes = 3 + Math.floor((inst.level - 1) / 3) + s.projectilesBonus;
+      fan(world, player.x, player.y, ang, lanes, 0.08, () => {
+        const crit = rolledCrit(s);
+        return {
+          damage: withCrit(dmgOf(s, this, inst), crit, s), crit,
+          pierce: 2 + s.pierce, speed: s.bulletSpeed * 1.5,
+          radius: s.bulletRadius * 1.1, life: s.bulletLife * 1.1,
+          tint: COLORS.shield, glow: COLORS.shield,
+        };
+      });
+      world.muzzle(player.x + Math.cos(ang) * 20, player.y + Math.sin(ang) * 20, ang);
+      world.audio?.play('shoot');
+    },
+  }),
+  W({
+    id: 'trinity', name: 'Trinity Beam', rarity: 'legendary', icon: '✴️', evolved: true,
+    desc: 'A radiant trident of unstoppable prisms that pierces everything it touches.',
+    baseCd: 0.72, dmgMul: 1.55, lvlDmg: 0.2,
+    fire(world, player, inst) {
+      const s = player.stats;
+      const t = player.acquireTarget(world);
+      const ang = t ? angleTo(player.x, player.y, t.x, t.y) : player.aimAngle;
+      const lanes = 5 + Math.floor(inst.level / 2) + s.projectilesBonus;
+      fan(world, player.x, player.y, ang, lanes, 0.09, () => {
+        const crit = rolledCrit(s);
+        return {
+          damage: withCrit(dmgOf(s, this, inst), crit, s), crit,
+          pierce: 6 + s.pierce, speed: s.bulletSpeed * 1.7,
+          radius: s.bulletRadius * 1.25, life: s.bulletLife * 1.2,
+          knockback: s.knockback * 1.1, tint: COLORS.shield, glow: COLORS.player,
+        };
+      });
+      world.muzzle(player.x + Math.cos(ang) * 22, player.y + Math.sin(ang) * 22, ang);
+      world.shake(2);
+      world.audio?.play('shoot');
+    },
+  }),
 ];
 
 export const WEAPON_BY_ID = Object.create(null);

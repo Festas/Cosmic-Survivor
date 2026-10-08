@@ -52,7 +52,7 @@ function G(id, name, icon, desc, opts) {
   };
 }
 
-// Sixteen ascending generators. Early ones are cheap trickle; later ones are the
+// Ascending generators. Early ones are cheap trickle; later ones are the
 // long-haul engine that makes Prestige worthwhile and give post-Collapse runs
 // something to keep chasing. baseCost and rate climb strictly monotonically so
 // there is always a meaningful next tier to unlock.
@@ -73,6 +73,9 @@ export const GENERATORS = [
   G('cosmicloom', 'Cosmic Loom', '🧵', 'Weaves the cosmic web itself into dense Nebula.', { baseCost: 1100000000000000, rate: 1000000000 }),
   G('realityengine', 'Reality Engine', '💠', 'Edits physical constants to overproduce.', { baseCost: 14000000000000000, rate: 6000000000 }),
   G('infinityspire', 'Infinity Spire', '🗼', 'A spire piercing the edge of everything. Endless output.', { baseCost: 180000000000000000, rate: 36000000000 }),
+  G('omnimatrix', 'Omni Matrix', '🔱', 'A lattice that computes Nebula into being from first principles.', { baseCost: 2200000000000000000, rate: 210000000000 }),
+  G('celestialfoundry', 'Celestial Foundry', '🏛️', 'Pours molten starstuff into Nebula ingots by the fleet-load.', { baseCost: 27000000000000000000, rate: 1200000000000 }),
+  G('eternityengine', 'Eternity Engine', '♾️', 'Runs outside of time, so its output has already happened.', { baseCost: 330000000000000000000, rate: 7000000000000 }),
 ];
 
 export const GENERATOR_BY_ID = Object.create(null);

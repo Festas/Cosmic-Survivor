@@ -104,6 +104,46 @@ export const SHIPS = [
       s.moveSpeed *= 0.94;
     },
   }),
+  S({
+    id: 'basilisk', name: 'Basilisk', icon: '🐍',
+    tag: 'Plaguebringer · acid & decay',
+    desc: 'Dissolves the swarm with corrosive venom. Starts with the Venom Spitter.',
+    weapon: 'venom', color: COLORS.toxin, unlockCost: 600,
+    apply(s) {
+      s.imbue.toxin = Math.min(1, s.imbue.toxin + 0.6);
+      s.elementMul *= 1.3;
+      s.cooldownMul *= 0.92;
+      s.areaMul *= 1.1;
+      s.maxHp -= 5;
+    },
+  }),
+  S({
+    id: 'demolisher', name: 'Demolisher', icon: '💣',
+    tag: 'Sapper · mines & blasts',
+    desc: 'Carpets the arena with explosives and soaks the counterattack. Lays Seeker Mines.',
+    weapon: 'mines', color: COLORS.danger, unlockCost: 640,
+    apply(s) {
+      s.areaMul *= 1.25;
+      s.explosiveChance = Math.min(0.6, s.explosiveChance + 0.15);
+      s.explosiveDamage += 22;
+      s.knockback *= 1.2;
+      s.maxHp += 25;
+      s.moveSpeed *= 0.95;
+    },
+  }),
+  S({
+    id: 'spectre', name: 'Spectre', icon: '👁️',
+    tag: 'Lightbringer · pierce & range',
+    desc: 'Rakes piercing light through entire columns of foes. Opens with the Prism Beam.',
+    weapon: 'prism', color: COLORS.shield, unlockCost: 680,
+    apply(s) {
+      s.pierce += 2;
+      s.projectileSpeedMul *= 1.15;
+      s.range *= 1.15;
+      s.critChance += 0.06;
+      s.maxHp -= 10;
+    },
+  }),
 ];
 
 export const SHIP_BY_ID = Object.create(null);

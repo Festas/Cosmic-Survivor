@@ -65,6 +65,22 @@ export const ACHIEVEMENTS = [
     (c) => n(c.bossKills) >= 5),
   A('slayer_50k', 'Annihilator', '💀', 'Defeat 50,000 enemies across all runs.', 220,
     (c) => n(c.totalKills) >= 50000),
+  A('veteran', 'Veteran', '🎖️', 'Complete 25 runs.', 40,
+    (c) => n(c.runs) >= 25),
+  A('survive_30', 'Immortal', '🛡️', 'Survive for 30 minutes in one run.', 300,
+    (c) => n(c.time) >= 1800),
+  A('massacre', 'Massacre', '🔪', 'Defeat 250 enemies in a single run.', 45,
+    (c) => n(c.kills) >= 250),
+  A('slayer_100k', 'Oblivion', '🪦', 'Defeat 100,000 enemies across all runs.', 320,
+    (c) => n(c.totalKills) >= 100000),
+  A('boss_legion', 'Boss Legion', '🏅', 'Destroy 25 bosses across all runs.', 140,
+    (c) => n(c.bossKillsTotal) >= 25),
+  A('boss_apex', 'Apex Predator', '🐲', 'Destroy 8 bosses in a single run.', 160,
+    (c) => n(c.bossKills) >= 8),
+  A('reactor_master', 'Reactor Master', '🔮', 'Trigger 250 elemental reactions in one run.', 110,
+    (c) => n(c.reactions) >= 250),
+  A('ascendant_40', 'Godlike', '🌌', 'Reach character level 40 in a single run.', 140,
+    (c) => n(c.level) >= 40),
 ];
 
 export const ACHIEVEMENT_BY_ID = Object.create(null);

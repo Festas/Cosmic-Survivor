@@ -125,6 +125,21 @@ export const META_UPGRADES = [
     apply: (b, l) => { b.revives += l; },
     effect: (l) => (l > 0 ? '1 revive per run' : ''),
   }),
+  M('executioner', 'Executioner Protocol', '⚔️', '+12% crit damage per level', {
+    max: 6, baseCost: 75, costGrowth: 1.7,
+    apply: (b, l) => { b.critMultAdd += 0.12 * l; },
+    effect: (l) => `+${Math.round(0.12 * l * 100)}% crit damage`,
+  }),
+  M('ordnance', 'Ordnance Bay', '🧨', '+6% blast & field radius per level', {
+    max: 5, baseCost: 70, costGrowth: 1.65,
+    apply: (b, l) => { b.areaMul *= 1 + 0.06 * l; },
+    effect: (l) => `+${Math.round(0.06 * l * 100)}% area`,
+  }),
+  M('penetrator', 'Penetrator Rounds', '➹', '+1 pierce per level', {
+    max: 3, baseCost: 120, costGrowth: 2,
+    apply: (b, l) => { b.pierceAdd += l; },
+    effect: (l) => `+${l} pierce`,
+  }),
 ];
 
 export const META_BY_ID = Object.create(null);

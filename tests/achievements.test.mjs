@@ -77,6 +77,14 @@ test('content-pack commendations unlock at their milestone thresholds', () => {
     ['chain_reactor', { reactions: 120 }, { reactions: 119 }],
     ['boss_rush', { bossKills: 5 }, { bossKills: 4 }],
     ['slayer_50k', { totalKills: 50000 }, { totalKills: 49999 }],
+    ['veteran', { runs: 25 }, { runs: 24 }],
+    ['survive_30', { time: 1800 }, { time: 1799 }],
+    ['massacre', { kills: 250 }, { kills: 249 }],
+    ['slayer_100k', { totalKills: 100000 }, { totalKills: 99999 }],
+    ['boss_legion', { bossKillsTotal: 25 }, { bossKillsTotal: 24 }],
+    ['boss_apex', { bossKills: 8 }, { bossKills: 7 }],
+    ['reactor_master', { reactions: 250 }, { reactions: 249 }],
+    ['ascendant_40', { level: 40 }, { level: 39 }],
   ];
   for (const [id, hit, miss] of cases) {
     const def = ACHIEVEMENT_BY_ID[id];

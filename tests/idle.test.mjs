@@ -48,6 +48,16 @@ test('generators ascend in both cost and rate', () => {
   }
 });
 
+test('endgame generators extend the top tier beyond Infinity Spire', () => {
+  const spire = GENERATOR_BY_ID.infinityspire;
+  for (const id of ['omnimatrix', 'celestialfoundry', 'eternityengine']) {
+    const g = GENERATOR_BY_ID[id];
+    assert.ok(g, `generator ${id} should exist`);
+    assert.ok(g.rate > spire.rate, `${id} out-produces Infinity Spire`);
+    assert.ok(g.baseCost > spire.baseCost, `${id} costs more than Infinity Spire`);
+  }
+});
+
 test('generatorCost grows geometrically with ownership', () => {
   const def = GENERATORS[0];
   assert.equal(generatorCost(def, 0), def.baseCost);

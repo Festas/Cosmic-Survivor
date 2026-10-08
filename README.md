@@ -31,7 +31,7 @@ Blink through danger on a short cooldown. The dash grants **i-frames**, briefly 
 anything you pass. *Rift Blades* turn your escape tool into an offensive weapon.
 
 ### ✴️ Elemental Resonance
-Imbue your shots with **Fire, Cryo, Shock, or Void**. Applying a second element to an
+Imbue your shots with **Fire, Cryo, Shock, Void, or Toxin**. Applying a second element to an
 already-afflicted enemy triggers a **Resonance reaction**:
 
 | Combo            | Reaction       | Effect                                  |
@@ -42,7 +42,12 @@ already-afflicted enemy triggers a **Resonance reaction**:
 | Fire + Void      | **Collapse**   | Gravity burst that pulls enemies in     |
 | Cryo + Void      | **Black Ice**  | Freezing gravity well                   |
 | Shock + Void     | **Ion Storm**  | Long-range chain lightning + pull       |
+| Fire + Toxin     | **Combust**    | Volatile toxic burst + knockback        |
+| Cryo + Toxin     | **Frostbite**  | Freezing corrosive field                |
+| Shock + Toxin    | **Electrolysis** | Corrosive chain lightning             |
+| Toxin + Void     | **Dissolve**   | Dissolving gravity field                |
 
+Toxin also leaves a lingering **Corrode** damage-over-time on anything it touches.
 Stack *Resonance Cascade* to make every reaction hit even harder.
 
 ### 🟡 Elite raiders
@@ -70,14 +75,14 @@ and bosses downed (the *Salvage Rig* upgrade multiplies the haul). Spend it in t
 **Hangar**, reachable from the start and game-over screens.
 
 ### 🌟 Ascension
-A tree of **14 permanent upgrades** bought with Stardust — more max HP, damage, move speed,
+A tree of **17 permanent upgrades** bought with Stardust — more max HP, damage, move speed,
 armor, regen, crit, attack speed, XP & pickup range, luck, Singularity charge, Stardust
-gain, **dodge** and **lifesteal**, and the capstone **Phoenix Protocol**, which revives you
-once per run at half HP with a clearing nova. Levels persist forever and layer on top of your
-ship and in-run drafts.
+gain, **dodge** and **lifesteal**, **crit damage**, **blast radius** and **pierce**, and the
+capstone **Phoenix Protocol**, which revives you once per run at half HP with a clearing nova.
+Levels persist forever and layer on top of your ship and in-run drafts.
 
 ### 🚀 Starfighters
-Pick from **7 ships**, each a distinct build identity with its own starter weapon, stat
+Pick from **10 ships**, each a distinct build identity with its own starter weapon, stat
 profile and accent colour:
 
 | Ship | Style | Starter | Identity |
@@ -89,6 +94,9 @@ profile and accent colour:
 | 🔥 **Pyre** | Pyromancer | Missile Pod | Fire imbue + explosions |
 | 🌀 **Oracle** | Voidcaller | Graviton Mortar | Void imbue + supercharged Singularity |
 | ❄️ **Frostbite** | Cryo bruiser | Hailstorm | Cryo imbue + bigger blasts, tanky but slow |
+| 🐍 **Basilisk** | Plaguebringer | Venom Spitter | Toxin imbue + stronger reactions |
+| 💣 **Demolisher** | Sapper | Seeker Mines | +area/explosions/HP, slower |
+| 👁️ **Spectre** | Lightbringer | Prism Beam | +pierce/range/crit, fragile |
 
 Ships beyond the Vanguard are unlocked permanently with Stardust.
 
@@ -170,6 +178,9 @@ own the passive it craves, it **evolves** into a legendary form:
 | Halo Launcher      | **Corona Burst**    | Split Barrel ×2 (+projectiles)   |
 | Arc Whip           | **Rift Reaver**     | Vampiric Circuit (lifesteal)     |
 | Hailstorm          | **Absolute Zero**   | Cryo Rounds (cryo imbue)         |
+| Venom Spitter      | **Plague Cannon**   | Corrosive Rounds (toxin imbue)   |
+| Seeker Mines       | **Minefield**       | any Area item                    |
+| Prism Beam         | **Trinity Beam**    | +2 pierce                        |
 
 **Passive items** are shared stat augments — damage, crit, haste, pierce, elemental imbues,
 drones, lifesteal, armor and more — that buff *every* weapon and ability at once, so builds

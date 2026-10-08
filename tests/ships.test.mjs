@@ -83,3 +83,21 @@ test('Frostbite is a cryo bruiser that opens with the Hailstorm', () => {
   assert.ok(s.moveSpeed < base.moveSpeed, 'frostbite trades speed for bulk');
   assert.ok(s.elementMul > base.elementMul, 'frostbite boosts elemental power');
 });
+
+test('Basilisk is a toxin ship that opens with the Venom Spitter', () => {
+  const basilisk = SHIP_BY_ID.basilisk;
+  assert.ok(basilisk, 'basilisk ship should exist');
+  assert.equal(basilisk.weapon, 'venom');
+  assert.ok(WEAPON_BY_ID.venom && !WEAPON_BY_ID.venom.evolved, 'venom must be a real base weapon');
+  const base = createStats();
+  const s = createStats(); basilisk.apply(s);
+  assert.ok(s.imbue.toxin > base.imbue.toxin, 'basilisk imbues Toxin');
+  assert.ok(s.elementMul > base.elementMul, 'basilisk boosts elemental power');
+});
+
+test('Spectre grants enough pierce for its Prism Beam to evolve', () => {
+  const spectre = SHIP_BY_ID.spectre;
+  assert.equal(spectre.weapon, 'prism');
+  const s = createStats(); spectre.apply(s);
+  assert.ok(s.pierce >= 2, 'spectre seeds the pierce needed for Trinity Beam');
+});

@@ -14,6 +14,7 @@ export const COLORS = {
   fire: '#ff6a3d',
   cryo: '#7fdbff',
   shock: '#ffe24d',
+  toxin: '#8aff00',
   danger: '#ff3b6b',
   white: '#ffffff',
   shield: '#64f0ff',

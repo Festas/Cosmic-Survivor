@@ -1015,7 +1015,7 @@ export class World {
     this.particles.burst(b.x, b.y, COLORS.white, 2, { speed: 140, life: 0.2, size: 2, budget: 500 });
     if (!e.alive) return;
     // elemental imbues -> possible reactions
-    for (const key of ['fire', 'cryo', 'shock', 'void']) {
+    for (const key of ['fire', 'cryo', 'shock', 'void', 'toxin']) {
       const c = s.imbue[key];
       if (c > 0 && chance(c, this.rng)) {
         const reaction = applyElement(e.status, key, s.elementMul);

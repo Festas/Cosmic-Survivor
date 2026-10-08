@@ -90,3 +90,11 @@ test('evasion and siphon meta fold into dodge and lifesteal bonuses', () => {
   assert.equal(neutral.dodgeAdd, 0);
   assert.equal(neutral.lifestealAdd, 0);
 });
+
+test('executioner, ordnance and penetrator meta fold into crit/area/pierce bonuses', () => {
+  assert.ok(META_BY_ID.executioner && META_BY_ID.ordnance && META_BY_ID.penetrator);
+  const b = computeMetaBonus({ executioner: 3, ordnance: 2, penetrator: 2 });
+  assert.ok(Math.abs(b.critMultAdd - 0.36) < 1e-9, '+12% crit damage * 3 levels');
+  assert.ok(Math.abs(b.areaMul - 1.12) < 1e-9, '+6% area * 2 levels (multiplicative)');
+  assert.equal(b.pierceAdd, 2, '+1 pierce * 2 levels');
+});
