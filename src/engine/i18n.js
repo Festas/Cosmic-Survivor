@@ -380,6 +380,7 @@ const DE = {
     imbue_cryo: { name: 'Kryogeschosse', desc: 'Schüsse wirken Kryo (verlangsamen/einfrieren)' },
     imbue_shock: { name: 'Teslageschosse', desc: 'Schüsse schocken Gegner (Ketten)' },
     imbue_void: { name: 'Leerengeschosse', desc: 'Schüsse wirken Leere (Schwerkraft) & stärken die Singularität' },
+    imbue_toxin: { name: 'Korrosionsgeschosse', desc: 'Schüsse zersetzen Gegner (schwerer Säure-Schaden)' },
     resonance: { name: 'Resonanzkaskade', desc: '+40% Elementar- & Reaktionsschaden' },
     sing_charge: { name: 'Dunkle-Materie-Kondensator', desc: '+30% Singularitäts-Laderate' },
     sing_power: { name: 'Ereignishorizont', desc: '+35% Singularitätsgröße & -schaden' },
@@ -576,6 +577,10 @@ const DE = {
     Collapse: 'Kollaps',
     'Black Ice': 'Schwarzeis',
     'Ion Storm': 'Ionensturm',
+    Combust: 'Verbrennung',
+    Frostbite: 'Erfrierung',
+    Electrolysis: 'Elektrolyse',
+    Dissolve: 'Zersetzung',
   },
 };
 

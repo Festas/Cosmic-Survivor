@@ -19,8 +19,22 @@ test('every element pair has a defined reaction', () => {
   }
 });
 
-test('REACTIONS table has 6 combos (4 elements choose 2)', () => {
-  assert.equal(Object.keys(REACTIONS).length, 6);
+test('REACTIONS table covers every element pair (n choose 2)', () => {
+  const n = ELEMENT_KEYS.length;
+  assert.equal(Object.keys(REACTIONS).length, (n * (n - 1)) / 2);
+});
+
+test('toxin is a registered element that corrodes and reacts with everything', () => {
+  assert.ok(ELEMENT_KEYS.includes('toxin'));
+  assert.ok(ELEMENTS.toxin && ELEMENTS.toxin.dps > 0, 'toxin should be a damage-over-time element');
+  const s = createStatus();
+  assert.equal(applyElement(s, 'toxin'), null);
+  assert.ok(s.toxin > 0 && hasAnyStatus(s));
+  // Toxin pairs with each other element to form a distinct reaction.
+  for (const other of ['fire', 'cryo', 'shock', 'void']) {
+    const r = getReaction('toxin', other);
+    assert.ok(r && r.name && r.type && r.damage > 0, `missing toxin|${other} reaction`);
+  }
 });
 
 test('applying one element sets a duration, no reaction', () => {

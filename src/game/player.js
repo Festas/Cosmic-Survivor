@@ -65,7 +65,7 @@ export function createStats() {
     singularityDamageMul: 1,
 
     elementMul: 1,
-    imbue: { fire: 0, cryo: 0, shock: 0, void: 0 },
+    imbue: { fire: 0, cryo: 0, shock: 0, void: 0, toxin: 0 },
 
     explosiveChance: 0,
     explosiveDamage: 0,

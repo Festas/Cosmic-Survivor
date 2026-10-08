@@ -9,9 +9,10 @@ export const ELEMENTS = {
   cryo: { key: 'cryo', name: 'Cryo', color: COLORS.cryo, duration: 3.0, slow: 0.5 },
   shock: { key: 'shock', name: 'Shock', color: COLORS.shock, duration: 1.4, dps: 4 },
   void: { key: 'void', name: 'Void', color: COLORS.void, duration: 2.4, dps: 6, pull: 1 },
+  toxin: { key: 'toxin', name: 'Corrode', color: COLORS.toxin, duration: 3.4, dps: 13 },
 };
 
-export const ELEMENT_KEYS = ['fire', 'cryo', 'shock', 'void'];
+export const ELEMENT_KEYS = ['fire', 'cryo', 'shock', 'void', 'toxin'];
 
 // Resonance reactions, keyed by the two elements sorted alphabetically.
 // `type` tells world.js how to resolve the spatial effect.
@@ -22,6 +23,11 @@ export const REACTIONS = {
   'fire|void': { name: 'Collapse', type: 'burst', color: COLORS.void, damage: 60, radius: 150, pull: 1, knockback: 60 },
   'cryo|void': { name: 'Black Ice', type: 'field', color: COLORS.cryo, damage: 24, radius: 140, freeze: 1.5, pull: 1 },
   'shock|void': { name: 'Ion Storm', type: 'chain', color: COLORS.void, damage: 34, radius: 200, chain: 6, pull: 1 },
+  // ---- Toxin resonances (acid corrosion meeting every other element) --------
+  'fire|toxin': { name: 'Combust', type: 'burst', color: COLORS.toxin, damage: 92, radius: 120, knockback: 180 },
+  'cryo|toxin': { name: 'Frostbite', type: 'field', color: COLORS.toxin, damage: 30, radius: 150, freeze: 1.1, slow: 0.5, slowDur: 2.6 },
+  'shock|toxin': { name: 'Electrolysis', type: 'chain', color: COLORS.toxin, damage: 40, radius: 190, chain: 5 },
+  'toxin|void': { name: 'Dissolve', type: 'field', color: COLORS.toxin, damage: 36, radius: 170, slow: 0.5, slowDur: 2.8, pull: 1 },
 };
 
 export function reactionKey(a, b) {
@@ -33,7 +39,7 @@ export function getReaction(a, b) {
 }
 
 export function createStatus() {
-  return { fire: 0, cryo: 0, shock: 0, void: 0, freeze: 0, slowField: 0, slowFieldAmt: 0 };
+  return { fire: 0, cryo: 0, shock: 0, void: 0, toxin: 0, freeze: 0, slowField: 0, slowFieldAmt: 0 };
 }
 
 // Returns the first active element on `status` other than `except`, by priority.
@@ -114,6 +120,7 @@ export function hasAnyStatus(status) {
     status.cryo > 0 ||
     status.shock > 0 ||
     status.void > 0 ||
+    status.toxin > 0 ||
     status.freeze > 0 ||
     status.slowField > 0
   );

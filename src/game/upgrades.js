@@ -32,7 +32,7 @@ function I(id, name, rarity, icon, desc, apply, opts = {}) {
 }
 
 function hasAnyImbue(s) {
-  return s.imbue.fire > 0 || s.imbue.cryo > 0 || s.imbue.shock > 0 || s.imbue.void > 0;
+  return s.imbue.fire > 0 || s.imbue.cryo > 0 || s.imbue.shock > 0 || s.imbue.void > 0 || s.imbue.toxin > 0;
 }
 
 export const ITEMS = [
@@ -53,6 +53,7 @@ export const ITEMS = [
   I('imbue_cryo', 'Cryo Rounds', 'rare', '❄️', 'Shots apply Cryo (slow/freeze)', (s) => { s.imbue.cryo = Math.min(1, s.imbue.cryo + 0.6); }, { maxStacks: 2, tags: ['element'] }),
   I('imbue_shock', 'Tesla Rounds', 'rare', '⚡', 'Shots Shock enemies (chains)', (s) => { s.imbue.shock = Math.min(1, s.imbue.shock + 0.6); }, { maxStacks: 2, tags: ['element'] }),
   I('imbue_void', 'Void Rounds', 'epic', '🟣', 'Shots apply Void (gravity) & boost Singularity', (s) => { s.imbue.void = Math.min(1, s.imbue.void + 0.6); s.singularityChargeMul *= 1.15; }, { maxStacks: 2, tags: ['element'] }),
+  I('imbue_toxin', 'Corrosive Rounds', 'epic', '☣️', 'Shots Corrode enemies (heavy acid DoT)', (s) => { s.imbue.toxin = Math.min(1, s.imbue.toxin + 0.6); }, { maxStacks: 2, tags: ['element'] }),
   I('resonance', 'Resonance Cascade', 'epic', '✴️', '+40% elemental & reaction damage', (s) => { s.elementMul *= 1.4; }, { maxStacks: 3, tags: ['element'], req: (s) => hasAnyImbue(s) }),
 
   // ---- Signature: Singularity ------------------------------------------
