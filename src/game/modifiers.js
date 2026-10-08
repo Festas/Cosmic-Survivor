@@ -51,6 +51,14 @@ export const DIRECTIVES = [
     (e) => { e.capMul *= 1.4; e.spawnMul *= 0.8; }),
   D('juggernauts', 'Juggernauts', '🗿', 'Enemies gain +60% HP but move 15% slower.', 'Tanky enemies', 1.2,
     (e) => { e.hpMul *= 1.6; e.speedMul *= 0.85; }),
+  D('berserk', 'Berserker Swarm', '🔥', 'Enemies move 15% faster and spawn far more often.', 'Relentless pressure', 1.35,
+    (e) => { e.speedMul *= 1.15; e.spawnMul *= 0.75; }),
+  D('fortress', 'Fortress Protocol', '🏯', 'Enemies have +40% HP and bosses +40% HP.', 'Damage sponges', 1.3,
+    (e) => { e.hpMul *= 1.4; e.bossHpMul *= 1.4; }),
+  D('scarcity', 'Scarcity', '🕯️', 'XP gain reduced by 30%.', 'Starved leveling', 1.3,
+    (e) => { e.xpMul *= 0.7; }),
+  D('cataclysm', 'Cataclysm', '🌋', 'You take +35% damage and enemies move 10% faster.', 'Brutal all-round', 1.45,
+    (e) => { e.dmgTakenMul *= 1.35; e.speedMul *= 1.1; }),
 ];
 
 export const DIRECTIVE_BY_ID = Object.create(null);

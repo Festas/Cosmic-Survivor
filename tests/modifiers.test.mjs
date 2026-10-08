@@ -84,3 +84,14 @@ test('juggernauts trade enemy speed for bulk', () => {
   assert.ok(e.speedMul < 1, 'slower enemies');
   assert.ok(e.stardustMul > 1);
 });
+
+test('fortress hardens enemies and bosses together', () => {
+  const e = computeDirectiveEffect(['fortress']);
+  assert.ok(e.hpMul > 1 && e.bossHpMul > 1, 'both enemy and boss HP rise');
+});
+
+test('cataclysm raises damage taken and enemy speed for a big reward', () => {
+  const e = computeDirectiveEffect(['cataclysm']);
+  assert.ok(e.dmgTakenMul > 1 && e.speedMul > 1);
+  assert.ok(e.stardustMul >= 1.45 - 1e-9, 'brutal directive pays the most');
+});
