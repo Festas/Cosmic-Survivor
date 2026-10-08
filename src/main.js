@@ -858,9 +858,11 @@ function togglePause(force) {
 }
 
 // ------------------------------------------------------------- level up UI
-const KIND_LABEL = {
-  'weapon-new': 'NEW WEAPON', 'weapon-up': 'UPGRADE', 'evolve': 'EVOLVE', 'item': 'ITEM',
+const KIND_KEY = {
+  'weapon-new': 'kind.weaponNew', 'weapon-up': 'kind.weaponUp', 'evolve': 'kind.evolve', 'item': 'kind.item',
 };
+function kindLabel(kind) { return KIND_KEY[kind] ? t(KIND_KEY[kind]) : ''; }
+function rarityLabel(rarity) { return t('rarity.' + rarity); }
 
 function showLevelUp(choices) {
   banishMode = false;
@@ -873,11 +875,11 @@ function showLevelUp(choices) {
     card.className = 'card' + (up.kind === 'evolve' ? ' evolve' : '');
     card.style.setProperty('--rarity', r.color);
     card.innerHTML = `
-      <div class="kind">${KIND_LABEL[up.kind] || ''}</div>
+      <div class="kind">${kindLabel(up.kind)}</div>
       <div class="icon">${up.icon}</div>
       <div class="name">${up.name}</div>
       <div class="desc">${up.desc}</div>
-      <div class="rarity">${up.tag || r.label} · ${i + 1}</div>`;
+      <div class="rarity">${up.tag || rarityLabel(up.rarity)} · ${i + 1}</div>`;
     card.addEventListener('click', () => {
       if (banishMode) doBanish(up);
       else pickUpgrade(up);
@@ -931,7 +933,7 @@ function showGameOver(summary) {
   const earned = summary.stardust || 0;
   const total = store.stardust;
   const goSd = $('go-stardust');
-  goSd.textContent = `✦ +${formatNumber(earned)} Stardust  ·  ${formatNumber(total)} total`;
+  goSd.textContent = t('go.stardust', { earned: formatNumber(earned), total: formatNumber(total) });
   goSd.classList.toggle('none', earned <= 0);
 
   // Nebula burst for the Orbital Station (idle layer) — shown only when earned so
@@ -939,7 +941,7 @@ function showGameOver(summary) {
   const goNeb = $('go-nebula');
   if (goNeb) {
     const neb = summary.nebula || 0;
-    goNeb.textContent = `⬡ +${formatNumber(neb)} Nebula  ·  ${formatNumber(summary.nebulaTotal || store.getIdle().nebula)} banked`;
+    goNeb.textContent = t('go.nebula', { earned: formatNumber(neb), banked: formatNumber(summary.nebulaTotal || store.getIdle().nebula) });
     goNeb.classList.toggle('hidden', neb <= 0);
   }
 
@@ -947,7 +949,7 @@ function showGameOver(summary) {
   if (gc) {
     if (newCommends.length) {
       gc.innerHTML = newCommends.map((a) =>
-        `<div class="commend"><span class="c-ico">${a.icon}</span><span class="c-name">${a.name}</span><span class="c-rew">✦ +${a.reward}</span></div>`).join('');
+        `<div class="commend"><span class="c-ico">${a.icon}</span><span class="c-name">${dName('achievements', a)}</span><span class="c-rew">✦ +${a.reward}</span></div>`).join('');
       gc.classList.remove('hidden');
     } else {
       gc.innerHTML = '';
@@ -992,7 +994,7 @@ function awardCommendations(summary) {
   for (const a of fresh) if (store.unlockAchievement(a.id)) bounty += a.reward || 0;
   if (bounty > 0) { store.addStardust(bounty); audio.play('levelup'); }
   for (const a of fresh) {
-    showToast(`<span class="t-ico">${a.icon}</span><div class="t-body"><b>${a.name}</b><span>Commendation · ✦ +${a.reward}</span></div>`);
+    showToast(`<span class="t-ico">${a.icon}</span><div class="t-body"><b>${dName('achievements', a)}</b><span>${t('toast.commendation', { reward: a.reward })}</span></div>`);
   }
   return fresh;
 }
@@ -1001,15 +1003,15 @@ function awardCommendations(summary) {
 function showToast(html) {
   const wrap = $('toast');
   if (!wrap) return;
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.innerHTML = html;
-  wrap.appendChild(t);
-  setTimeout(() => t.remove(), 3200);
+  const node = document.createElement('div');
+  node.className = 'toast';
+  node.innerHTML = html;
+  wrap.appendChild(node);
+  setTimeout(() => node.remove(), 3200);
 }
 
 function statRows(obj) {
-  return Object.entries(obj).map(([k, v]) => `<div>${k} <b>${v}</b></div>`).join('');
+  return Object.entries(obj).map(([k, v]) => `<div>${t('stat.' + k)} <b>${v}</b></div>`).join('');
 }
 
 // ------------------------------------------------------------- touch
@@ -1097,13 +1099,13 @@ function updateHud() {
   el.timer.textContent = formatTime(h.time);
   el.score.textContent = formatNumber(h.score);
   el.mult.textContent = 'x' + h.multiplier.toFixed(1);
-  el.hiscore.textContent = 'BEST ' + formatNumber(store.get().highScore);
+  el.hiscore.textContent = t('hud.best', { n: formatNumber(store.get().highScore) });
 
   const hpFrac = Math.max(0, h.hp / h.maxHp);
   el.healthFill.style.width = (hpFrac * 100) + '%';
   el.healthText.textContent = `${h.hp} / ${h.maxHp}`;
   el.xpFill.style.width = Math.min(100, (h.xp / h.xpToNext) * 100) + '%';
-  el.levelText.textContent = 'LV ' + h.level;
+  el.levelText.textContent = t('hud.lv', { n: h.level });
 
   el.singArc.style.strokeDashoffset = ARC_LEN * (1 - Math.min(1, h.singCharge / h.singMax));
   el.abilitySing.classList.toggle('ready', h.singReady);
@@ -1118,7 +1120,7 @@ function updateHud() {
   el.odFill.style.width = (odFrac * 100) + '%';
   el.odBar.classList.toggle('ready', p.overdrive >= 100 && !odActive);
   el.odBar.classList.toggle('active', odActive);
-  el.odText.textContent = odActive ? 'OVERDRIVE!' : 'OVERDRIVE';
+  el.odText.textContent = odActive ? t('hud.overdriveOn') : t('hud.overdrive');
 
   // Weapon loadout strip (rebuild only when the loadout actually changes)
   const sig = p.weapons.map((w) => w.id + w.level).join(',');
@@ -1127,7 +1129,7 @@ function updateHud() {
     el.loadout.innerHTML = p.weapons.map((w) => {
       const def = weaponDef(w);
       const evolved = def && def.evolved ? ' evolved' : '';
-      const name = def ? def.name : w.id;
+      const name = def ? dName('weapons', def) : w.id;
       const icon = def ? def.icon : '❓';
       return `<div class="w${evolved}" title="${name}">${icon}<b>${w.level}</b></div>`;
     }).join('');
@@ -1135,7 +1137,7 @@ function updateHud() {
 
   if (h.boss) {
     el.bossBar.classList.remove('hidden');
-    el.bossName.textContent = h.boss.type.name.toUpperCase();
+    el.bossName.textContent = dName('bosses', h.boss.type).toUpperCase();
     el.bossFill.style.width = Math.max(0, (h.boss.hp / h.boss.maxHp) * 100) + '%';
   } else {
     el.bossBar.classList.add('hidden');
@@ -1144,7 +1146,7 @@ function updateHud() {
   // combo popup on tier change
   const tier = Math.floor(h.multiplier * 10) / 10;
   if (tier > lastMultTier && h.multiplier > 1) {
-    el.comboPop.textContent = 'COMBO x' + h.multiplier.toFixed(1);
+    el.comboPop.textContent = t('hud.combo', { n: h.multiplier.toFixed(1) });
     el.comboPop.classList.remove('show');
     void el.comboPop.offsetWidth;
     el.comboPop.classList.add('show');
